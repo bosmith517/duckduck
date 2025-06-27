@@ -7,6 +7,7 @@ import {useFormik} from 'formik'
 import {getUserByToken, login} from '../core/_requests'
 import {toAbsoluteUrl} from '../../../../_metronic/helpers'
 import {useSupabaseAuth} from '../core/SupabaseAuth'
+import {ForgotPasswordModal} from '../../../components/auth/ForgotPasswordModal'
 
 const loginSchema = Yup.object().shape({
   email: Yup.string()
@@ -33,6 +34,7 @@ const initialValues = {
 
 export function Login() {
   const [loading, setLoading] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const {signIn} = useSupabaseAuth()
 
   const formik = useFormik({
@@ -162,7 +164,19 @@ export function Login() {
 
       {/* begin::Form group */}
       <div className='fv-row mb-3'>
-        <label className='form-label fw-bolder text-gray-900 fs-6 mb-0'>Password</label>
+        <div className='d-flex justify-content-between mb-2'>
+          <label className='form-label fw-bolder text-gray-900 fs-6 mb-0'>Password</label>
+          <a
+            href='#'
+            onClick={(e) => {
+              e.preventDefault()
+              setShowForgotPassword(true)
+            }}
+            className='link-primary fs-6 fw-bold'
+          >
+            Forgot Password?
+          </a>
+        </div>
         <input
           type='password'
           autoComplete='off'
@@ -224,6 +238,12 @@ export function Login() {
           Sign up
         </Link>
       </div>
+      
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal 
+        show={showForgotPassword}
+        onHide={() => setShowForgotPassword(false)}
+      />
     </form>
   )
 }

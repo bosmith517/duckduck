@@ -28,10 +28,21 @@ serve(async (req) => {
       throw new Error("Server configuration error: Missing SignalWire credentials."); 
     }
     
-    const { clientIdentity, room_name } = await req.json()
+    const body = await req.json().catch(() => ({}))
+    const { clientIdentity, room_name } = body
     
     if (!clientIdentity || !room_name) { 
-      throw new Error('A clientIdentity and room_name are required to generate a token.') 
+      console.log('generate-signalwire-token called without required parameters - returning error gracefully')
+      return new Response(
+        JSON.stringify({ 
+          error: 'A clientIdentity and room_name are required to generate a token.',
+          success: false 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
     
     console.log('Token request:', { clientIdentity, room_name });

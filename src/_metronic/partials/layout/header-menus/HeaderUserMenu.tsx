@@ -1,12 +1,14 @@
 
-import {FC} from 'react'
+import {FC, useState} from 'react'
 import {Link} from 'react-router-dom'
 import {useSupabaseAuth} from '../../../../app/modules/auth/core/SupabaseAuth'
 import {Languages} from './Languages'
 import {toAbsoluteUrl} from '../../../helpers'
+import {ChangePasswordModal} from '../../../../app/components/auth/ChangePasswordModal'
 
 const HeaderUserMenu: FC = () => {
   const {currentUser, signOut} = useSupabaseAuth()
+  const [showChangePassword, setShowChangePassword] = useState(false)
   return (
     <div
       className='menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg menu-state-primary fw-semibold py-4 fs-6 w-275px'
@@ -124,10 +126,32 @@ const HeaderUserMenu: FC = () => {
       </div>
 
       <div className='menu-item px-5'>
+        <a 
+          onClick={(e) => {
+            e.preventDefault()
+            setShowChangePassword(true)
+          }} 
+          className='menu-link px-5' 
+          style={{cursor: 'pointer'}}
+        >
+          <span className='menu-icon'>
+            <i className='bi bi-key fs-4'></i>
+          </span>
+          <span className='menu-title'>Change Password</span>
+        </a>
+      </div>
+
+      <div className='menu-item px-5'>
         <a onClick={signOut} className='menu-link px-5' style={{cursor: 'pointer'}}>
           Sign Out
         </a>
       </div>
+      
+      {/* Change Password Modal */}
+      <ChangePasswordModal 
+        show={showChangePassword}
+        onHide={() => setShowChangePassword(false)}
+      />
     </div>
   )
 }

@@ -25,6 +25,7 @@ import SimpleTrackingTest from '../pages/test/SimpleTrackingTest'
 import LandingPage from '../pages/marketing/LandingPage'
 import SignupPage from '../pages/marketing/SignupPage'
 import HomeownerSignupPage from '../pages/marketing/HomeownerSignupPage'
+import {ResetPasswordPage} from '../pages/auth/ResetPasswordPage'
 
 
 /**
@@ -86,6 +87,9 @@ const AppRoutes: FC = () => {
         <Route path='/' element={<LandingPage />} />
         <Route path='signup' element={<SignupPage />} />
         <Route path='homeowner-signup' element={<HomeownerSignupPage />} />
+        
+        {/* Auth routes */}
+        <Route path='auth/reset-password' element={<ResetPasswordPage />} />
         
         <Route element={<App />}>
           <Route path='error/*' element={<ErrorsPage />} />

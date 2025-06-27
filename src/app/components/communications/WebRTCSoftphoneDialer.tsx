@@ -80,7 +80,7 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
         showToast.loading('Connecting to VoIP system...')
 
         // Get WebRTC credentials
-        const { data: credentials, error } = await supabase.functions.invoke('generate-webrtc-token', {})
+        const { data: credentials, error } = await supabase.functions.invoke('generate-signalwire-voice-token', {})
         
         if (error || !credentials) {
           throw new Error('Failed to get WebRTC credentials')
