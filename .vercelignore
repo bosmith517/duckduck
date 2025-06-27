@@ -1,0 +1,28 @@
+# Ignore mobile app platforms
+android/
+ios/
+
+# Ignore relay service
+relay-service/
+
+# Ignore test files
+*.test.ts
+*.spec.ts
+__tests__/
+
+# Ignore development files
+.env.local
+.env.development
+supabase/
+scripts/
+docs/
+.env
+
+# Ignore large assets that aren't needed
+public/videos/
+*.mp4
+*.mov
+
+# Ignore SQL files
+*.sql
+*.md

@@ -1,0 +1,288 @@
+import React from 'react'
+
+interface SmartDashboardProps {
+  customer: any
+  currentJob: any
+  jobHistory: any[]
+  currentTrackingData: any
+  onContactTechnician?: () => void
+  onRescheduleJob?: () => void
+  onPayInvoice?: () => void
+  onViewJobDetails?: (jobId: string) => void
+  onScheduleService?: () => void
+}
+
+export const SmartDashboard: React.FC<SmartDashboardProps> = ({
+  customer,
+  currentJob,
+  jobHistory,
+  currentTrackingData,
+  onContactTechnician,
+  onRescheduleJob,
+  onPayInvoice,
+  onViewJobDetails,
+  onScheduleService
+}) => {
+  const hasOutstandingBalance = () => {
+    // Check for unpaid invoices - this would come from invoices table
+    return false // Placeholder
+  }
+
+  const getLastServiceSummary = () => {
+    if (jobHistory.length === 0) return null
+    const lastJob = jobHistory[0]
+    return {
+      date: new Date(lastJob.date).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      service: lastJob.service,
+      technician: lastJob.technician,
+      id: lastJob.id
+    }
+  }
+
+  const getNextServiceInfo = () => {
+    if (!currentJob) return null
+    
+    return {
+      date: new Date(currentJob.start_date).toLocaleDateString('en-US', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }),
+      service: currentJob.title,
+      technician: currentJob.technician_name,
+      timeWindow: currentJob.estimated_start_time || '9 AM - 11 AM', // Placeholder
+      status: currentJob.status
+    }
+  }
+
+  const nextService = getNextServiceInfo()
+  const lastService = getLastServiceSummary()
+
+  return (
+    <div className="row g-6 mb-8">
+      {/* Welcome Header */}
+      <div className="col-12">
+        <div className="card card-flush h-lg-100">
+          <div className="card-body">
+            <div className="row align-items-center">
+              <div className="col-md-8">
+                <h1 className="text-dark mb-3">
+                  Welcome back, {customer.first_name || customer.name}! 👋
+                </h1>
+                <p className="text-muted fs-5 mb-0">
+                  Your home at {[customer.address_line1, customer.city].filter(Boolean).join(', ')}
+                </p>
+              </div>
+              <div className="col-md-4 text-end">
+                <div className="symbol symbol-100px">
+                  <span className="symbol-label bg-light-primary">
+                    <i className="ki-duotone ki-home-2 fs-2x text-primary">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Next Service Card */}
+      {nextService && (
+        <div className="col-xl-6">
+          <div className="card card-flush h-lg-100 bg-primary">
+            <div className="card-body text-white">
+              <div className="d-flex align-items-center mb-4">
+                <i className="ki-duotone ki-calendar-2 fs-2x me-3">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                  <span className="path3"></span>
+                  <span className="path4"></span>
+                  <span className="path5"></span>
+                </i>
+                <h3 className="text-white mb-0">Your Next Service</h3>
+              </div>
+              
+              <div className="mb-4">
+                <h4 className="text-white fw-bold mb-2">{nextService.service}</h4>
+                <div className="d-flex align-items-center mb-2">
+                  <i className="ki-duotone ki-clock fs-5 me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  <span className="fs-5">{nextService.date}</span>
+                </div>
+                <div className="d-flex align-items-center mb-3">
+                  <i className="ki-duotone ki-profile-circle fs-5 me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                    <span className="path3"></span>
+                  </i>
+                  <span className="fs-6">
+                    Technician: {nextService.technician} • {nextService.timeWindow}
+                  </span>
+                </div>
+              </div>
+
+              {nextService.status === 'On The Way' && currentTrackingData && (
+                <div className="alert alert-light-success border-0 mb-4">
+                  <div className="d-flex align-items-center">
+                    <i className="ki-duotone ki-geolocation fs-3 text-success me-3">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                    <div>
+                      <h6 className="text-dark mb-1">🚐 Your technician is on the way!</h6>
+                      <p className="text-muted mb-0 fs-7">Live tracking is active below</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="d-flex gap-3">
+                <button 
+                  className="btn btn-light btn-sm"
+                  onClick={() => {
+                    if (onContactTechnician) {
+                      onContactTechnician()
+                    } else {
+                      // Fallback - open phone call
+                      window.open('tel:+15551234567', '_self')
+                    }
+                  }}
+                >
+                  <i className="ki-duotone ki-message-text-2 fs-5 me-1">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                    <span className="path3"></span>
+                  </i>
+                  Contact Tech
+                </button>
+                <button 
+                  className="btn btn-light-warning btn-sm"
+                  onClick={() => {
+                    if (onRescheduleJob) {
+                      onRescheduleJob()
+                    } else {
+                      alert('Please call us at (555) 123-4567 to reschedule your appointment.')
+                    }
+                  }}
+                >
+                  <i className="ki-duotone ki-calendar-edit fs-5 me-1">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  Reschedule
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Outstanding Balance Card */}
+      {hasOutstandingBalance() && (
+        <div className="col-xl-6">
+          <div className="card card-flush h-lg-100 bg-warning">
+            <div className="card-body text-white">
+              <div className="d-flex align-items-center mb-4">
+                <i className="ki-duotone ki-dollar fs-2x me-3">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                  <span className="path3"></span>
+                </i>
+                <h3 className="text-white mb-0">Outstanding Balance</h3>
+              </div>
+              
+              <div className="mb-4">
+                <h2 className="text-white fw-bold mb-2">$485.00</h2>
+                <p className="text-white fs-6 mb-0">Invoice #1234 • Due March 25, 2024</p>
+              </div>
+
+              <button 
+                className="btn btn-light btn-lg w-100"
+                onClick={() => {
+                  if (onPayInvoice) {
+                    onPayInvoice()
+                  } else {
+                    // Fallback - open payment portal (placeholder)
+                    alert('Payment portal coming soon! Please call us to pay your invoice.')
+                  }
+                }}
+              >
+                <i className="ki-duotone ki-credit-cart fs-4 me-2">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                Pay Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Last Service Summary */}
+      {lastService && !hasOutstandingBalance() && (
+        <div className="col-xl-6">
+          <div className="card card-flush h-lg-100">
+            <div className="card-body">
+              <div className="d-flex align-items-center mb-4">
+                <i className="ki-duotone ki-check-circle fs-2x text-success me-3">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                <h3 className="text-dark mb-0">Last Service</h3>
+              </div>
+              
+              <div className="mb-4">
+                <h5 className="text-dark fw-bold mb-2">{lastService.service}</h5>
+                <div className="d-flex align-items-center mb-2">
+                  <i className="ki-duotone ki-calendar fs-6 me-2 text-muted">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  <span className="text-muted fs-6">{lastService.date}</span>
+                </div>
+                <div className="d-flex align-items-center mb-3">
+                  <i className="ki-duotone ki-profile-circle fs-6 me-2 text-muted">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                    <span className="path3"></span>
+                  </i>
+                  <span className="text-muted fs-6">Technician: {lastService.technician}</span>
+                </div>
+              </div>
+
+              <button 
+                className="btn btn-light-primary btn-sm"
+                onClick={() => {
+                  if (onViewJobDetails && lastService) {
+                    onViewJobDetails(lastService.id)
+                  } else {
+                    alert('Job details coming soon!')
+                  }
+                }}
+              >
+                <i className="ki-duotone ki-eye fs-5 me-1">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                  <span className="path3"></span>
+                </i>
+                View Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+export default SmartDashboard

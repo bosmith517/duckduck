@@ -1,0 +1,690 @@
+List all Phone Numbers
+GET
+https://YOUR_SPACE.signalwire.com/api/relay/rest/phone_numbers
+Returns a list of your Phone Numbers. The phone numbers are returned sorted by creation date, with the most recent phone numbers appearing first. The list is filterable by sending in any of the following parameters.
+
+Permissions
+The API token must include the following scopes: Numbers.
+
+Request
+Query Parameters
+filter_name
+string
+The name given to the phone number. Will return all Phone Numbers containing this value as a substring.
+
+filter_number
+string
+The phone number in E164 format. Will return all Phone Numbers containing this value as a substring.
+
+Responses
+200
+OK
+
+application/json
+Schema
+Example (auto)
+Schema
+links
+object
+self
+string
+first
+string
+next
+string
+prev
+string
+data
+object[]
+
+Purchase a Phone Number
+POST
+https://YOUR_SPACE.signalwire.com/api/relay/rest/phone_numbers
+Purchase a number and add it to your project.
+
+Permissions
+The API token must include the following scopes: Numbers.
+
+Request
+application/json
+Bodyrequired
+number
+string
+required
+The phone number in E164 format.
+
+Example: +15558675309
+Responses
+200
+OK
+
+application/json
+Schema
+Example (auto)
+Schema
+id
+uuid
+The unique identifier of the Phone Number on SignalWire. This can be used to find, update or delete the phone number programmatically.
+
+number
+string
+required
+The phone number in E164 format.
+
+Example: +15558675309
+name
+string
+The name given to the phone number. Helps to distinguish different phone numbers within your project.
+
+Example: Jenny
+call_handler
+string
+What type of handler you want to run on inbound calls.
+
+Possible values: [relay_script, relay_context, relay_topic, relay_application, laml_webhooks, laml_application, dialogflow, relay_connector, relay_sip_endpoint, relay_verto_endpoint, video_room]
+
+Example: relay_context
+call_receive_mode
+string
+How do you want to receive the incoming call. Possible values are: voice or fax. Default is voice.
+
+Example: voice
+call_request_url
+string
+The URL to make a request to when using the laml_webhooks call handler.
+
+Example:
+call_request_method
+string
+The HTTP method to use when making a request to the call_request_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_fallback_url
+string
+The fallback URL to make a request to when using the laml_webhooks call handler and the call_request_url fails.
+
+Example:
+call_fallback_method
+string
+The HTTP method to use when making a request to the call_fallback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_status_callback_url
+string
+The URL to make status callbacks to when using the laml_webhooks call handler.
+
+Example:
+call_status_callback_method
+string
+The HTTP method to use when making a request to the call_status_callback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_laml_application_id
+string
+The ID of the LaML Application to use when using the laml_application call handler.
+
+Example: null
+call_dialogflow_agent_id
+string
+The ID of the Dialogflow Agent to start when using the dialogflow call handler.
+
+Example: null
+call_relay_topic
+string
+A string representing the Relay topic to forward incoming calls to. This is only used (and required) when call_handler is set to relay_topic. Alias of call_relay_application. If both are sent, call_relay_application takes precedence.
+
+Example: office
+call_relay_topic_status_callback_url
+string
+A string representing a URL to send status change messages to. This is only used when call_handler is set to relay_topic.
+
+Example: https://myapplication/handle_relay_callbacks
+call_relay_context
+string
+The name of the Relay Context to send this call to when using the relay_context call handler. Alias of message_relay_application. If both are sent, call_relay_application takes precedence.
+
+Example: my_relay_app
+call_relay_context_status_callback_url
+string
+A string representing a URL to send status change messages to. This is only used (and required) when call_handler is set to relay_context.
+
+Example: https://myapplication/handle_relay_callbacks
+call_relay_application
+string
+The name of the Relay Application to send this call to when using the relay_application call handler. Alias of call_relay_context. If both are sent, call_relay_application takes precedence.
+
+Example: my_relay_app
+call_relay_connector_id
+string
+The ID of the Relay Connector to send this call to when using the relay_connector call handler.
+
+Example: null
+call_sip_endpoint_id
+string
+The ID of the Relay SIP Endpoint to send this call to when using the relay_sip_endpoint call handler.
+
+Example: null
+call_verto_resource
+string
+The name of the Verto Relay Endpoint to send this call to when using the relay_verto_endpoint call handler.
+
+Example:
+call_video_room_id
+uuid
+The ID of the Video Room to send this call to when using the video_room call handler.
+
+Example: fe4093d9-58c2-4931-b4b9-5679f82652c6
+message_handler
+string
+What type of handler you want to run on inbound messages. Possible values are: relay_context, relay_topic, relay_application, laml_webhooks, laml_application.
+
+Example: relay_application
+message_request_url
+string
+The URL to make a request to when using the laml_webhooks message handler.
+
+Example:
+message_request_method
+string
+The HTTP method to use when making a request to the message_request_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+message_fallback_url
+string
+The fallback URL to make a request to when using the laml_webhooks message handler and the message_request_url fails.
+
+Example:
+message_fallback_method
+string
+The HTTP method to use when making a request to the message_fallback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+message_laml_application_id
+string
+The ID of the LaML Application to use when using the laml_application message handler.
+
+Example: null
+message_relay_topic
+string
+The name of the Relay Topic to send this message to when using the relay_topic message handler. Alias of message_relay_application. If both are sent, message_relay_application takes precedence.
+
+message_relay_context
+string
+The name of the Relay Context to send this message to when using the relay_context message handler. Alias of message_relay_application. If both are sent, message_relay_application takes precedence.
+
+Example: my_relay_app
+message_relay_application
+string
+The name of the Relay Application to send this message to when using the relay_application message handler. Alias of message_relay_context. If both are sent, message_relay_application takes precedence.
+
+Example: my_relay_app
+capabilities
+string[]
+A list of communication methods this phone number supports. Possible values are: voice, fax, sms, mms.
+
+Example: ["voice","sms","mms","fax"]
+number_type
+string
+The type of number this is defined as. Possible values are: toll-free or longcode.
+
+Example: toll-free
+e911_address_id
+string
+A list of communication methods this phone number supports.
+
+Example: null
+created_at
+date-time
+The date the number was added to your project.
+
+updated_at
+date-time
+The date the number was last updated.
+
+next_billed_at
+date-time
+The next date the number will be billed for.
+
+Retrieve a Phone Number
+GET
+https://YOUR_SPACE.signalwire.com/api/relay/rest/phone_numbers/:id
+Retrieves the details of a Phone Number that has been previously created.
+
+Permissions
+The API token must include the following scopes: Numbers.
+
+Request
+Path Parameters
+id
+uuid
+required
+Unique ID of the phone number
+
+Responses
+200
+OK
+
+application/json
+Schema
+Example (auto)
+Schema
+id
+uuid
+The unique identifier of the Phone Number on SignalWire. This can be used to find, update or delete the phone number programmatically.
+
+number
+string
+required
+The phone number in E164 format.
+
+Example: +15558675309
+name
+string
+The name given to the phone number. Helps to distinguish different phone numbers within your project.
+
+Example: Jenny
+call_handler
+string
+What type of handler you want to run on inbound calls.
+
+Possible values: [relay_script, relay_context, relay_application, laml_webhooks, laml_application, dialogflow, relay_connector, relay_sip_endpoint, relay_verto_endpoint, video_room]
+
+Example: relay_context
+call_receive_mode
+string
+How do you want to receive the incoming call. Possible values are: voice or fax. Default is voice.
+
+Example: voice
+call_request_url
+string
+The URL to make a request to when using the laml_webhooks call handler.
+
+Example:
+call_request_method
+string
+The HTTP method to use when making a request to the call_request_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_fallback_url
+string
+The fallback URL to make a request to when using the laml_webhooks call handler and the call_request_url fails.
+
+Example:
+call_fallback_method
+string
+The HTTP method to use when making a request to the call_fallback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_status_callback_url
+string
+The URL to make status callbacks to when using the laml_webhooks call handler.
+
+Example:
+call_status_callback_method
+string
+The HTTP method to use when making a request to the call_status_callback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_laml_application_id
+string
+The ID of the LaML Application to use when using the laml_application call handler.
+
+Example: null
+call_dialogflow_agent_id
+string
+The ID of the Dialogflow Agent to start when using the dialogflow call handler.
+
+Example: null
+call_relay_topic
+string
+A string representing the Relay topic to forward incoming calls to. This is only used (and required) when call_handler is set to relay_topic. Alias of call_relay_application. If both are sent, call_relay_application takes precedence.
+
+Example: office
+call_relay_topic_status_callback_url
+string
+A string representing a URL to send status change messages to. This is only used (and required) when call_handler is set to relay_topic.
+
+Example: https://myapplication/handle_relay_callbacks
+call_relay_context
+string
+The name of the Relay Context to send this call to when using the relay_context call handler. Alias of message_relay_application. If both are sent, call_relay_application takes precedence.
+
+Example: my_relay_app
+call_relay_context_status_callback_url
+string
+A string representing a URL to send status change messages to. This is only used (and required) when call_handler is set to relay_context.
+
+Example: https://myapplication/handle_relay_callbacks
+call_relay_application
+string
+The name of the Relay Application to send this call to when using the relay_application call handler. Alias of message_relay_context. If both are sent, call_relay_application takes precedence.
+
+Example: my_relay_app
+call_relay_connector_id
+string
+The ID of the Relay Connector to send this call to when using the relay_connector call handler.
+
+Example: null
+call_sip_endpoint_id
+string
+The ID of the Relay SIP Endpoint to send this call to when using the relay_sip_endpoint call handler.
+
+Example: null
+call_verto_resource
+string
+The name of the Verto Relay Endpoint to send this call to when using the relay_verto_endpoint call handler.
+
+Example:
+call_video_room_id
+uuid
+The ID of the Video Room to send this call to when using the video_room call handler.
+
+Example: fe4093d9-58c2-4931-b4b9-5679f82652c6
+message_handler
+string
+What type of handler you want to run on inbound messages. Possible values are: relay_context, relay_application, laml_webhooks, laml_application.
+
+Example: relay_application
+message_request_url
+string
+The URL to make a request to when using the laml_webhooks message handler.
+
+Example:
+message_request_method
+string
+The HTTP method to use when making a request to the message_request_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+message_fallback_url
+string
+The fallback URL to make a request to when using the laml_webhooks message handler and the message_request_url fails.
+
+Example:
+message_fallback_method
+string
+The HTTP method to use when making a request to the message_fallback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+message_laml_application_id
+string
+The ID of the LaML Application to use when using the laml_application message handler.
+
+Example: null
+message_relay_context
+string
+The name of the Relay Context to send this message to when using the relay_context message handler. Alias of message_relay_application. If both are sent, message_relay_application takes precedence.
+
+Example: my_relay_app
+message_relay_application
+string
+The name of the Relay Application to send this message to when using the relay_application message handler. Alias of message_relay_context. If both are sent, message_relay_application takes precedence.
+
+Example: my_relay_app
+capabilities
+string[]
+A list of communication methods this phone number supports. Possible values are: voice, fax, sms, mms.
+
+Example: ["voice","sms","mms","fax"]
+number_type
+string
+The type of number this is defined as. Possible values are: toll-free or longcode.
+
+Example: toll-free
+e911_address_id
+string
+A list of communication methods this phone number supports.
+
+Example: null
+created_at
+date-time
+The date the number was added to your project.
+
+updated_at
+date-time
+The date the number was last updated.
+
+next_billed_at
+date-time
+The next date the number will be billed for.
+
+Update a Phone Number
+PUT
+https://YOUR_SPACE.signalwire.com/api/relay/rest/phone_numbers/:id
+Updates the specific Phone Number by setting the values of any parameters passed in. Any parameters not provided will be unchanged.
+
+Permissions
+The API token must include the following scopes: Numbers.
+
+Request
+Path Parameters
+id
+uuid
+required
+Unique ID of the phone number
+
+application/json
+Bodyrequired
+name
+string
+The name given to the phone number. Helps to distinguish different phone numbers within your project.
+
+Example: Jenny
+call_handler
+string
+What type of handler you want to run on inbound calls.
+
+Possible values: [relay_script, relay_context, relay_topic, relay_application, laml_webhooks, laml_application, dialogflow, relay_connector, relay_sip_endpoint, relay_verto_endpoint, video_room]
+
+Example: relay_context
+call_receive_mode
+string
+How do you want to receive the incoming call. Possible values are: voice or fax. Default is voice.
+
+Example: voice
+call_request_url
+string
+The URL to make a request to when using the laml_webhooks call handler.
+
+Example:
+call_request_method
+string
+The HTTP method to use when making a request to the call_request_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_fallback_url
+string
+The fallback URL to make a request to when using the laml_webhooks call handler and the call_request_url fails.
+
+Example:
+call_fallback_method
+string
+The HTTP method to use when making a request to the call_fallback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_status_callback_url
+string
+The URL to make status callbacks to when using the laml_webhooks call handler.
+
+Example:
+call_status_callback_method
+string
+The HTTP method to use when making a request to the call_status_callback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+call_laml_application_id
+string
+The ID of the LaML Application to use when using the laml_application call handler.
+
+Example: null
+call_dialogflow_agent_id
+string
+The ID of the Dialogflow Agent to start when using the dialogflow call handler.
+
+Example: null
+call_relay_topic
+string
+A string representing the Relay topic to forward incoming calls to. This is only used (and required) when call_handler is set to relay_topic. Alias of call_relay_application. If both are sent, call_relay_application takes precedence.
+
+Example: office
+call_relay_topic_status_callback_url
+string
+A string representing a URL to send status change messages to. This is only used (and required) when call_handler is set to relay_topic.
+
+Example: https://myapplication/handle_relay_callbacks
+call_relay_context
+string
+deprecated
+This handler type is deprecated. Please use call_relay_application or call_relay_topic instead.
+
+Example: my_relay_app
+call_relay_context_status_callback_url
+string
+deprecated
+This property is deprecated. Please use call_relay_topic_status_callback_url instead.
+
+Example: https://myapplication/handle_relay_callbacks
+call_relay_application
+string
+The name of the Relay Application to send this call to when using the relay_application call handler. Alias of call_relay_context. If both are sent, call_relay_application takes precedence.
+
+Example: my_relay_app
+call_relay_connector_id
+string
+The ID of the Relay Connector to send this call to when using the relay_connector call handler.
+
+Example: null
+call_sip_endpoint_id
+string
+The ID of the Relay SIP Endpoint to send this call to when using the relay_sip_endpoint call handler.
+
+Example: null
+call_verto_resource
+string
+The name of the Verto Relay Endpoint to send this call to when using the relay_verto_endpoint call handler.
+
+Example:
+call_video_room_id
+uuid
+The ID of the Video Room to send this call to when using the video_room call handler.
+
+Example: fe4093d9-58c2-4931-b4b9-5679f82652c6
+message_handler
+string
+What type of handler you want to run on inbound messages. Possible values are: relay_context, relay_topic, relay_application, laml_webhooks, laml_application.
+
+Example: relay_application
+message_request_url
+string
+The URL to make a request to when using the laml_webhooks message handler.
+
+Example:
+message_request_method
+string
+The HTTP method to use when making a request to the message_request_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+message_fallback_url
+string
+The fallback URL to make a request to when using the laml_webhooks message handler and the message_request_url fails.
+
+Example:
+message_fallback_method
+string
+The HTTP method to use when making a request to the message_fallback_url. Possible values are: POST or GET. Default is POST.
+
+Example: POST
+message_laml_application_id
+string
+The ID of the LaML Application to use when using the laml_application message handler.
+
+Example: null
+message_relay_topic
+string
+The name of the Relay Topic to send this message to when using the relay_topic message handler. Alias of message_relay_application. If both are sent, message_relay_application takes precedence.
+
+Example: my_relay_app
+message_relay_context
+string
+deprecated
+This handler type is deprecated. Please use message_relay_application or message_relay_topic instead.
+
+Example: my_relay_app
+message_relay_application
+string
+The name of the Relay Application to send this message to when using the relay_application message handler. Alias of message_relay_context. If both are sent, message_relay_application takes precedence.
+
+Example: my_relay_app
+
+Release a Phone Number
+DELETE
+https://YOUR_SPACE.signalwire.com/api/relay/rest/phone_numbers/:id
+Permanently releases a Phone Number. This cannot be undone. Its existing logs will still be available but any new calls or messages will not work.
+
+Permissions
+The API token must include the following scopes: Numbers.
+
+Request
+Path Parameters
+id
+uuid
+required
+Unique ID of the phone number
+
+Responses
+204
+No Content
+
+Search for available Phone Numbers to Purchase
+GET
+https://YOUR_SPACE.signalwire.com/api/relay/rest/phone_numbers/search
+Returns a list of phone numbers available for purchase that match the given search criteria parameters.
+
+Permissions
+The API token must include the following scopes: Numbers.
+
+Request
+Query Parameters
+areacode
+string
+An areacode to search within.
+
+number_type
+string
+Search for either local or toll-free numbers. Defaults to local.
+
+starts_with
+string
+A string of 3 to 7 digits that should be used as the start of a number. Cannot be used in combination with contains or ends_with.
+
+contains
+string
+A string of 3 to 7 digits that should appear somewhere in the number. Cannot be used in combination with starts_with or ends_with.
+
+ends_with
+string
+A string of 3 to 7 digits that should be used as the end of a number. Cannot be used in combination with starts_with or contains.
+
+max_results
+number
+The maximum number of matches to return. Upper limit of 100. Defaults to 50.
+
+region
+string
+A region or state to search within. Must be an ISO 3166-2 alpha-2 code, i.e. TX for Texas. Cannot be used in combination with areacode.
+
+city
+string
+A specific City to search within. Must be used in combination with region. Cannot be used in combination with areacode, starts_with, contains, or ends_with.
+
+Responses
+200
+OK
+
+application/json
+Schema
+Example (auto)
+Schema
+links
+object
+data
+object[]

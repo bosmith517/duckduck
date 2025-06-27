@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(supabase status:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": []
+  }
+}

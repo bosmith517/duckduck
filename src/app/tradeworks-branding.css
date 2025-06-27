@@ -1,0 +1,262 @@
+/* TradeWorks Pro Branding Overrides */
+
+/* Improve header contrast with darker backgrounds */
+.header .topbar .btn {
+  background-color: #495057 !important;
+  border: 1px solid #6c757d !important;
+  color: #ffffff !important;
+}
+
+.header .topbar .btn:hover {
+  background-color: #343a40 !important;
+  border-color: #495057 !important;
+  color: #ffffff !important;
+}
+
+.header .topbar .btn .svg-icon {
+  color: #ffffff !important;
+}
+
+/* Improve user menu visibility */
+.header .topbar .symbol img {
+  border: 2px solid #ffffff !important;
+  background-color: #495057 !important;
+  padding: 2px !important;
+}
+
+/* Remove any Metronic logos or branding */
+img[alt*="metronic" i],
+img[alt*="keenthemes" i],
+img[src*="metronic" i],
+img[src*="keenthemes" i] {
+  display: none !important;
+}
+
+/* Hide any text containing Metronic or KeenThemes */
+*:contains("Metronic"),
+*:contains("KeenThemes"),
+*:contains("Keen Themes") {
+  display: none !important;
+}
+
+/* Improve overall contrast with darker grays */
+.text-muted {
+  color: #495057 !important;
+}
+
+.text-gray-600 {
+  color: #343a40 !important;
+}
+
+.text-gray-700 {
+  color: #212529 !important;
+}
+
+.text-gray-800 {
+  color: #1a1e21 !important;
+}
+
+/* Card and content backgrounds */
+.card {
+  background-color: #ffffff !important;
+  border: 1px solid #dee2e6 !important;
+}
+
+.card-header {
+  background-color: #f8f9fa !important;
+  border-bottom: 1px solid #dee2e6 !important;
+}
+
+/* Ensure TradeWorks branding is prominent */
+.header-logo .text-dark {
+  color: #212529 !important;
+  font-weight: 700 !important;
+}
+
+.header-logo .text-muted {
+  color: #495057 !important;
+  font-weight: 600 !important;
+}
+
+/* Style the tools icon with better contrast */
+.header-logo .bg-primary {
+  background: linear-gradient(135deg, #0d6efd, #6f42c1) !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+/* Improve button visibility in header */
+.header .btn-custom {
+  transition: all 0.2s ease !important;
+}
+
+.header .btn-custom:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+}
+
+/* Footer branding */
+.footer a[href="#"] {
+  color: #0d6efd !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+}
+
+.footer a[href="#"]:hover {
+  color: #0b5ed7 !important;
+}
+
+/* Dashboard card improvements */
+.dashboard .card {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
+}
+
+.dashboard .card-title {
+  color: #212529 !important;
+  font-weight: 600 !important;
+}
+
+/* Sidebar improvements - match header color */
+.aside {
+  background-color: #495057 !important;
+  border-right: 1px solid #6c757d !important;
+}
+
+.aside .menu-link {
+  color: #ffffff !important;
+}
+
+.aside .menu-link:hover,
+.aside .menu-link.active {
+  background-color: #343a40 !important;
+  color: #ffffff !important;
+}
+
+.aside .menu-title {
+  color: #ffffff !important;
+}
+
+.aside .menu-icon {
+  color: #ffffff !important;
+}
+
+/* Fix button clickability issues */
+.btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.btn:disabled {
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
+
+/* Ensure dropdown menus work */
+.dropdown-toggle {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.dropdown-menu {
+  pointer-events: auto !important;
+  z-index: 1055 !important;
+}
+
+/* Fix profile avatar visibility and clickability */
+.header .topbar .symbol {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 1000 !important;
+}
+
+/* Ensure all interactive elements are clickable */
+a, button, .btn, [role="button"], .clickable {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Fix any z-index issues */
+.header {
+  z-index: 1050 !important;
+}
+
+.topbar {
+  z-index: 1051 !important;
+}
+
+/* Fix specific button issues on pages */
+.toolbar .btn,
+.page-title .btn,
+.card-toolbar .btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: auto !important;
+}
+
+/* Ensure menu dropdowns work properly */
+[data-kt-menu-trigger] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.menu {
+  pointer-events: auto !important;
+}
+
+.menu-item {
+  pointer-events: auto !important;
+}
+
+.menu-link {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Add a simple logout button to header as backup */
+.header-logout-btn {
+  background-color: #dc3545 !important;
+  border: 1px solid #dc3545 !important;
+  color: #ffffff !important;
+  padding: 8px 16px !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  text-decoration: none !important;
+  margin-left: 10px !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+.header-logout-btn:hover {
+  background-color: #c82333 !important;
+  border-color: #bd2130 !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
+}
+
+/* Force all buttons to be clickable */
+.btn, button, [type="button"], [type="submit"], [role="button"] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  position: relative !important;
+  z-index: auto !important;
+}
+
+/* Ensure page action buttons work */
+.page-title .btn,
+.card-header .btn,
+.card-toolbar .btn,
+.toolbar .btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 1 !important;
+}
+
+/* Fix any overlay issues */
+.overlay {
+  pointer-events: none !important;
+}
+
+/* Ensure modals and dropdowns work */
+.modal {
+  pointer-events: auto !important;
+}

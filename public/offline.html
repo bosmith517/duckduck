@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradeWorks Pro - Offline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .offline-container {
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .offline-icon {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+            opacity: 0.8;
+        }
+
+        .offline-title {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .offline-message {
+            font-size: 1.125rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .retry-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.875rem 2rem;
+            border-radius: 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .retry-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .offline-features {
+            margin-top: 3rem;
+            text-align: left;
+        }
+
+        .offline-features h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 0.5rem 0;
+            opacity: 0.8;
+        }
+
+        .feature-list li::before {
+            content: "✓ ";
+            color: #4ade80;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 480px) {
+            .offline-title {
+                font-size: 1.75rem;
+            }
+            
+            .offline-message {
+                font-size: 1rem;
+            }
+            
+            .offline-icon {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon pulse">📡</div>
+        
+        <h1 class="offline-title">You're Offline</h1>
+        
+        <p class="offline-message">
+            Don't worry! TradeWorks Pro works offline too. Your data will sync when you're back online.
+        </p>
+        
+        <button class="retry-button" onclick="window.location.reload()">
+            Try Again
+        </button>
+        
+        <div class="offline-features">
+            <h3>Available Offline:</h3>
+            <ul class="feature-list">
+                <li>View cached job details</li>
+                <li>Take and store photos</li>
+                <li>Add job notes</li>
+                <li>Record time entries</li>
+                <li>Access contact information</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Check for network status changes
+        window.addEventListener('online', function() {
+            // Redirect to main app when back online
+            window.location.href = '/';
+        });
+
+        // Add some interactivity
+        document.addEventListener('DOMContentLoaded', function() {
+            const retryButton = document.querySelector('.retry-button');
+            
+            retryButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Show loading state
+                retryButton.textContent = 'Checking Connection...';
+                retryButton.style.opacity = '0.6';
+                
+                // Check if online
+                setTimeout(function() {
+                    if (navigator.onLine) {
+                        window.location.reload();
+                    } else {
+                        retryButton.textContent = 'Still Offline - Try Again';
+                        retryButton.style.opacity = '1';
+                        
+                        // Reset after 2 seconds
+                        setTimeout(function() {
+                            retryButton.textContent = 'Try Again';
+                        }, 2000);
+                    }
+                }, 1000);
+            });
+        });
+    </script>
+</body>
+</html>

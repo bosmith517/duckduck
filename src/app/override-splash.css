@@ -1,0 +1,80 @@
+/* TARGETED SPLASH SCREEN OVERRIDE */
+.hidden {
+  display: none !important;
+}
+
+/* Force override any splash screen elements */
+.splash-screen,
+#splash-screen,
+.page-loader,
+[class*="splash"],
+[id*="splash"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  z-index: -1 !important;
+}
+
+/* Override specific Metronic demo splash screen background */
+body::before,
+body::after,
+html::before,
+html::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Remove any demo/splash background images from body */
+body[style*="background"],
+html[style*="background"] {
+  background-image: none !important;
+  background: #f5f8fa !important; /* Use Metronic's default background color */
+}
+
+/* Ensure body doesn't have loading state */
+body.page-loading,
+body[data-kt-app-page-loading="on"],
+body[class*="loading"] {
+  overflow: visible !important;
+}
+
+/* Remove any loading classes from body */
+body.page-loading::before,
+body.page-loading::after,
+body[data-kt-app-page-loading="on"]::before,
+body[data-kt-app-page-loading="on"]::after {
+  display: none !important;
+}
+
+/* Hide any loading overlays */
+.page-loading .splash-screen,
+[data-kt-app-page-loading="on"] .splash-screen,
+.page-loading .page-loader,
+[data-kt-app-page-loading="on"] .page-loader,
+.page-loading *[class*="splash"],
+[data-kt-app-page-loading="on"] *[class*="splash"] {
+  display: none !important;
+}
+
+/* Force hide anything that looks like a loading screen */
+div[style*="position: fixed"],
+div[style*="position: absolute"] {
+  background-image: none !important;
+}
+
+/* Override any background that might be showing the splash */
+body {
+  background-image: none !important;
+}
+
+/* Hide any elements with Metronic logo or loading text */
+*:contains("Metronic"),
+*:contains("Loading"),
+*:contains("Fast, Efficient and Productive") {
+  display: none !important;
+}
