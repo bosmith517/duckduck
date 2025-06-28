@@ -95,15 +95,22 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
           document.body.appendChild(audioRef.current)
         }
 
-        // Configure UserAgent
-        const uri = new URI('sip', credentials.sip.username, credentials.sip.domain)
+        // Configure UserAgent with proper credentials format
+        const sipUsername = credentials.sip?.username || credentials.identity
+        const sipDomain = credentials.sip?.domain || credentials.space_url?.replace('wss://', '')
+        const sipPassword = credentials.sip?.password || credentials.token
+        const wsServer = credentials.websocket?.server || `wss://${sipDomain}`
+
+        console.log('SIP Configuration:', { sipUsername, sipDomain, wsServer })
+
+        const uri = new URI('sip', sipUsername, sipDomain)
         const transportOptions = {
-          server: credentials.sip.wsServers[0]
+          server: wsServer
         }
 
         const userAgentOptions = {
-          authorizationUsername: credentials.sip.username,
-          authorizationPassword: credentials.sip.password,
+          authorizationUsername: sipUsername,
+          authorizationPassword: sipPassword,
           transportOptions,
           uri,
           displayName: user.email || 'User',
@@ -230,10 +237,15 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
       setCallState('dialing')
       setCallInfo({ name, number: phoneNumber, contactId })
 
-      // Create target URI
+      // Create target URI with proper phone number formatting
       const uriString = userAgentRef.current.configuration.uri.toString()
       const domain = uriString.split('@')[1]
-      const target = new URI('sip', phoneNumber, domain)
+      
+      // Clean and format phone number for SIP
+      const cleanNumber = phoneNumber.replace(/[^\d+]/g, '')
+      const sipNumber = cleanNumber.startsWith('+') ? cleanNumber.substring(1) : cleanNumber
+      
+      const target = new URI('sip', sipNumber, domain)
       
       // Options for the call
       const inviterOptions: InviterOptions = {

@@ -90,12 +90,29 @@ serve(async (req) => {
     
     console.log('Generating VoIP credentials for identity:', identity);
     
+    // Get or create SIP credentials for WebRTC
+    const sipUsername = sipConfig?.sip_username || `${identity}@${tenant.name.toLowerCase().replace(/\s+/g, '-')}`;
+    const sipDomain = `${tenant.name.toLowerCase().replace(/\s+/g, '-')}.sip.signalwire.com`;
+    const websocketServer = `wss://${sipDomain}`;
+    
+    // For now, use a simple password (in production, this should be stored securely)
+    const sipPassword = apiToken; // This needs to be the actual SIP password
+    
     return new Response(JSON.stringify({
+      // WebRTC SIP credentials
+      sip: {
+        username: sipUsername,
+        password: sipPassword,
+        domain: sipDomain
+      },
+      websocket: {
+        server: websocketServer
+      },
+      // Additional info for reference
       project: projectId,
-      token: apiToken, // Use the API token directly
+      token: apiToken,
       identity: identity,
       space_url: spaceUrl,
-      sip_username: sipConfig?.sip_username || identity,
       tenant_id: userProfile.tenant_id,
       tenant_name: tenant.name
     }), { 
