@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
+import ProfitabilityReports from '../../components/billing/ProfitabilityReports'
 
 interface ReportData {
   totalRevenue: number
@@ -13,7 +15,8 @@ interface ReportData {
   lowStockItems: number
 }
 
-const ReportsPage: React.FC = () => {
+const ReportsOverview: React.FC = () => {
+  const navigate = useNavigate()
   const [reportData] = useState<ReportData>({
     totalRevenue: 125000,
     totalJobs: 45,
@@ -233,15 +236,21 @@ const ReportsPage: React.FC = () => {
                   </button>
                 </div>
                 <div className='col-md-3'>
-                  <button className='btn btn-light-info w-100 mb-3'>
-                    <i className='ki-duotone ki-profile-user fs-2'></i>
-                    <span className='d-block mt-2'>Client Report</span>
+                  <button 
+                    className='btn btn-light-success w-100 mb-3'
+                    onClick={() => navigate('/reports/profitability')}
+                  >
+                    <i className='ki-duotone ki-chart-line-up fs-2'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    <span className='d-block mt-2'>Profitability Report</span>
                   </button>
                 </div>
                 <div className='col-md-3'>
-                  <button className='btn btn-light-success w-100 mb-3'>
-                    <i className='ki-duotone ki-briefcase fs-2'></i>
-                    <span className='d-block mt-2'>Job Report</span>
+                  <button className='btn btn-light-info w-100 mb-3'>
+                    <i className='ki-duotone ki-profile-user fs-2'></i>
+                    <span className='d-block mt-2'>Client Report</span>
                   </button>
                 </div>
                 <div className='col-md-3'>
@@ -256,6 +265,26 @@ const ReportsPage: React.FC = () => {
         </div>
       </div>
     </>
+  )
+}
+
+const ReportsPage: React.FC = () => {
+  return (
+    <Routes>
+      <Route index element={<ReportsOverview />} />
+      <Route 
+        path="profitability" 
+        element={
+          <>
+            <PageTitle breadcrumbs={[{title: 'Reports', path: '/reports', isSeparator: false, isActive: false}]}>
+              Profitability Reports
+            </PageTitle>
+            <ProfitabilityReports />
+          </>
+        } 
+      />
+      <Route path="*" element={<Navigate to="/reports" replace />} />
+    </Routes>
   )
 }
 

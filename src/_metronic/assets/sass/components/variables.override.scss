@@ -1,8 +1,19 @@
-// Tradeworks Pro Custom Variables Override
-// Override primary colors for Tradeworks Pro branding
+// TradeWorks Pro Custom Variables Override - Modern Professional Color Scheme
+// Override primary colors with electric teal and dark charcoal
 
-// Primary colors - Professional blue-green
-$primary: #2E7D8A;
-$primary-active: #1F5A65;
-$primary-light: #E8F4F6;
-$primary-clarity: rgba(#2E7D8A, 0.2);
+// Import TradeWorks variables first
+@import "variables.tradeworks";
+
+// Override Bootstrap variables with TradeWorks colors
+$primary: $tradeworks-electric-teal !default;
+$primary-active: darken($tradeworks-electric-teal, 15%) !default;
+$primary-light: lighten($tradeworks-electric-teal, 40%) !default;
+$primary-clarity: rgba($tradeworks-electric-teal, 0.2) !default;
+
+$dark: $tradeworks-dark-charcoal !default;
+$warning: $tradeworks-warm-amber !default;
+$body-color: $tradeworks-dark-charcoal !default;
+
+// Sidebar and navigation colors
+$aside-bg: $tradeworks-dark-charcoal !default;
+$header-bg: $tradeworks-pure-white !default;

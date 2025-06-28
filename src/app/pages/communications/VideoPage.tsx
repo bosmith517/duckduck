@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import SignalWireVideo from '../../components/communications/SignalWireVideo'
@@ -9,6 +10,7 @@ import { TableSkeleton, StatCardSkeleton } from '../../components/shared/skeleto
 
 const VideoPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
+  const navigate = useNavigate()
   const [meetings, setMeetings] = useState<VideoMeeting[]>([])
   const [loading, setLoading] = useState(true)
   const [activeView, setActiveView] = useState<'live' | 'meetings'>('live')
@@ -103,6 +105,16 @@ const VideoPage: React.FC = () => {
     return `badge ${videoService.getStatusBadgeClass(status)}`
   }
 
+  const createInstantMeeting = async () => {
+    try {
+      const instantMeetingId = `instant-${Date.now()}`
+      navigate(`/video-meeting/${instantMeetingId}/room`)
+      showToast.success('Instant meeting started!')
+    } catch (error) {
+      showToast.error('Failed to create instant meeting')
+    }
+  }
+
   const getMeetingStats = () => {
     const total = meetings.length
     const active = meetings.filter(m => m.status === 'active').length
@@ -162,6 +174,46 @@ const VideoPage: React.FC = () => {
                 </h3>
               </div>
               <KTCardBody className='py-3'>
+                {/* Instant Meeting Actions */}
+                <div className='row g-5 mb-8'>
+                  <div className='col-md-6'>
+                    <div className='card bg-light-primary h-100 cursor-pointer' onClick={createInstantMeeting}>
+                      <div className='card-body text-center p-6'>
+                        <i className='ki-duotone ki-rocket fs-3x text-primary mb-3'>
+                          <span className='path1'></span>
+                          <span className='path2'></span>
+                        </i>
+                        <h4 className='fw-bold text-dark mb-2'>Start Instant Meeting</h4>
+                        <p className='text-muted fs-7 mb-3'>Begin a video call immediately without scheduling</p>
+                        <button className='btn btn-primary'>
+                          Start Now →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-6'>
+                    <div className='card bg-light-info h-100 cursor-pointer' onClick={() => navigate('/video-meeting/create')}>
+                      <div className='card-body text-center p-6'>
+                        <i className='ki-duotone ki-calendar-add fs-3x text-info mb-3'>
+                          <span className='path1'></span>
+                          <span className='path2'></span>
+                          <span className='path3'></span>
+                          <span className='path4'></span>
+                          <span className='path5'></span>
+                          <span className='path6'></span>
+                        </i>
+                        <h4 className='fw-bold text-dark mb-2'>Schedule Meeting</h4>
+                        <p className='text-muted fs-7 mb-3'>Plan a future meeting with agenda and invites</p>
+                        <button className='btn btn-info'>
+                          Schedule →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className='separator my-6'></div>
+                
                 <SignalWireVideo />
               </KTCardBody>
             </KTCard>

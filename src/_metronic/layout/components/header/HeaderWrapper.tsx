@@ -64,13 +64,7 @@ export function HeaderWrapper() {
 
         {/* begin::Wrapper */}
         <div className='d-flex align-items-stretch justify-content-between flex-lg-grow-1'>
-          {/* begin::Navbar */}
-          {header.left === 'menu' && (
-            <div className='d-flex align-items-stretch' id='kt_header_nav'>
-              <Header />
-            </div>
-          )}
-
+          {/* Secondary menu removed - keeping only page title */}
           {header.left === 'page-title' && (
             <div className='d-flex align-items-center' id='kt_header_nav'>
               <DefaultTitle />

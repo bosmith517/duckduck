@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
+import ModernTeamChat from '../../components/communications/ModernTeamChat'
 
 interface TeamMember {
   id: string
@@ -18,6 +19,7 @@ interface TeamMember {
 }
 
 const TeamPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'directory' | 'chat'>('directory')
   const [teamMembers] = useState<TeamMember[]>([
     {
       id: '1',
@@ -109,9 +111,46 @@ const TeamPage: React.FC = () => {
     <>
       <PageTitle breadcrumbs={[]}>Team Management</PageTitle>
       
-      <div className='row g-5 g-xl-8'>
-        <div className='col-xl-12'>
-          <KTCard>
+      {/* Tab Navigation */}
+      <div className="d-flex justify-content-center mb-6">
+        <ul className="nav nav-pills nav-line-tabs nav-line-tabs-2x border-transparent fs-6 fw-bold">
+          <li className="nav-item">
+            <a 
+              className={`nav-link ${activeTab === 'directory' ? 'active' : 'text-muted'}`}
+              href="#"
+              onClick={(e) => { e.preventDefault(); setActiveTab('directory') }}
+            >
+              <i className="ki-duotone ki-people fs-4 me-2">
+                <span className="path1"></span>
+                <span className="path2"></span>
+                <span className="path3"></span>
+                <span className="path4"></span>
+                <span className="path5"></span>
+              </i>
+              Team Directory
+            </a>
+          </li>
+          <li className="nav-item">
+            <a 
+              className={`nav-link ${activeTab === 'chat' ? 'active' : 'text-muted'}`}
+              href="#"
+              onClick={(e) => { e.preventDefault(); setActiveTab('chat') }}
+            >
+              <i className="ki-duotone ki-message-text fs-4 me-2">
+                <span className="path1"></span>
+                <span className="path2"></span>
+                <span className="path3"></span>
+              </i>
+              Team Chat
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      {activeTab === 'directory' && (
+        <div className='row g-5 g-xl-8'>
+          <div className='col-xl-12'>
+            <KTCard>
             <div className='card-header border-0 pt-5'>
               <h3 className='card-title align-items-start flex-column'>
                 <span className='card-label fw-bold fs-3 mb-1'>Team Directory</span>
@@ -254,6 +293,13 @@ const TeamPage: React.FC = () => {
           </KTCard>
         </div>
       </div>
+      )}
+
+      {activeTab === 'chat' && (
+        <div style={{ height: '70vh' }}>
+          <ModernTeamChat />
+        </div>
+      )}
     </>
   )
 }

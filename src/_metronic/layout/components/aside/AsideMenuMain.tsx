@@ -9,134 +9,168 @@ export function AsideMenuMain() {
 
   return (
     <>
+      {/* COMMAND CENTER */}
       <AsideMenuItem
         to='/dashboard'
         icon='element-11'
-        title='Dashboard'
-        fontIcon='bi-app-indicator'
+        title='Command Center'
+        fontIcon='bi-speedometer2'
       />
       
+      {/* NEW FEATURES SHOWCASE */}
       <div className='menu-item'>
-        <div className='menu-content pt-8 pb-2'>
-          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Project Management</span>
+        <div className='menu-content pt-4 pb-2'>
+          <span className='menu-section text-primary text-uppercase fs-8 ls-1 fw-bold'>✨ New Features</span>
         </div>
       </div>
       
       <AsideMenuItem
-        to='/jobs'
-        icon='briefcase'
-        title='Jobs'
-        fontIcon='bi-briefcase'
-      />
-      
-      <AsideMenuItem
-        to='/accounts'
-        icon='office-bag'
-        title='Accounts'
-        fontIcon='bi-building'
-      />
-      
-      <AsideMenuItem
-        to='/clients'
-        icon='profile-circle'
-        title='Clients'
-        fontIcon='bi-person'
-      />
-      
-      <AsideMenuItem
-        to='/contacts'
-        icon='address-book'
-        title='Contacts'
-        fontIcon='bi-person-lines-fill'
-      />
-      
-      <AsideMenuItem
-        to='/estimates'
-        icon='file-text'
-        title='Estimates'
-        fontIcon='bi-file-text'
-      />
-      
-      <AsideMenuItem
-        to='/invoices'
-        icon='bill'
-        title='Invoices'
-        fontIcon='bi-receipt'
-      />
-      
-      <div className='menu-item'>
-        <div className='menu-content pt-8 pb-2'>
-          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Communications</span>
-        </div>
-      </div>
-      
-      <AsideMenuItemWithSub to='/communications' title='Communications' icon='message-text-2' fontIcon='bi-chat-dots'>
-        <AsideMenuItem to='/communications/call-center' title='Call Center' hasBullet={true} />
-        <AsideMenuItem to='/communications/voicemail' title='Voicemail' hasBullet={true} />
-        <AsideMenuItem to='/communications/sms' title='SMS Messages' hasBullet={true} />
-        <AsideMenuItem to='/communications/video' title='Video Meetings' hasBullet={true} />
-      </AsideMenuItemWithSub>
-      
-      <div className='menu-item'>
-        <div className='menu-content pt-8 pb-2'>
-          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Operations</span>
-        </div>
-      </div>
-      
-      <AsideMenuItem
-        to='/inventory'
-        icon='package'
-        title='Inventory'
-        fontIcon='bi-box'
-      />
-      
-      <AsideMenuItem
-        to='/schedule'
-        icon='calendar-8'
-        title='Schedule'
-        fontIcon='bi-calendar3'
+        to='/communications/video'
+        icon='video'
+        title='Modern Video Meetings'
+        fontIcon='bi-camera-video'
       />
       
       <AsideMenuItem
         to='/team'
-        icon='people'
-        title='Team'
-        fontIcon='bi-people'
+        icon='message-text'
+        title='Team Chat'
+        fontIcon='bi-chat-dots'
       />
-      
-      <div className='menu-item'>
-        <div className='menu-content pt-8 pb-2'>
-          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Analytics</span>
-        </div>
-      </div>
       
       <AsideMenuItem
-        to='/reports'
-        icon='chart-simple'
-        title='Reports'
-        fontIcon='bi-graph-up'
+        to='/communications/numbers'
+        icon='phone'
+        title='Phone Management'
+        fontIcon='bi-telephone'
       />
       
+      {/* BUSINESS OPERATIONS */}
       <div className='menu-item'>
         <div className='menu-content pt-8 pb-2'>
-          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Account</span>
+          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Business Operations</span>
         </div>
       </div>
       
-      <AsideMenuItemWithSub to='/profile' title='Profile' icon='profile-circle' fontIcon='bi-person'>
+      <AsideMenuItemWithSub to='/jobs' title='Jobs & Projects' icon='briefcase' fontIcon='bi-briefcase'>
+        <AsideMenuItem to='/jobs' title='All Jobs' hasBullet={true} />
+        <AsideMenuItem to='/jobs/costing' title='Job Costing' hasBullet={true} />
+        <AsideMenuItem to='/jobs/analytics' title='Project Analytics' hasBullet={true} />
+        <AsideMenuItem to='/jobs/templates' title='Job Templates' hasBullet={true} />
+        <AsideMenuItem to='/jobs/planning' title='Resource Planning' hasBullet={true} />
+      </AsideMenuItemWithSub>
+      
+      <AsideMenuItemWithSub to='/customers' title='Customers' icon='profile-circle' fontIcon='bi-people'>
+        <AsideMenuItem to='/customers/accounts' title='Accounts' hasBullet={true} />
+        <AsideMenuItem to='/customers/contacts' title='Contacts' hasBullet={true} />
+        <AsideMenuItem to='/customers/analytics' title='Customer Analytics' hasBullet={true} />
+        <AsideMenuItem to='/customers/portal-preview' title='Portal Preview' hasBullet={true} />
+        <AsideMenuItem to='/customers/communications' title='Communications' hasBullet={true} />
+        <AsideMenuItem to='/customers/feedback' title='Feedback' hasBullet={true} />
+      </AsideMenuItemWithSub>
+      
+      <AsideMenuItemWithSub to='/schedule' title='Scheduling & Dispatch' icon='calendar-8' fontIcon='bi-calendar3'>
+        <AsideMenuItem to='/schedule' title='Schedule Overview' hasBullet={true} />
+        <AsideMenuItem to='/schedule/tracking' title='Technician Tracking' hasBullet={true} />
+        <AsideMenuItem to='/schedule/routes' title='Route Optimization' hasBullet={true} />
+        <AsideMenuItem to='/schedule/mobile' title='Mobile Dispatch' hasBullet={true} />
+        <AsideMenuItem to='/schedule/automation' title='Automation' hasBullet={true} />
+      </AsideMenuItemWithSub>
+      
+      <AsideMenuItemWithSub to='/services' title='Services & Inventory' icon='package' fontIcon='bi-box'>
+        <AsideMenuItem to='/services/inventory' title='Inventory' hasBullet={true} />
+        <AsideMenuItem to='/services/catalog' title='Service Catalog' hasBullet={true} />
+        <AsideMenuItem to='/services/equipment' title='Equipment Tracking' hasBullet={true} />
+        <AsideMenuItem to='/services/smart-devices' title='Smart Devices' hasBullet={true} />
+        <AsideMenuItem to='/services/analytics' title='Service Analytics' hasBullet={true} />
+      </AsideMenuItemWithSub>
+
+      {/* REVENUE ENGINE */}
+      <div className='menu-item'>
+        <div className='menu-content pt-8 pb-2'>
+          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Revenue Engine</span>
+        </div>
+      </div>
+      
+      <AsideMenuItemWithSub to='/billing' title='Billing & Payments' icon='bill' fontIcon='bi-credit-card'>
+        <AsideMenuItem to='/billing/invoices' title='Invoices' hasBullet={true} />
+        <AsideMenuItem to='/billing/estimates' title='Estimates & Quotes' hasBullet={true} />
+        <AsideMenuItem to='/billing/payments' title='Payment Processing' hasBullet={true} />
+        <AsideMenuItem to='/billing/reports' title='Financial Reports' hasBullet={true} />
+        <AsideMenuItem to='/billing/automation' title='Automated Billing' hasBullet={true} />
+        <AsideMenuItem to='/billing/signatures' title='Digital Signatures' hasBullet={true} />
+        <AsideMenuItem to='/billing/customer-portal' title='Customer Portal' hasBullet={true} />
+      </AsideMenuItemWithSub>
+      
+      <AsideMenuItemWithSub to='/reports' title='Reports & Analytics' icon='chart-simple' fontIcon='bi-graph-up'>
+        <AsideMenuItem to='/reports/executive' title='Executive Dashboard' hasBullet={true} />
+        <AsideMenuItem to='/reports/financial' title='Financial Reports' hasBullet={true} />
+        <AsideMenuItem to='/reports/operations' title='Operational Reports' hasBullet={true} />
+        <AsideMenuItem to='/reports/customers' title='Customer Reports' hasBullet={true} />
+        <AsideMenuItem to='/reports/communications' title='Communication Reports' hasBullet={true} />
+        <AsideMenuItem to='/reports/custom' title='Custom Reports' hasBullet={true} />
+      </AsideMenuItemWithSub>
+
+      {/* COMMUNICATION COMMAND */}
+      <div className='menu-item'>
+        <div className='menu-content pt-8 pb-2'>
+          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Communication Command</span>
+        </div>
+      </div>
+      
+      <AsideMenuItemWithSub to='/communications' title='Communications Hub' icon='message-text-2' fontIcon='bi-chat-dots'>
+        <AsideMenuItem to='/communications/call-center' title='Call Center' hasBullet={true} />
+        <AsideMenuItem to='/communications/voicemail' title='Voicemail Center' hasBullet={true} />
+        <AsideMenuItem to='/communications/sms' title='SMS Messages' hasBullet={true} />
+        <AsideMenuItem to='/communications/team-chat' title='Team Chat' hasBullet={true} />
+        <AsideMenuItem to='/communications/video' title='Video Meetings' hasBullet={true} />
+        <AsideMenuItem to='/communications/numbers' title='Phone Numbers' hasBullet={true} />
+        <AsideMenuItem to='/communications/users' title='User Provisioning' hasBullet={true} />
+        <AsideMenuItem to='/communications/analytics' title='Analytics' hasBullet={true} />
+      </AsideMenuItemWithSub>
+
+      {/* TEAM EXCELLENCE */}
+      <div className='menu-item'>
+        <div className='menu-content pt-8 pb-2'>
+          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Team Excellence</span>
+        </div>
+      </div>
+      
+      <AsideMenuItemWithSub to='/team' title='Team & Resources' icon='people' fontIcon='bi-people'>
+        <AsideMenuItem to='/team/members' title='Team Members' hasBullet={true} />
+        <AsideMenuItem to='/team/profiles' title='Technician Profiles' hasBullet={true} />
+        <AsideMenuItem to='/team/users' title='User Management' hasBullet={true} />
+        <AsideMenuItem to='/team/performance' title='Performance' hasBullet={true} />
+        <AsideMenuItem to='/team/training' title='Training' hasBullet={true} />
+        <AsideMenuItem to='/team/analytics' title='Team Analytics' hasBullet={true} />
+      </AsideMenuItemWithSub>
+
+      {/* SETTINGS & CONFIGURATION */}
+      <div className='menu-item'>
+        <div className='menu-content pt-8 pb-2'>
+          <span className='menu-section text-muted text-uppercase fs-8 ls-1'>Configuration</span>
+        </div>
+      </div>
+      
+      <AsideMenuItemWithSub to='/settings' title='Settings' icon='setting-2' fontIcon='bi-gear'>
+        <AsideMenuItem to='/settings/company' title='Company Settings' hasBullet={true} />
+        <AsideMenuItem to='/settings/billing' title='Billing Config' hasBullet={true} />
+        <AsideMenuItem to='/settings/communications' title='Communication Settings' hasBullet={true} />
+        <AsideMenuItem to='/settings/users' title='User & Permissions' hasBullet={true} />
+        <AsideMenuItem to='/settings/notifications' title='Notifications' hasBullet={true} />
+        <AsideMenuItem to='/settings/security' title='Security' hasBullet={true} />
+        <AsideMenuItem to='/settings/layout' title='Layout Builder' hasBullet={true} />
+        <AsideMenuItem to='/settings/integrations' title='Integrations' hasBullet={true} />
+        <AsideMenuItem to='/settings/system' title='System Health' hasBullet={true} />
+      </AsideMenuItemWithSub>
+      
+      <AsideMenuItemWithSub to='/profile' title='My Profile' icon='profile-circle' fontIcon='bi-person'>
         <AsideMenuItem to='/profile/overview' title='Overview' hasBullet={true} />
         <AsideMenuItem to='/profile/projects' title='Projects' hasBullet={true} />
         <AsideMenuItem to='/profile/campaigns' title='Campaigns' hasBullet={true} />
         <AsideMenuItem to='/profile/documents' title='Documents' hasBullet={true} />
         <AsideMenuItem to='/profile/connections' title='Connections' hasBullet={true} />
       </AsideMenuItemWithSub>
-      
-      <AsideMenuItem
-        to='/settings'
-        icon='setting-2'
-        title='Settings'
-        fontIcon='bi-gear'
-      />
     </>
   )
 }

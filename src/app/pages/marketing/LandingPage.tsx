@@ -41,7 +41,7 @@ const LandingPage: React.FC = () => {
                 <a className="nav-link" href="#demo">Demo</a>
               </li>
               <li className="nav-item">
-                <a className="nav-link" href="#homeowners">For Homeowners</a>
+                <Link className="nav-link" to="/customer-portal">Customer Portal</Link>
               </li>
               <li className="nav-item ms-3">
                 <Link className="btn btn-primary" to="/signup">Start Free Trial</Link>

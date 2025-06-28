@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../supabaseClient'
 import { showToast } from '../../utils/toast'
 import { useSoftphoneContext } from '../../contexts/SoftphoneContext'
-import * as SignalWire from '@signalwire/js'
+import SignalWire from '@signalwire/js'
 import { User } from '@supabase/supabase-js'
 
 interface SoftphoneDialerProps {
@@ -104,7 +104,7 @@ export const SignalWireSoftphone: React.FC<SoftphoneDialerProps> = ({ isVisible,
 
       console.log('Initializing SignalWire Device with:', deviceConfig)
       
-      const client = new SignalWire.Device(deviceConfig)
+      const client = new (SignalWire as any).Device(deviceConfig)
 
       clientRef.current = client
 
@@ -232,7 +232,7 @@ export const SignalWireSoftphone: React.FC<SoftphoneDialerProps> = ({ isVisible,
   }
 
   const toggleMute = () => {
-    if (currentCallRef.current && callState === 'active') {
+    if (currentCallRef.current && (callState === 'active' || callState === 'muted')) {
       // Toggle mute on the call
       if (callState === 'muted') {
         currentCallRef.current.unmute()
@@ -370,7 +370,7 @@ export const SignalWireSoftphone: React.FC<SoftphoneDialerProps> = ({ isVisible,
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .softphone-overlay {
           position: fixed;
           top: 0;

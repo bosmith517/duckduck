@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Job } from '../../../../supabaseClient'
 
 interface JobsListProps {
@@ -9,6 +10,7 @@ interface JobsListProps {
 }
 
 export const JobsList: React.FC<JobsListProps> = ({ jobs, onEdit, onDelete, onStatusChange }) => {
+  const navigate = useNavigate()
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -101,10 +103,10 @@ export const JobsList: React.FC<JobsListProps> = ({ jobs, onEdit, onDelete, onSt
                 <div className='d-flex flex-column'>
                   <a
                     href='#'
-                    className='text-gray-800 text-hover-primary mb-1'
+                    className='text-gray-800 text-hover-primary mb-1 fw-bold'
                     onClick={(e) => {
                       e.preventDefault()
-                      onEdit(job)
+                      navigate(`/jobs/${job.id}`)
                     }}
                   >
                     {job.title}
@@ -206,9 +208,30 @@ export const JobsList: React.FC<JobsListProps> = ({ jobs, onEdit, onDelete, onSt
                       className='menu-link px-3'
                       onClick={(e) => {
                         e.preventDefault()
+                        navigate(`/jobs/${job.id}`)
+                      }}
+                    >
+                      <i className='ki-duotone ki-eye fs-5 me-2'>
+                        <span className='path1'></span>
+                        <span className='path2'></span>
+                        <span className='path3'></span>
+                      </i>
+                      View Details
+                    </a>
+                  </div>
+                  <div className='menu-item px-3'>
+                    <a
+                      href='#'
+                      className='menu-link px-3'
+                      onClick={(e) => {
+                        e.preventDefault()
                         onEdit(job)
                       }}
                     >
+                      <i className='ki-duotone ki-pencil fs-5 me-2'>
+                        <span className='path1'></span>
+                        <span className='path2'></span>
+                      </i>
                       Edit
                     </a>
                   </div>
@@ -221,6 +244,13 @@ export const JobsList: React.FC<JobsListProps> = ({ jobs, onEdit, onDelete, onSt
                         onDelete(job.id)
                       }}
                     >
+                      <i className='ki-duotone ki-trash fs-5 me-2'>
+                        <span className='path1'></span>
+                        <span className='path2'></span>
+                        <span className='path3'></span>
+                        <span className='path4'></span>
+                        <span className='path5'></span>
+                      </i>
                       Delete
                     </a>
                   </div>

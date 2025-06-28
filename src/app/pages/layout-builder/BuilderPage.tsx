@@ -619,4 +619,4 @@ const BuilderPage: React.FC = () => {
   )
 }
 
-export {BuilderPage}
+export default BuilderPage

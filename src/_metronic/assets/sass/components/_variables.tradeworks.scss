@@ -1,50 +1,50 @@
-// TradeWorks Pro Color Scheme: "High-Vis & Concrete"
-// This palette is strong and high-contrast, borrowing from the industrial world 
-// to create a feeling of strength and action.
+// TradeWorks Pro Color Scheme: "Modern Professional"
+// This palette combines dark sophistication with vibrant accent colors
+// for a modern, professional appearance.
 
 // Primary Colors
-$tradeworks-matte-black: #141414;    // A powerful, primary background color
-$tradeworks-safety-yellow: #FFD700;  // A vibrant, attention-grabbing color for logos and primary actions
-$tradeworks-concrete-gray: #808080;  // A cool, industrial neutral for text and UI elements
+$tradeworks-dark-charcoal: #121417;  // Professional dark background
+$tradeworks-electric-teal: #17E1D1;  // Vibrant accent color for primary actions
+$tradeworks-warm-amber: #FBAF40;     // Secondary accent for warnings and highlights
 $tradeworks-light-gray: #D3D3D3;     // For hover states and subtle backgrounds
 $tradeworks-pure-white: #FFFFFF;     // For high-contrast text
 
 // Override Metronic variables with TradeWorks colors
-$primary: $tradeworks-safety-yellow;
-$secondary: $tradeworks-concrete-gray;
+$primary: $tradeworks-electric-teal;
+$secondary: #6c757d;
 $success: #28a745;
-$info: $tradeworks-light-gray;
-$warning: $tradeworks-safety-yellow;
+$info: $tradeworks-electric-teal;
+$warning: $tradeworks-warm-amber;
 $danger: #dc3545;
 $light: $tradeworks-light-gray;
-$dark: $tradeworks-matte-black;
+$dark: $tradeworks-dark-charcoal;
 
 // Background colors
 $body-bg: $tradeworks-pure-white;
-$body-color: $tradeworks-matte-black;
+$body-color: $tradeworks-dark-charcoal;
 
 // Text colors
-$text-muted: $tradeworks-concrete-gray;
-$headings-color: $tradeworks-matte-black;
+$text-muted: #6c757d;
+$headings-color: $tradeworks-dark-charcoal;
 
 // Border colors
 $border-color: $tradeworks-light-gray;
 
 // Button colors
-$btn-primary-bg: $tradeworks-safety-yellow;
-$btn-primary-border-color: $tradeworks-safety-yellow;
-$btn-primary-color: $tradeworks-matte-black;
+$btn-primary-bg: $tradeworks-electric-teal;
+$btn-primary-border-color: $tradeworks-electric-teal;
+$btn-primary-color: $tradeworks-pure-white;
 
 // Navigation colors
-$navbar-dark-bg: $tradeworks-matte-black;
+$navbar-dark-bg: $tradeworks-dark-charcoal;
 $navbar-dark-color: $tradeworks-pure-white;
-$navbar-dark-hover-color: $tradeworks-safety-yellow;
+$navbar-dark-hover-color: $tradeworks-electric-teal;
 
 // Sidebar colors
-$sidebar-bg: $tradeworks-matte-black;
+$sidebar-bg: $tradeworks-dark-charcoal;
 $sidebar-color: $tradeworks-pure-white;
-$sidebar-hover-bg: rgba($tradeworks-safety-yellow, 0.1);
-$sidebar-hover-color: $tradeworks-safety-yellow;
+$sidebar-hover-bg: rgba($tradeworks-electric-teal, 0.1);
+$sidebar-hover-color: $tradeworks-electric-teal;
 
 // Card colors
 $card-bg: $tradeworks-pure-white;
@@ -53,9 +53,9 @@ $card-border-color: $tradeworks-light-gray;
 // Form colors
 $input-bg: $tradeworks-pure-white;
 $input-border-color: $tradeworks-light-gray;
-$input-focus-border-color: $tradeworks-safety-yellow;
-$input-focus-box-shadow: 0 0 0 0.2rem rgba($tradeworks-safety-yellow, 0.25);
+$input-focus-border-color: $tradeworks-electric-teal;
+$input-focus-box-shadow: 0 0 0 0.2rem rgba($tradeworks-electric-teal, 0.25);
 
 // Link colors
-$link-color: $tradeworks-safety-yellow;
-$link-hover-color: darken($tradeworks-safety-yellow, 15%);
+$link-color: $tradeworks-electric-teal;
+$link-hover-color: darken($tradeworks-electric-teal, 15%);

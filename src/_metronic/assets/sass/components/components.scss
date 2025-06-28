@@ -2,6 +2,9 @@
 // Components
 //
 
+// Import TradeWorks Variables First
+@import "variables.tradeworks";
+
 // Import Dependencies
 @import "stepper/multistep";
 @import "landing";

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../supabaseClient' // Make sure this path is correct
 import { showToast } from '../../utils/toast'      // Make sure this path is correct
 import { useSoftphoneContext } from '../../contexts/SoftphoneContext' // Make sure this path is correct
-import * as SignalWire from '@signalwire/js'
+// SignalWire SDK will be imported dynamically when needed
 
 import { User } from '@supabase/supabase-js'
 

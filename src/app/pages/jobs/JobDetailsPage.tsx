@@ -7,6 +7,8 @@ import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { PaymentSchedule } from './components/PaymentSchedule'
 import { trackingService } from '../../services/trackingService'
 import { showToast } from '../../utils/toast'
+import JobCostingDashboard from '../../components/billing/JobCostingDashboard'
+import JobPhotoGallery from '../../components/shared/JobPhotoGallery'
 
 interface JobWithRelations {
   id: string
@@ -265,6 +267,30 @@ const JobDetailsPage: React.FC = () => {
                 </li>
                 <li className='nav-item'>
                   <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'costing' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('costing')
+                    }}
+                  >
+                    Job Costing
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'photos' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('photos')
+                    }}
+                  >
+                    Photos
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
                     className={`nav-link text-active-primary pb-4 ${activeTab === 'activity' ? 'active' : ''}`}
                     href='#'
                     onClick={(e) => {
@@ -467,6 +493,24 @@ const JobDetailsPage: React.FC = () => {
 
           {activeTab === 'payment' && (
             <PaymentSchedule jobId={job.id} />
+          )}
+
+          {activeTab === 'costing' && (
+            <JobCostingDashboard jobId={job.id} />
+          )}
+
+          {activeTab === 'photos' && (
+            <div className="card">
+              <div className="card-body">
+                <JobPhotoGallery 
+                  jobId={job.id} 
+                  showTitle={false}
+                  photoTypes={['job_progress', 'before', 'after', 'general']}
+                  allowCapture={true}
+                  compactView={false}
+                />
+              </div>
+            </div>
           )}
 
           {activeTab === 'activity' && (

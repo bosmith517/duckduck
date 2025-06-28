@@ -1,16 +1,33 @@
-/* TradeWorks Pro Branding Overrides */
+/* TradeWorks Pro Branding Overrides - Modern Professional Color Scheme */
 
-/* Improve header contrast with darker backgrounds */
+/* Force new color scheme throughout the application */
+:root {
+  --tradeworks-dark-charcoal: #121417;
+  --tradeworks-electric-teal: #17E1D1;
+  --tradeworks-warm-amber: #FBAF40;
+  --tradeworks-light-gray: #D3D3D3;
+  --tradeworks-pure-white: #FFFFFF;
+  
+  /* Override CSS custom properties */
+  --bs-primary: var(--tradeworks-electric-teal);
+  --bs-primary-rgb: 23, 225, 209;
+  --bs-dark: var(--tradeworks-dark-charcoal);
+  --bs-dark-rgb: 18, 20, 23;
+  --bs-warning: var(--tradeworks-warm-amber);
+  --bs-warning-rgb: 251, 175, 64;
+}
+
+/* Header styling with new color scheme */
 .header .topbar .btn {
-  background-color: #495057 !important;
-  border: 1px solid #6c757d !important;
+  background-color: #121417 !important;
+  border: 1px solid #17E1D1 !important;
   color: #ffffff !important;
 }
 
 .header .topbar .btn:hover {
-  background-color: #343a40 !important;
-  border-color: #495057 !important;
-  color: #ffffff !important;
+  background-color: #17E1D1 !important;
+  border-color: #17E1D1 !important;
+  color: #121417 !important;
 }
 
 .header .topbar .btn .svg-icon {
@@ -19,8 +36,8 @@
 
 /* Improve user menu visibility */
 .header .topbar .symbol img {
-  border: 2px solid #ffffff !important;
-  background-color: #495057 !important;
+  border: 2px solid #17E1D1 !important;
+  background-color: #121417 !important;
   padding: 2px !important;
 }
 
@@ -39,21 +56,21 @@ img[src*="keenthemes" i] {
   display: none !important;
 }
 
-/* Improve overall contrast with darker grays */
+/* Improve overall contrast with new color scheme */
 .text-muted {
-  color: #495057 !important;
+  color: #6c757d !important;
 }
 
 .text-gray-600 {
-  color: #343a40 !important;
+  color: #121417 !important;
 }
 
 .text-gray-700 {
-  color: #212529 !important;
+  color: #121417 !important;
 }
 
 .text-gray-800 {
-  color: #1a1e21 !important;
+  color: #121417 !important;
 }
 
 /* Card and content backgrounds */
@@ -69,19 +86,19 @@ img[src*="keenthemes" i] {
 
 /* Ensure TradeWorks branding is prominent */
 .header-logo .text-dark {
-  color: #212529 !important;
+  color: #121417 !important;
   font-weight: 700 !important;
 }
 
 .header-logo .text-muted {
-  color: #495057 !important;
+  color: #6c757d !important;
   font-weight: 600 !important;
 }
 
-/* Style the tools icon with better contrast */
+/* Style the tools icon with new electric teal gradient */
 .header-logo .bg-primary {
-  background: linear-gradient(135deg, #0d6efd, #6f42c1) !important;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+  background: linear-gradient(135deg, #17E1D1, #0fb8aa) !important;
+  box-shadow: 0 2px 4px rgba(18, 20, 23, 0.3) !important;
 }
 
 /* Improve button visibility in header */
@@ -96,29 +113,29 @@ img[src*="keenthemes" i] {
 
 /* Footer branding */
 .footer a[href="#"] {
-  color: #0d6efd !important;
+  color: #17E1D1 !important;
   font-weight: 600 !important;
   text-decoration: none !important;
 }
 
 .footer a[href="#"]:hover {
-  color: #0b5ed7 !important;
+  color: #0fb8aa !important;
 }
 
 /* Dashboard card improvements */
 .dashboard .card {
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
+  box-shadow: 0 2px 6px rgba(18, 20, 23, 0.15) !important;
 }
 
 .dashboard .card-title {
-  color: #212529 !important;
+  color: #121417 !important;
   font-weight: 600 !important;
 }
 
-/* Sidebar improvements - match header color */
+/* Sidebar improvements - new dark charcoal theme */
 .aside {
-  background-color: #495057 !important;
-  border-right: 1px solid #6c757d !important;
+  background-color: #121417 !important;
+  border-right: 1px solid #17E1D1 !important;
 }
 
 .aside .menu-link {
@@ -127,8 +144,8 @@ img[src*="keenthemes" i] {
 
 .aside .menu-link:hover,
 .aside .menu-link.active {
-  background-color: #343a40 !important;
-  color: #ffffff !important;
+  background-color: rgba(23, 225, 209, 0.1) !important;
+  color: #17E1D1 !important;
 }
 
 .aside .menu-title {
@@ -137,6 +154,70 @@ img[src*="keenthemes" i] {
 
 .aside .menu-icon {
   color: #ffffff !important;
+}
+
+/* Force primary color updates throughout */
+.btn-primary {
+  background-color: #17E1D1 !important;
+  border-color: #17E1D1 !important;
+  color: #121417 !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: #0fb8aa !important;
+  border-color: #0fb8aa !important;
+  color: #121417 !important;
+}
+
+.text-primary,
+.link-primary {
+  color: #17E1D1 !important;
+}
+
+.bg-primary {
+  background-color: #17E1D1 !important;
+}
+
+.border-primary {
+  border-color: #17E1D1 !important;
+}
+
+.btn-light-primary {
+  background-color: rgba(23, 225, 209, 0.1) !important;
+  border-color: rgba(23, 225, 209, 0.2) !important;
+  color: #17E1D1 !important;
+}
+
+.badge-primary {
+  background-color: #17E1D1 !important;
+  color: #121417 !important;
+}
+
+/* Update warning/amber elements */
+.btn-warning {
+  background-color: #FBAF40 !important;
+  border-color: #FBAF40 !important;
+  color: #121417 !important;
+}
+
+.text-warning {
+  color: #FBAF40 !important;
+}
+
+.bg-warning {
+  background-color: #FBAF40 !important;
+}
+
+/* Update dark elements */
+.bg-dark,
+.navbar-dark {
+  background-color: #121417 !important;
+}
+
+.text-dark {
+  color: #121417 !important;
 }
 
 /* Fix button clickability issues */

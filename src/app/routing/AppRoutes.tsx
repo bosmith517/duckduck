@@ -25,6 +25,7 @@ import SimpleTrackingTest from '../pages/test/SimpleTrackingTest'
 import LandingPage from '../pages/marketing/LandingPage'
 import SignupPage from '../pages/marketing/SignupPage'
 import HomeownerSignupPage from '../pages/marketing/HomeownerSignupPage'
+import CustomerPortalLandingPage from '../pages/marketing/CustomerPortalLandingPage'
 import {ResetPasswordPage} from '../pages/auth/ResetPasswordPage'
 
 
@@ -87,6 +88,7 @@ const AppRoutes: FC = () => {
         <Route path='/' element={<LandingPage />} />
         <Route path='signup' element={<SignupPage />} />
         <Route path='homeowner-signup' element={<HomeownerSignupPage />} />
+        <Route path='customer-portal' element={<CustomerPortalLandingPage />} />
         
         {/* Auth routes */}
         <Route path='auth/reset-password' element={<ResetPasswordPage />} />
@@ -110,7 +112,7 @@ const AppRoutes: FC = () => {
           ) : (
             <>
               <Route path='auth/*' element={<AuthPage />} />
-              <Route path='*' element={<Navigate to='/auth/login' />} />
+              <Route path='app/*' element={<Navigate to='/auth/login' />} />
             </>
           )}
         </Route>

@@ -3,6 +3,8 @@ import { useFormik } from 'formik'
 import * as Yup from 'yup'
 import clsx from 'clsx'
 import { Job, Account, Contact } from '../../../../supabaseClient'
+import JobCostingDashboard from '../../../components/billing/JobCostingDashboard'
+import JobPhotoGallery from '../../../components/shared/JobPhotoGallery'
 
 interface JobFormProps {
   job?: Job | null
@@ -38,6 +40,7 @@ const jobSchema = Yup.object().shape({
 export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSave, onCancel }) => {
   const [loading, setLoading] = useState(false)
   const [filteredContacts, setFilteredContacts] = useState<typeof contacts>([])
+  const [activeTab, setActiveTab] = useState('details')
 
   const formik = useFormik({
     initialValues: {
@@ -116,6 +119,52 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
 
           <form onSubmit={formik.handleSubmit} noValidate>
             <div className='modal-body'>
+              {/* Tab Navigation */}
+              <ul className='nav nav-tabs nav-line-tabs nav-line-tabs-2x border-0 fs-4 fw-semibold mb-6'>
+                <li className='nav-item'>
+                  <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'details' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('details')
+                    }}
+                  >
+                    Job Details
+                  </a>
+                </li>
+                {job?.id && (
+                  <>
+                    <li className='nav-item'>
+                      <a
+                        className={`nav-link text-active-primary pb-4 ${activeTab === 'costing' ? 'active' : ''}`}
+                        href='#'
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setActiveTab('costing')
+                        }}
+                      >
+                        Job Costing
+                      </a>
+                    </li>
+                    <li className='nav-item'>
+                      <a
+                        className={`nav-link text-active-primary pb-4 ${activeTab === 'photos' ? 'active' : ''}`}
+                        href='#'
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setActiveTab('photos')
+                        }}
+                      >
+                        Photos
+                      </a>
+                    </li>
+                  </>
+                )}
+              </ul>
+
+              {/* Tab Content */}
+              {activeTab === 'details' && (
               <div className='row'>
                 {/* Job Title */}
                 <div className='col-md-8 mb-7'>
@@ -482,6 +531,27 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
                   )}
                 </div>
               </div>
+              )}
+
+              {/* Job Costing Tab */}
+              {activeTab === 'costing' && job?.id && (
+                <div className="h-400px overflow-auto">
+                  <JobCostingDashboard jobId={job.id} />
+                </div>
+              )}
+
+              {/* Photos Tab */}
+              {activeTab === 'photos' && job?.id && (
+                <div className="h-400px overflow-auto">
+                  <JobPhotoGallery 
+                    jobId={job.id} 
+                    showTitle={false}
+                    photoTypes={['job_progress', 'before', 'after', 'general', 'receipt']}
+                    allowCapture={true}
+                    compactView={false}
+                  />
+                </div>
+              )}
             </div>
 
             <div className='modal-footer'>
@@ -491,22 +561,24 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
                 onClick={onCancel}
                 disabled={loading}
               >
-                Cancel
+                {activeTab === 'details' ? 'Cancel' : 'Close'}
               </button>
-              <button
-                type='submit'
-                className='btn btn-primary'
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <span className='spinner-border spinner-border-sm align-middle me-2'></span>
-                    Saving...
-                  </>
-                ) : (
-                  <>Save Job</>
-                )}
-              </button>
+              {activeTab === 'details' && (
+                <button
+                  type='submit'
+                  className='btn btn-primary'
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <span className='spinner-border spinner-border-sm align-middle me-2'></span>
+                      Saving...
+                    </>
+                  ) : (
+                    <>Save Job</>
+                  )}
+                </button>
+              )}
             </div>
           </form>
         </div>

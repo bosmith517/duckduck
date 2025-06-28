@@ -17,6 +17,7 @@ import {
   TilesWidget4,
   TilesWidget5,
 } from '../../../_metronic/partials/widgets'
+import NewFeaturesWidget from '../../components/dashboard/NewFeaturesWidget'
 
 const DashboardPage = () => (
   <>
@@ -109,6 +110,13 @@ const DashboardPage = () => (
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    {/* New Features Showcase */}
+    <div className='row g-5 g-xl-8 mb-8'>
+      <div className='col-xl-12'>
+        <NewFeaturesWidget />
       </div>
     </div>
 

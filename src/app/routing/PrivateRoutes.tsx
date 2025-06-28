@@ -23,8 +23,32 @@ const PrivateRoutes = () => {
   const SettingsPage = lazy(() => import('../pages/settings/SettingsPage'))
   const CallCenterPage = lazy(() => import('../pages/communications/CallCenterPage'))
   const VideoPage = lazy(() => import('../pages/communications/VideoPage'))
+  const ModernVideoPage = lazy(() => import('../pages/communications/ModernVideoPage'))
+  
+  // New Video Meeting Components
+  const MeetingCreationWizard = lazy(() => import('../components/video/MeetingCreationWizard'))
+  const PreCallLobby = lazy(() => import('../components/video/PreCallLobby'))
+  const InCallWorkspace = lazy(() => import('../components/video/InCallWorkspace'))
+  const PostCallSummary = lazy(() => import('../components/video/PostCallSummary'))
   const TestPage = lazy(() => import('../pages/test/TestPage'))
   const SimpleTestPage = lazy(() => import('../pages/test/SimpleTestPage'))
+  
+  // Hidden Settings Pages (Now Accessible!)
+  const CompanyConfigurationPage = lazy(() => import('../pages/settings/CompanyConfigurationPage'))
+  const ServiceLibraryPage = lazy(() => import('../pages/settings/ServiceLibraryPage'))
+  const TechnicianProfilesPage = lazy(() => import('../pages/settings/TechnicianProfilesPage'))
+  const PhoneNumbersPage = lazy(() => import('../pages/settings/PhoneNumbersPage'))
+  const PhoneNumbersSettingsPage = lazy(() => import('../pages/settings/PhoneNumbersSettingsPage'))
+  
+  // New Hub Pages
+  const BillingDashboardPage = lazy(() => import('../pages/billing/BillingDashboardPage'))
+  const CommunicationsHubPage = lazy(() => import('../pages/communications/CommunicationsHubPage'))
+  const CustomersPage = lazy(() => import('../pages/customers/CustomersPage'))
+  
+  // Hidden Advanced Modules (Now Accessible!)
+  const BuilderPage = lazy(() => import('../pages/layout-builder/BuilderPage'))
+  const ProfitabilityPage = lazy(() => import('../pages/reports/ProfitabilityPage'))
+  const CustomerPortalPage = lazy(() => import('../pages/customer-portal/CustomerPortalPage'))
   
   // Profile and Account Pages
   const ProfilePage = lazy(() => import('../modules/profile/ProfilePage'))
@@ -170,10 +194,52 @@ const PrivateRoutes = () => {
           }
         />
         <Route
-          path='communications/video'
+          path='communications/video/*'
           element={
             <SuspensedView>
-              <VideoPage />
+              <ModernVideoPage />
+            </SuspensedView>
+          }
+        />
+        {/* New Video Meeting Workflow */}
+        <Route
+          path='video-meeting/create'
+          element={
+            <SuspensedView>
+              <MeetingCreationWizard />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='video-meeting/:meetingId/lobby'
+          element={
+            <SuspensedView>
+              <PreCallLobby />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='video-meeting/:meetingId/room'
+          element={
+            <SuspensedView>
+              <InCallWorkspace />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='video-meeting/:meetingId/summary'
+          element={
+            <SuspensedView>
+              <PostCallSummary />
+            </SuspensedView>
+          }
+        />
+        {/* Legacy video routes */}
+        <Route
+          path='video-meeting/*'
+          element={
+            <SuspensedView>
+              <ModernVideoPage />
             </SuspensedView>
           }
         />
@@ -217,6 +283,223 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        
+        {/* BILLING & PAYMENTS ROUTES - The Revenue Engine! */}
+        <Route
+          path='billing'
+          element={
+            <SuspensedView>
+              <BillingDashboardPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='billing/invoices'
+          element={
+            <SuspensedView>
+              <InvoicesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='billing/estimates'
+          element={
+            <SuspensedView>
+              <EstimatesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='billing/customer-portal'
+          element={
+            <SuspensedView>
+              <CustomerPortalPage />
+            </SuspensedView>
+          }
+        />
+
+        {/* COMMUNICATIONS HUB ROUTES */}
+        <Route
+          path='communications'
+          element={
+            <SuspensedView>
+              <CommunicationsHubPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='communications/numbers'
+          element={
+            <SuspensedView>
+              <PhoneNumbersSettingsPage />
+            </SuspensedView>
+          }
+        />
+
+        {/* CUSTOMER MANAGEMENT ROUTES */}
+        <Route
+          path='customers'
+          element={
+            <SuspensedView>
+              <CustomersPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='customers/accounts'
+          element={
+            <SuspensedView>
+              <AccountsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='customers/contacts'
+          element={
+            <SuspensedView>
+              <ContactsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='customers/portal-preview'
+          element={
+            <SuspensedView>
+              <CustomerPortalPage />
+            </SuspensedView>
+          }
+        />
+
+        {/* ENHANCED SETTINGS ROUTES */}
+        <Route
+          path='settings/company'
+          element={
+            <SuspensedView>
+              <CompanyConfigurationPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='settings/billing'
+          element={
+            <SuspensedView>
+              <ServiceLibraryPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='settings/communications'
+          element={
+            <SuspensedView>
+              <PhoneNumbersSettingsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='settings/layout'
+          element={
+            <SuspensedView>
+              <BuilderPage />
+            </SuspensedView>
+          }
+        />
+
+        {/* ENHANCED SERVICES ROUTES */}
+        <Route
+          path='services/inventory'
+          element={
+            <SuspensedView>
+              <InventoryPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='services/catalog'
+          element={
+            <SuspensedView>
+              <ServiceLibraryPage />
+            </SuspensedView>
+          }
+        />
+
+        {/* ENHANCED TEAM ROUTES */}
+        <Route
+          path='team/members'
+          element={
+            <SuspensedView>
+              <TeamPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='team/profiles'
+          element={
+            <SuspensedView>
+              <TechnicianProfilesPage />
+            </SuspensedView>
+          }
+        />
+
+        {/* ENHANCED REPORTS ROUTES */}
+        <Route
+          path='reports/financial'
+          element={
+            <SuspensedView>
+              <ProfitabilityPage />
+            </SuspensedView>
+          }
+        />
+        
+        {/* MISSING NAVIGATION ROUTES - Redirect to existing pages */}
+        <Route path='jobs/costing' element={<Navigate to='/jobs' />} />
+        <Route path='jobs/analytics' element={<Navigate to='/jobs' />} />
+        <Route path='jobs/templates' element={<Navigate to='/jobs' />} />
+        <Route path='jobs/planning' element={<Navigate to='/jobs' />} />
+        
+        <Route path='customers/analytics' element={<Navigate to='/customers' />} />
+        <Route path='customers/communications' element={<Navigate to='/customers' />} />
+        <Route path='customers/feedback' element={<Navigate to='/customers' />} />
+        
+        <Route path='schedule/tracking' element={<Navigate to='/schedule' />} />
+        <Route path='schedule/routes' element={<Navigate to='/schedule' />} />
+        <Route path='schedule/mobile' element={<Navigate to='/schedule' />} />
+        <Route path='schedule/automation' element={<Navigate to='/schedule' />} />
+        
+        <Route path='services/equipment' element={<Navigate to='/services/inventory' />} />
+        <Route path='services/smart-devices' element={<Navigate to='/services/inventory' />} />
+        <Route path='services/analytics' element={<Navigate to='/services/inventory' />} />
+        
+        <Route path='billing/payments' element={<Navigate to='/billing' />} />
+        <Route path='billing/reports' element={<Navigate to='/billing' />} />
+        <Route path='billing/automation' element={<Navigate to='/billing' />} />
+        <Route path='billing/signatures' element={<Navigate to='/billing' />} />
+        
+        <Route path='communications/team-chat' element={<Navigate to='/team' />} />
+        <Route path='communications/users' element={<Navigate to='/communications' />} />
+        <Route path='communications/analytics' element={<Navigate to='/communications' />} />
+        
+        <Route path='team/users' element={<Navigate to='/team' />} />
+        <Route path='team/performance' element={<Navigate to='/team' />} />
+        <Route path='team/training' element={<Navigate to='/team' />} />
+        <Route path='team/analytics' element={<Navigate to='/team' />} />
+        
+        <Route path='reports/executive' element={<Navigate to='/reports' />} />
+        <Route path='reports/operations' element={<Navigate to='/reports' />} />
+        <Route path='reports/customers' element={<Navigate to='/reports' />} />
+        <Route path='reports/communications' element={<Navigate to='/reports' />} />
+        <Route path='reports/custom' element={<Navigate to='/reports' />} />
+        
+        <Route path='settings/users' element={<Navigate to='/settings' />} />
+        <Route path='settings/notifications' element={<Navigate to='/settings' />} />
+        <Route path='settings/security' element={<Navigate to='/settings' />} />
+        <Route path='settings/integrations' element={<Navigate to='/settings' />} />
+        <Route path='settings/system' element={<Navigate to='/settings' />} />
+        
+        <Route path='profile/overview' element={<Navigate to='/profile' />} />
+        <Route path='profile/projects' element={<Navigate to='/profile' />} />
+        <Route path='profile/campaigns' element={<Navigate to='/profile' />} />
+        <Route path='profile/documents' element={<Navigate to='/profile' />} />
+        <Route path='profile/connections' element={<Navigate to='/profile' />} />
         
         {/* Page Not Found */}
         <Route path='*' element={<Navigate to='/error/404' />} />

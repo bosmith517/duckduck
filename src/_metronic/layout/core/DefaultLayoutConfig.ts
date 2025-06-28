@@ -21,7 +21,7 @@ export const DefaultLayoutConfig: ILayout = {
   header: {
     display: true, // Set true|false to show or hide Header
     width: 'fixed', // Set fixed|fluid to change width type
-    left: 'menu',
+    left: 'page-title', // Changed from 'menu' to 'page-title' to remove secondary menu
     fixed: {
       desktop: true, // Set true|false to set fixed Header for desktop mode
       tabletAndMobile: true, // Set true|false to set fixed Header for tablet and mobile modes
@@ -29,7 +29,7 @@ export const DefaultLayoutConfig: ILayout = {
     menuIcon: 'svg',
   },
   megaMenu: {
-    display: true, // Set true|false to show or hide Mega Menu
+    display: false, // Set true|false to show or hide Mega Menu
   },
   aside: {
     display: true,
