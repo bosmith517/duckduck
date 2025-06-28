@@ -70,9 +70,9 @@ const HeaderNotificationsMenu: FC = () => (
                 </div>
 
                 <div className='mb-0 me-2'>
-                  <a href='#' className='fs-6 text-gray-800 text-hover-primary fw-bold'>
+                  <Link to='/reports' className='fs-6 text-gray-800 text-hover-primary fw-bold'>
                     {alert.title}
-                  </a>
+                  </Link>
                   <div className='text-gray-500 fs-7'>{alert.description}</div>
                 </div>
               </div>
@@ -84,7 +84,7 @@ const HeaderNotificationsMenu: FC = () => (
 
         <div className='py-3 text-center border-top'>
           <Link
-            to='/crafted/pages/profile'
+            to='/reports'
             className='btn btn-color-gray-600 btn-active-color-primary'
           >
             View All <KTIcon iconName='arrow-right' className='fs-5' />
@@ -102,14 +102,12 @@ const HeaderNotificationsMenu: FC = () => (
             </div>
 
             <div className='text-center mt-5 mb-9'>
-              <a
-                href='#'
+              <Link
+                to='/billing'
                 className='btn btn-sm btn-primary px-6'
-                data-bs-toggle='modal'
-                data-bs-target='#kt_modal_upgrade_plan'
               >
                 Upgrade
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -128,9 +126,9 @@ const HeaderNotificationsMenu: FC = () => (
                   {log.code}
                 </span>
 
-                <a href='#' className='text-gray-800 text-hover-primary fw-semibold'>
+                <Link to='/reports' className='text-gray-800 text-hover-primary fw-semibold'>
                   {log.message}
-                </a>
+                </Link>
 
                 <span className='badge badge-light fs-8'>{log.time}</span>
               </div>
@@ -139,7 +137,7 @@ const HeaderNotificationsMenu: FC = () => (
         </div>
         <div className='py-3 text-center border-top'>
           <Link
-            to='/crafted/pages/profile'
+            to='/reports'
             className='btn btn-color-gray-600 btn-active-color-primary'
           >
             View All <KTIcon iconName='arrow-right' className='fs-5' />

@@ -35,18 +35,18 @@ const HeaderUserMenu: FC = () => {
       <div className='separator my-2'></div>
 
       <div className='menu-item px-5'>
-        <Link to={'/crafted/pages/profile'} className='menu-link px-5'>
+        <Link to={'/profile'} className='menu-link px-5'>
           My Profile
         </Link>
       </div>
 
       <div className='menu-item px-5'>
-        <a href='#' className='menu-link px-5'>
+        <Link to={'/jobs'} className='menu-link px-5'>
           <span className='menu-text'>My Projects</span>
           <span className='menu-badge'>
             <span className='badge badge-light-danger badge-circle fw-bold fs-7'>3</span>
           </span>
-        </a>
+        </Link>
       </div>
 
       <div
@@ -62,32 +62,32 @@ const HeaderUserMenu: FC = () => {
 
         <div className='menu-sub menu-sub-dropdown w-175px py-4'>
           <div className='menu-item px-3'>
-            <a href='#' className='menu-link px-5'>
+            <Link to={'/team'} className='menu-link px-5'>
               Referrals
-            </a>
+            </Link>
           </div>
 
           <div className='menu-item px-3'>
-            <a href='#' className='menu-link px-5'>
+            <Link to={'/billing'} className='menu-link px-5'>
               Billing
-            </a>
+            </Link>
           </div>
 
           <div className='menu-item px-3'>
-            <a href='#' className='menu-link px-5'>
+            <Link to={'/billing/payments'} className='menu-link px-5'>
               Payments
-            </a>
+            </Link>
           </div>
 
           <div className='menu-item px-3'>
-            <a href='#' className='menu-link d-flex flex-stack px-5'>
+            <Link to={'/invoices'} className='menu-link d-flex flex-stack px-5'>
               Statements
               <i
                 className='fas fa-exclamation-circle ms-2 fs-7'
                 data-bs-toggle='tooltip'
                 title='View your statements'
               ></i>
-            </a>
+            </Link>
           </div>
 
           <div className='separator my-2'></div>
@@ -110,9 +110,9 @@ const HeaderUserMenu: FC = () => {
       </div>
 
       <div className='menu-item px-5'>
-        <a href='#' className='menu-link px-5'>
+        <Link to={'/reports'} className='menu-link px-5'>
           My Statements
-        </a>
+        </Link>
       </div>
 
       <div className='separator my-2'></div>
@@ -120,7 +120,7 @@ const HeaderUserMenu: FC = () => {
       <Languages />
 
       <div className='menu-item px-5 my-1'>
-        <Link to='/crafted/account/settings' className='menu-link px-5'>
+        <Link to='/settings' className='menu-link px-5'>
           Account Settings
         </Link>
       </div>

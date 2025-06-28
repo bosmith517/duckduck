@@ -32,6 +32,7 @@ const PrivateRoutes = () => {
   const PostCallSummary = lazy(() => import('../components/video/PostCallSummary'))
   const TestPage = lazy(() => import('../pages/test/TestPage'))
   const SimpleTestPage = lazy(() => import('../pages/test/SimpleTestPage'))
+  const BackendConnectivityTest = lazy(() => import('../components/test/BackendConnectivityTest'))
   
   // Hidden Settings Pages (Now Accessible!)
   const CompanyConfigurationPage = lazy(() => import('../pages/settings/CompanyConfigurationPage'))
@@ -197,7 +198,7 @@ const PrivateRoutes = () => {
           path='communications/video/*'
           element={
             <SuspensedView>
-              <ModernVideoPage />
+              <VideoPage />
             </SuspensedView>
           }
         />
@@ -256,6 +257,16 @@ const PrivateRoutes = () => {
           }
         />
         
+        {/* Backend Connectivity Test */}
+        <Route
+          path='test-backend'
+          element={
+            <SuspensedView>
+              <BackendConnectivityTest />
+            </SuspensedView>
+          }
+        />
+        
         {/* Simple Test Page - No Layout */}
         <Route
           path='simple-test'
@@ -275,6 +286,7 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        <Route path='profile' element={<Navigate to='/profile/overview' />} />
         <Route
           path='account/*'
           element={

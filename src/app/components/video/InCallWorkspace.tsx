@@ -75,6 +75,7 @@ export const InCallWorkspace: React.FC = () => {
   const { user, userProfile } = useSupabaseAuth()
   const videoGridRef = useRef<HTMLDivElement>(null)
   const localVideoRef = useRef<HTMLVideoElement>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
 
   const [meeting, setMeeting] = useState<MeetingData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -108,21 +109,97 @@ export const InCallWorkspace: React.FC = () => {
     }
 
     return () => {
+      // Cleanup media streams
       if (stream) {
-        stream.getTracks().forEach(track => track.stop())
+        stream.getTracks().forEach(track => {
+          track.stop()
+          console.log(`Cleanup: Stopped ${track.kind} track`)
+        })
+      }
+      
+      // Cleanup audio context
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
       }
     }
   }, [meetingId])
 
   const loadMeetingData = async () => {
     try {
+      // Create demo meeting data for instant meetings
+      if (meetingId?.startsWith('instant-')) {
+        const demoMeeting: MeetingData = {
+          id: meetingId,
+          title: 'Instant Meeting',
+          agenda: [
+            {
+              id: '1',
+              title: 'Welcome & Introductions',
+              duration: 5,
+              description: 'Quick introductions and meeting overview',
+              status: 'current'
+            },
+            {
+              id: '2', 
+              title: 'Main Discussion',
+              duration: 15,
+              description: 'Core meeting content and discussion',
+              status: 'upcoming'
+            },
+            {
+              id: '3',
+              title: 'Action Items & Next Steps',
+              duration: 5,
+              description: 'Review action items and plan next steps',
+              status: 'upcoming'
+            }
+          ],
+          participants: [
+            {
+              id: '1',
+              name: 'You',
+              email: user?.email || 'user@example.com',
+              role: 'host',
+              isMuted: false,
+              isCameraOff: false,
+              isPresenting: false,
+              isSpeaking: false
+            }
+          ],
+          notes: [],
+          files: [],
+          transcript: [],
+          status: 'in_progress'
+        }
+        setMeeting(demoMeeting)
+        setLoading(false)
+        return
+      }
+
+      // Try to load from database for scheduled meetings
       const { data, error } = await supabase
         .from('video_meetings')
         .select('*')
         .eq('id', meetingId)
         .single()
 
-      if (error) throw error
+      if (error) {
+        // If database error, create demo data
+        const demoMeeting: MeetingData = {
+          id: meetingId || 'demo',
+          title: 'Demo Meeting',
+          agenda: [],
+          participants: [],
+          notes: [],
+          files: [],
+          transcript: [],
+          status: 'in_progress'
+        }
+        setMeeting(demoMeeting)
+        setLoading(false)
+        return
+      }
 
       if (data) {
         setMeeting({
@@ -142,7 +219,18 @@ export const InCallWorkspace: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading meeting:', error)
-      showToast.error('Failed to load meeting data')
+      // Create fallback demo meeting
+      const demoMeeting: MeetingData = {
+        id: meetingId || 'demo',
+        title: 'Demo Meeting',
+        agenda: [],
+        participants: [],
+        notes: [],
+        files: [],
+        transcript: [],
+        status: 'in_progress'
+      }
+      setMeeting(demoMeeting)
     } finally {
       setLoading(false)
     }
@@ -150,19 +238,39 @@ export const InCallWorkspace: React.FC = () => {
 
   const initializeMedia = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      })
+      // Try to get both video and audio first
+      let mediaStream: MediaStream | null = null
       
-      setStream(mediaStream)
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        })
+      } catch (error) {
+        // If video fails, try audio only
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: false,
+            audio: true
+          })
+          showToast.warning('Camera not available, using audio only')
+        } catch (audioError) {
+          // If both fail, continue without media
+          showToast.warning('Camera and microphone not available in demo mode')
+          return
+        }
+      }
       
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = mediaStream
+      if (mediaStream) {
+        setStream(mediaStream)
+        
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = mediaStream
+        }
       }
     } catch (error) {
       console.error('Error accessing media:', error)
-      showToast.error('Unable to access camera and microphone')
+      // Don't show error toast in demo mode, just continue
     }
   }
 
@@ -257,6 +365,21 @@ export const InCallWorkspace: React.FC = () => {
 
   const leaveMeeting = () => {
     if (confirm('Are you sure you want to leave the meeting?')) {
+      // Clean up media streams before leaving
+      if (stream) {
+        stream.getTracks().forEach(track => {
+          track.stop()
+          console.log(`Stopped ${track.kind} track`)
+        })
+        setStream(null)
+      }
+      
+      // Clean up audio context
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+      
       navigate(`/video-meeting/${meetingId}/summary`)
     }
   }

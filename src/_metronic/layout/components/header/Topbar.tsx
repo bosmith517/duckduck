@@ -1,4 +1,5 @@
 import {FC} from 'react'
+import {useNavigate} from 'react-router-dom'
 import clsx from 'clsx'
 import {KTIcon, toAbsoluteUrl} from '../../../helpers'
 import {
@@ -16,6 +17,7 @@ const toolbarButtonMarginClass = 'ms-1 ms-lg-3',
   toolbarButtonIconSizeClass = 'fs-1 text-primary'
 
 const Topbar: FC = () => {
+  const navigate = useNavigate()
   const { showDialer } = useSoftphoneContext()
   
   return (
@@ -27,17 +29,19 @@ const Topbar: FC = () => {
         </div>
         {/* Activities */}
         <div className={clsx('d-flex align-items-center ', toolbarButtonMarginClass)}>
-          {/* begin::Drawer toggle */}
+          {/* begin::Reports button */}
           <div
             className={clsx(
               'btn btn-icon btn-active-light-primary btn-custom',
               toolbarButtonHeightClass
             )}
-            id='kt_activities_toggle'
+            onClick={() => navigate('/reports')}
+            title='View Reports'
+            style={{ cursor: 'pointer' }}
           >
             <KTIcon iconName='chart-simple' className={toolbarButtonIconSizeClass} />
           </div>
-          {/* end::Drawer toggle */}
+          {/* end::Reports button */}
         </div>
 
         {/* NOTIFICATIONS */}
@@ -61,19 +65,21 @@ const Topbar: FC = () => {
 
         {/* CHAT */}
         <div className={clsx('d-flex align-items-center', toolbarButtonMarginClass)}>
-          {/* begin::Menu wrapper */}
+          {/* begin::Chat button */}
           <div
             className={clsx(
               'btn btn-icon btn-active-light-primary btn-custom position-relative',
               toolbarButtonHeightClass
             )}
-            id='kt_drawer_chat_toggle'
+            onClick={() => navigate('/team')}
+            title='Team Chat'
+            style={{ cursor: 'pointer' }}
           >
             <KTIcon iconName='message-text-2' className={toolbarButtonIconSizeClass} />
 
             <span className='bullet bullet-dot bg-success h-6px w-6px position-absolute translate-middle top-0 start-50 animation-blink'></span>
           </div>
-          {/* end::Menu wrapper */}
+          {/* end::Chat button */}
         </div>
 
         {/* SOFTPHONE */}

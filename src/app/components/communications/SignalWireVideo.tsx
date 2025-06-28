@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../supabaseClient';
 import { showToast } from '../../utils/toast';
 import * as SignalWire from '@signalwire/js';
 import { User } from '@supabase/supabase-js';
 
 const SignalWireVideo = () => {
+    const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [roomSession, setRoomSession] = useState<any>(null);
@@ -55,27 +57,19 @@ const SignalWireVideo = () => {
     const handleCreateMeeting = async () => {
         setIsLoading(true);
         setError(null);
-        setRoomSession(null);
-        setEventLog([]);
         
         try {
-            const { data, error: functionError } = await supabase.functions.invoke('create-signalwire-video-room', { 
-                body: { jobId: null } 
-            });
+            // Create a new instant meeting using the new video meeting system
+            const instantMeetingId = `instant-${Date.now()}`;
+            logEvent(`Room created: TradeWorks-Meeting-${instantMeetingId}`);
             
-            if (functionError) throw new Error(functionError.message);
-            if (data.error) throw new Error(data.error);
-            
-            if (data.roomName) {
-                setRoomName(data.roomName);
-                logEvent(`Room created: ${data.roomName}`);
-                await setupPreJoinScreen();
-            } else {
-                throw new Error('Could not retrieve room name from server.');
-            }
+            // Navigate to the new InCallWorkspace with the instant meeting
+            navigate(`/video-meeting/${instantMeetingId}/room`);
+            showToast.success('Meeting created! Redirecting to meeting room...');
         } catch (err: any) {
             console.error('Error creating meeting:', err);
             setError(err.message || 'An unknown error occurred.');
+        } finally {
             setIsLoading(false);
         }
     };
@@ -236,7 +230,7 @@ const SignalWireVideo = () => {
                 <h2 style={{margin: 0}}>Video Meeting</h2>
                 {!roomSession && !showPreJoin && ( 
                     <button onClick={handleCreateMeeting} disabled={isLoading} className="btn btn-primary">
-                        {isLoading ? 'Creating...' : '➕ Create & Join Meeting'}
+                        {isLoading ? 'Creating...' : '🚀 Create & Join Meeting'}
                     </button> 
                 )}
                 {roomSession && ( 
@@ -349,7 +343,7 @@ const SignalWireVideo = () => {
             {!roomSession && !showPreJoin && !isLoading && ( 
                 <div style={{ textAlign: 'center', padding: '4rem', border: '2px dashed #ccc', borderRadius: '8px', background: '#f9f9f9' }}>
                     <h3>No Active Meeting</h3>
-                    <p>Click "Create & Join Meeting" to start a video call.</p>
+                    <p>Click "🚀 Create & Join Meeting" to start a professional video meeting with agenda, notes, and collaboration tools.</p>
                 </div> 
             )}
         </div>

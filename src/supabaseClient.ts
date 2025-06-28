@@ -65,7 +65,7 @@ export interface Contact {
   email?: string
   phone?: string
   mobile?: string
-  is_primary: boolean
+  is_primary?: boolean // Made optional since it doesn't exist in the database
   notes?: string
   created_at: string
   updated_at: string

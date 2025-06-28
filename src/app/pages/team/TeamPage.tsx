@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import ModernTeamChat from '../../components/communications/ModernTeamChat'
+import InstantChatPopup from '../../components/communications/InstantChatPopup'
 
 interface TeamMember {
   id: string
@@ -20,6 +21,7 @@ interface TeamMember {
 
 const TeamPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'directory' | 'chat'>('directory')
+  const [activeChatMember, setActiveChatMember] = useState<TeamMember | null>(null)
   const [teamMembers] = useState<TeamMember[]>([
     {
       id: '1',
@@ -115,10 +117,9 @@ const TeamPage: React.FC = () => {
       <div className="d-flex justify-content-center mb-6">
         <ul className="nav nav-pills nav-line-tabs nav-line-tabs-2x border-transparent fs-6 fw-bold">
           <li className="nav-item">
-            <a 
-              className={`nav-link ${activeTab === 'directory' ? 'active' : 'text-muted'}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveTab('directory') }}
+            <button 
+              className={`nav-link border-0 bg-transparent ${activeTab === 'directory' ? 'active' : 'text-muted'}`}
+              onClick={() => setActiveTab('directory')}
             >
               <i className="ki-duotone ki-people fs-4 me-2">
                 <span className="path1"></span>
@@ -128,13 +129,12 @@ const TeamPage: React.FC = () => {
                 <span className="path5"></span>
               </i>
               Team Directory
-            </a>
+            </button>
           </li>
           <li className="nav-item">
-            <a 
-              className={`nav-link ${activeTab === 'chat' ? 'active' : 'text-muted'}`}
-              href="#"
-              onClick={(e) => { e.preventDefault(); setActiveTab('chat') }}
+            <button 
+              className={`nav-link border-0 bg-transparent ${activeTab === 'chat' ? 'active' : 'text-muted'}`}
+              onClick={() => setActiveTab('chat')}
             >
               <i className="ki-duotone ki-message-text fs-4 me-2">
                 <span className="path1"></span>
@@ -142,7 +142,7 @@ const TeamPage: React.FC = () => {
                 <span className="path3"></span>
               </i>
               Team Chat
-            </a>
+            </button>
           </li>
         </ul>
       </div>
@@ -250,10 +250,21 @@ const TeamPage: React.FC = () => {
                         </td>
                         <td>
                           <div className='d-flex justify-content-end flex-shrink-0'>
-                            <a
-                              href='#'
+                            <button
+                              className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
+                              title='Instant Chat'
+                              onClick={() => setActiveChatMember(member)}
+                            >
+                              <i className='ki-duotone ki-message-text-2 fs-3'>
+                                <span className='path1'></span>
+                                <span className='path2'></span>
+                                <span className='path3'></span>
+                              </i>
+                            </button>
+                            <button
                               className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
                               title='View Profile'
+                              onClick={() => console.log('View profile', member.id)}
                             >
                               <i className='ki-duotone ki-profile-user fs-3'>
                                 <span className='path1'></span>
@@ -261,27 +272,27 @@ const TeamPage: React.FC = () => {
                                 <span className='path3'></span>
                                 <span className='path4'></span>
                               </i>
-                            </a>
-                            <a
-                              href='#'
+                            </button>
+                            <button
                               className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
                               title='Edit'
+                              onClick={() => console.log('Edit member', member.id)}
                             >
                               <i className='ki-duotone ki-pencil fs-3'>
                                 <span className='path1'></span>
                                 <span className='path2'></span>
                               </i>
-                            </a>
-                            <a
-                              href='#'
+                            </button>
+                            <button
                               className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm'
                               title='Assign Job'
+                              onClick={() => console.log('Assign job to', member.id)}
                             >
                               <i className='ki-duotone ki-briefcase fs-3'>
                                 <span className='path1'></span>
                                 <span className='path2'></span>
                               </i>
-                            </a>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -299,6 +310,22 @@ const TeamPage: React.FC = () => {
         <div style={{ height: '70vh' }}>
           <ModernTeamChat />
         </div>
+      )}
+
+      {/* Instant Chat Popup */}
+      {activeChatMember && (
+        <InstantChatPopup
+          member={{
+            id: activeChatMember.id,
+            name: activeChatMember.name,
+            email: activeChatMember.email,
+            avatar: activeChatMember.avatar,
+            status: activeChatMember.status === 'active' ? 'online' : 
+                   activeChatMember.status === 'on-leave' ? 'away' : 'offline',
+            role: activeChatMember.role
+          }}
+          onClose={() => setActiveChatMember(null)}
+        />
       )}
     </>
   )

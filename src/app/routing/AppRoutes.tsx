@@ -39,11 +39,8 @@ const {VITE_BASE_URL} = import.meta.env
 const AppRoutes: FC = () => {
   const {currentUser, authLoading} = useSupabaseAuth() // Use the new authLoading state
   
-  console.log('AppRoutes - authLoading:', authLoading, 'currentUser:', currentUser)
-  
   // Only show the main loading screen during the initial auth check
   if (authLoading) {
-    console.log('AppRoutes - showing loading screen')
     return (
       <div style={{
         display: 'flex',
@@ -73,8 +70,6 @@ const AppRoutes: FC = () => {
       </div>
     )
   }
-  
-  console.log('AppRoutes - rendering routes, currentUser:', !!currentUser)
   
   return (
     <BrowserRouter basename={VITE_BASE_URL}>

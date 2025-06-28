@@ -56,7 +56,6 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
 
     // This listener just sets the raw session/user and stops the loading state.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id)
       setSession(session)
       setUser(session?.user ?? null)
       
@@ -186,9 +185,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
 }
 
 const SupabaseAuthInit: FC<WithChildren> = ({children}) => {
-  const { authLoading, currentUser } = useSupabaseAuth()
-
-  console.log('SupabaseAuthInit - authLoading:', authLoading, 'currentUser:', currentUser)
+  const { authLoading } = useSupabaseAuth()
 
   return authLoading ? <TradeWorksSplashScreen /> : <>{children}</>
 }

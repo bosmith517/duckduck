@@ -53,7 +53,6 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
     // If we have a user but we haven't fetched their detailed profile yet...
     if (user && !userProfile) {
       const fetchDetails = async () => {
-        console.log('User is logged in, now fetching details...')
         try {
           const { data: profile, error } = await supabase
             .from('user_profiles')
@@ -64,17 +63,27 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
           if (error) {
             console.error('Error fetching profile:', error)
             // Create a fallback profile if database doesn't exist
-            console.log('Creating fallback profile for user')
+            const fallbackProfile = {
+              id: user.id,
+              email: user.email || '',
+              first_name: user.user_metadata?.first_name || 'User',
+              last_name: user.user_metadata?.last_name || '',
+              tenant_id: '1', // Default tenant
+              role: 'admin' as const,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+            setUserProfile(fallbackProfile)
             return
           }
           
           if (profile) {
-            console.log('Profile found, updating context')
             setUserProfile(profile)
 
-            // Update the currentUser with proper profile data
+            // Update the currentUser with proper profile data only if ID changed
+            const newId = parseInt(profile.id) || 1
             const userModel = {
-              id: parseInt(profile.id) || 1,
+              id: newId,
               username: profile.email,
               password: undefined,
               email: profile.email,
@@ -83,7 +92,8 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
               fullname: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
               roles: profile.role === 'admin' ? [1] : [2],
             }
-            setCurrentUser(userModel)
+            // Only update if the user data actually changed to prevent infinite loops
+            setCurrentUser(prev => prev?.id !== newId ? userModel : prev)
 
             // Fetch tenant data
             const { data: tenant } = await supabase
@@ -93,7 +103,6 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
               .single()
             
             if (tenant) {
-              console.log('Tenant found, updating context')
               setTenant(tenant)
             }
           }
@@ -104,7 +113,7 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
 
       fetchDetails()
     }
-  }, [user, userProfile, setUserProfile, setTenant, setCurrentUser]) // This hook runs when the user object becomes available
+  }, [user?.id]) // Only run when user ID changes
 
   return (
     <PageDataProvider>

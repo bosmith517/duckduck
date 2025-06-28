@@ -19,46 +19,46 @@ const QuickLinks: FC = () => (
 
     <div className='row g-0'>
       <div className='col-6'>
-        <a
-          href='#'
+        <Link
+          to='/billing'
           className='d-flex flex-column flex-center h-100 p-6 bg-hover-light border-end border-bottom'
         >
           <KTIcon iconName='euro' className='fs-3x text-primary mb-2' />
-          <span className='fs-5 fw-semibold text-gray-800 mb-0'>Accounting</span>
-          <span className='fs-7 text-gray-500'>eCommerce</span>
-        </a>
+          <span className='fs-5 fw-semibold text-gray-800 mb-0'>Billing</span>
+          <span className='fs-7 text-gray-500'>Invoices & Payments</span>
+        </Link>
       </div>
 
       <div className='col-6'>
-        <a
-          href='#'
+        <Link
+          to='/settings'
           className='d-flex flex-column flex-center h-100 p-6 bg-hover-light border-bottom'
         >
-          <KTIcon iconName='sms' className='fs-3x text-primary mb-2' />
-          <span className='fs-5 fw-semibold text-gray-800 mb-0'>Administration</span>
-          <span className='fs-7 text-gray-500'>Console</span>
-        </a>
+          <KTIcon iconName='setting-3' className='fs-3x text-primary mb-2' />
+          <span className='fs-5 fw-semibold text-gray-800 mb-0'>Settings</span>
+          <span className='fs-7 text-gray-500'>Configuration</span>
+        </Link>
       </div>
 
       <div className='col-6'>
-        <a href='#' className='d-flex flex-column flex-center h-100 p-6 bg-hover-light border-end'>
+        <Link to='/jobs' className='d-flex flex-column flex-center h-100 p-6 bg-hover-light border-end'>
           <KTIcon iconName='abstract-41' className='fs-3x text-primary mb-2' />
           <span className='fs-5 fw-semibold text-gray-800 mb-0'>Projects</span>
-          <span className='fs-7 text-gray-500'>Pending Tasks</span>
-        </a>
+          <span className='fs-7 text-gray-500'>Active Jobs</span>
+        </Link>
       </div>
 
       <div className='col-6'>
-        <a href='#' className='d-flex flex-column flex-center h-100 p-6 bg-hover-light'>
-          <KTIcon iconName='briefcase' className='fs-3x text-primary mb-2' />
-          <span className='fs-5 fw-semibold text-gray-800 mb-0'>Customers</span>
-          <span className='fs-7 text-gray-500'>Latest cases</span>
-        </a>
+        <Link to='/contacts' className='d-flex flex-column flex-center h-100 p-6 bg-hover-light'>
+          <KTIcon iconName='profile-user' className='fs-3x text-primary mb-2' />
+          <span className='fs-5 fw-semibold text-gray-800 mb-0'>Contacts</span>
+          <span className='fs-7 text-gray-500'>Customer Directory</span>
+        </Link>
       </div>
     </div>
 
     <div className='py-2 text-center border-top'>
-      <Link to='/crafted/pages/profile' className='btn btn-color-gray-600 btn-active-color-primary'>
+      <Link to='/dashboard' className='btn btn-color-gray-600 btn-active-color-primary'>
         View All <KTIcon iconName='arrow-right' className='fs-5' />
       </Link>
     </div>

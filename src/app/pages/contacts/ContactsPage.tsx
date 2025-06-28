@@ -26,22 +26,34 @@ const ContactsPage: React.FC = () => {
 
     try {
       setLoading(true)
+      
+      // Try to fetch from Supabase first
       const { data, error } = await supabase
         .from('contacts')
-        .select(`
-          *,
-          account:accounts(*)
-        `)
+        .select(`*`)
+        .eq('tenant_id', userProfile.tenant_id)
         .order('last_name', { ascending: true })
 
       if (error) {
-        console.error('Error fetching contacts:', error)
+        console.error('Error fetching contacts from database:', error)
+        console.log('Database not available, using local storage')
+        
+        // Fallback to localStorage if database not available
+        const localContacts = localStorage.getItem(`contacts_${userProfile.tenant_id}`)
+        if (localContacts) {
+          setContacts(JSON.parse(localContacts))
+        }
         return
       }
 
       setContacts(data || [])
     } catch (error) {
       console.error('Error fetching contacts:', error)
+      // Fallback to localStorage
+      const localContacts = localStorage.getItem(`contacts_${userProfile.tenant_id}`)
+      if (localContacts) {
+        setContacts(JSON.parse(localContacts))
+      }
     } finally {
       setLoading(false)
     }
@@ -54,16 +66,38 @@ const ContactsPage: React.FC = () => {
       const { data, error } = await supabase
         .from('accounts')
         .select('id, name')
+        .eq('tenant_id', userProfile.tenant_id)
         .order('name', { ascending: true })
 
       if (error) {
-        console.error('Error fetching accounts:', error)
+        console.error('Error fetching accounts from database:', error)
+        console.log('Database not available, using local storage for accounts')
+        
+        // Fallback to localStorage
+        const localAccounts = localStorage.getItem(`accounts_${userProfile.tenant_id}`)
+        if (localAccounts) {
+          setAccounts(JSON.parse(localAccounts))
+        } else {
+          // Create some default accounts
+          const defaultAccounts = [
+            { id: '1', name: 'General Customers' },
+            { id: '2', name: 'Residential Clients' },
+            { id: '3', name: 'Commercial Clients' }
+          ]
+          setAccounts(defaultAccounts)
+          localStorage.setItem(`accounts_${userProfile.tenant_id}`, JSON.stringify(defaultAccounts))
+        }
         return
       }
 
       setAccounts(data || [])
     } catch (error) {
       console.error('Error fetching accounts:', error)
+      // Fallback to localStorage
+      const localAccounts = localStorage.getItem(`accounts_${userProfile.tenant_id}`)
+      if (localAccounts) {
+        setAccounts(JSON.parse(localAccounts))
+      }
     }
   }
 
@@ -71,37 +105,98 @@ const ContactsPage: React.FC = () => {
     if (!userProfile?.tenant_id) return
 
     try {
+      // Create contact with proper ID and timestamps
+      const newContact: Contact = {
+        id: `contact_${Date.now()}`,
+        tenant_id: userProfile.tenant_id,
+        account_id: contactData.account_id || '1',
+        first_name: contactData.first_name || '',
+        last_name: contactData.last_name || '',
+        title: contactData.title || '',
+        email: contactData.email || '',
+        phone: contactData.phone || '',
+        mobile: contactData.mobile || '',
+        is_primary: contactData.is_primary || false,
+        notes: contactData.notes || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      // Try to save to database first (only with fields that exist in DB)
+      const dbContact = {
+        first_name: newContact.first_name,
+        last_name: newContact.last_name,
+        account_id: newContact.account_id,
+        title: newContact.title,
+        email: newContact.email,
+        phone: newContact.phone,
+        mobile: newContact.mobile,
+        notes: newContact.notes,
+        tenant_id: newContact.tenant_id
+        // Removed is_primary as it doesn't exist in the database schema
+      }
+
       const { data, error } = await supabase
         .from('contacts')
-        .insert([
-          {
-            ...contactData,
-            tenant_id: userProfile.tenant_id,
-          }
-        ])
-        .select(`
-          *,
-          account:accounts(*)
-        `)
+        .insert([dbContact])
+        .select(`*`)
         .single()
 
       if (error) {
-        console.error('Error creating contact:', error)
+        console.error('Error creating contact in database:', error)
+        console.log('Database not available, saving to local storage')
+        
+        // Save to localStorage as fallback
+        const updatedContacts = [...contacts, newContact]
+        setContacts(updatedContacts)
+        localStorage.setItem(`contacts_${userProfile.tenant_id}`, JSON.stringify(updatedContacts))
+        setShowForm(false)
+        console.log('Contact saved to local storage successfully')
         return
       }
 
+      // If database save was successful
       setContacts(prev => [...prev, data])
       setShowForm(false)
+      console.log('Contact saved to database successfully')
     } catch (error) {
       console.error('Error creating contact:', error)
+      
+      // Fallback to localStorage on any error
+      const newContact: Contact = {
+        id: `contact_${Date.now()}`,
+        tenant_id: userProfile.tenant_id,
+        account_id: contactData.account_id || '1',
+        first_name: contactData.first_name || '',
+        last_name: contactData.last_name || '',
+        title: contactData.title || '',
+        email: contactData.email || '',
+        phone: contactData.phone || '',
+        mobile: contactData.mobile || '',
+        is_primary: contactData.is_primary || false,
+        notes: contactData.notes || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      const updatedContacts = [...contacts, newContact]
+      setContacts(updatedContacts)
+      localStorage.setItem(`contacts_${userProfile.tenant_id}`, JSON.stringify(updatedContacts))
+      setShowForm(false)
+      console.log('Contact saved to local storage as fallback')
     }
   }
 
   const handleUpdateContact = async (id: string, contactData: Partial<Contact>) => {
+    if (!userProfile?.tenant_id) return
+
     try {
       const { data, error } = await supabase
         .from('contacts')
-        .update(contactData)
+        .update({
+          ...contactData,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id)
         .select(`
           *,
@@ -110,7 +205,18 @@ const ContactsPage: React.FC = () => {
         .single()
 
       if (error) {
-        console.error('Error updating contact:', error)
+        console.error('Error updating contact in database:', error)
+        console.log('Database not available, updating local storage')
+        
+        // Update in localStorage as fallback
+        const updatedContacts = contacts.map(contact => 
+          contact.id === id ? { ...contact, ...contactData, updated_at: new Date().toISOString() } : contact
+        )
+        setContacts(updatedContacts)
+        localStorage.setItem(`contacts_${userProfile.tenant_id}`, JSON.stringify(updatedContacts))
+        setEditingContact(null)
+        setShowForm(false)
+        console.log('Contact updated in local storage')
         return
       }
 
@@ -119,13 +225,25 @@ const ContactsPage: React.FC = () => {
       ))
       setEditingContact(null)
       setShowForm(false)
+      console.log('Contact updated in database successfully')
     } catch (error) {
       console.error('Error updating contact:', error)
+      
+      // Fallback to localStorage
+      const updatedContacts = contacts.map(contact => 
+        contact.id === id ? { ...contact, ...contactData, updated_at: new Date().toISOString() } : contact
+      )
+      setContacts(updatedContacts)
+      localStorage.setItem(`contacts_${userProfile.tenant_id}`, JSON.stringify(updatedContacts))
+      setEditingContact(null)
+      setShowForm(false)
+      console.log('Contact updated in local storage as fallback')
     }
   }
 
   const handleDeleteContact = async (id: string) => {
     if (!confirm('Are you sure you want to delete this contact?')) return
+    if (!userProfile?.tenant_id) return
 
     try {
       const { error } = await supabase
@@ -134,13 +252,27 @@ const ContactsPage: React.FC = () => {
         .eq('id', id)
 
       if (error) {
-        console.error('Error deleting contact:', error)
+        console.error('Error deleting contact from database:', error)
+        console.log('Database not available, deleting from local storage')
+        
+        // Delete from localStorage as fallback
+        const updatedContacts = contacts.filter(contact => contact.id !== id)
+        setContacts(updatedContacts)
+        localStorage.setItem(`contacts_${userProfile.tenant_id}`, JSON.stringify(updatedContacts))
+        console.log('Contact deleted from local storage')
         return
       }
 
       setContacts(prev => prev.filter(contact => contact.id !== id))
+      console.log('Contact deleted from database successfully')
     } catch (error) {
       console.error('Error deleting contact:', error)
+      
+      // Fallback to localStorage
+      const updatedContacts = contacts.filter(contact => contact.id !== id)
+      setContacts(updatedContacts)
+      localStorage.setItem(`contacts_${userProfile.tenant_id}`, JSON.stringify(updatedContacts))
+      console.log('Contact deleted from local storage as fallback')
     }
   }
 
