@@ -1,37 +1,67 @@
 import React, {FC, useEffect, useRef, useState} from 'react'
+import {useNavigate} from 'react-router-dom'
 import {SearchComponent} from '../../../assets/ts/components'
-import {KTIcon, toAbsoluteUrl} from '../../../helpers'
+import {KTIcon} from '../../../helpers'
+import {SearchService, SearchCategory, SearchResult} from '../../../../app/services/searchService'
+import {useSupabaseAuth} from '../../../../app/modules/auth/core/SupabaseAuth'
 
 const Search: FC = () => {
+  const navigate = useNavigate()
+  const {userProfile} = useSupabaseAuth()
   const [menuState, setMenuState] = useState<'main' | 'advanced' | 'preferences'>('main')
+  const [searchResults, setSearchResults] = useState<SearchCategory[]>([])
+  const [recentSearches, setRecentSearches] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  
   const element = useRef<HTMLDivElement | null>(null)
   const wrapperElement = useRef<HTMLDivElement | null>(null)
   const resultsElement = useRef<HTMLDivElement | null>(null)
   const suggestionsElement = useRef<HTMLDivElement | null>(null)
   const emptyElement = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
 
-  const processs = (search: SearchComponent) => {
-    setTimeout(function () {
-      const number = Math.floor(Math.random() * 6) + 1
-
-      // Hide recently viewed
-      suggestionsElement.current!.classList.add('d-none')
-
-      if (number === 3) {
-        // Hide results
-        resultsElement.current!.classList.add('d-none')
-        // Show empty message
-        emptyElement.current!.classList.remove('d-none')
-      } else {
-        // Show results
-        resultsElement.current!.classList.remove('d-none')
-        // Hide empty message
-        emptyElement.current!.classList.add('d-none')
-      }
-
-      // Complete search
+  const processs = async (search: SearchComponent) => {
+    const query = searchInputRef.current?.value || ''
+    
+    if (!query || query.length < 2) {
       search.complete()
-    }, 1500)
+      return
+    }
+
+    setIsSearching(true)
+    setSearchQuery(query)
+    
+    // Hide recently viewed
+    suggestionsElement.current!.classList.add('d-none')
+
+    try {
+      if (userProfile?.tenant_id) {
+        const results = await SearchService.performGlobalSearch(query, userProfile.tenant_id)
+        setSearchResults(results)
+        
+        if (results.length === 0) {
+          // Hide results
+          resultsElement.current!.classList.add('d-none')
+          // Show empty message
+          emptyElement.current!.classList.remove('d-none')
+        } else {
+          // Show results
+          resultsElement.current!.classList.remove('d-none')
+          // Hide empty message
+          emptyElement.current!.classList.add('d-none')
+        }
+      }
+    } catch (error) {
+      console.error('Search error:', error)
+      // Hide results
+      resultsElement.current!.classList.add('d-none')
+      // Show empty message
+      emptyElement.current!.classList.remove('d-none')
+    } finally {
+      setIsSearching(false)
+      search.complete()
+    }
   }
 
   const clear = () => {
@@ -41,6 +71,16 @@ const Search: FC = () => {
     resultsElement.current!.classList.add('d-none')
     // Hide empty message
     emptyElement.current!.classList.add('d-none')
+    // Clear search results
+    setSearchResults([])
+    setSearchQuery('')
+  }
+
+  const handleResultClick = (result: SearchResult) => {
+    navigate(result.url)
+    // Clear the search modal
+    const searchComponent = SearchComponent.getInstance(element.current!)
+    searchComponent?.hide()
   }
 
   useEffect(() => {
@@ -52,7 +92,19 @@ const Search: FC = () => {
 
     // Clear handler
     searchObject!.on('kt.search.clear', clear)
-  }, [])
+  }, [userProfile])
+
+  useEffect(() => {
+    // Load recent searches when component mounts
+    const loadRecentSearches = async () => {
+      if (userProfile?.tenant_id) {
+        const recent = await SearchService.getRecentSearches(userProfile.tenant_id)
+        setRecentSearches(recent)
+      }
+    }
+    
+    loadRecentSearches()
+  }, [userProfile])
 
   return (
     <>
@@ -99,10 +151,11 @@ const Search: FC = () => {
               />
 
               <input
+                ref={searchInputRef}
                 type='text'
                 className='form-control form-control-flush ps-10'
                 name='search'
-                placeholder='Search...'
+                placeholder='Search contacts, accounts, jobs...'
                 data-kt-search-element='input'
               />
 
@@ -152,370 +205,75 @@ const Search: FC = () => {
 
             <div ref={resultsElement} data-kt-search-element='results' className='d-none'>
               <div className='scroll-y mh-200px mh-lg-350px'>
-                <h3 className='fs-5 text-muted m-0 pb-5' data-kt-search-element='category-title'>
-                  Users
-                </h3>
+                {searchResults.map((category, categoryIndex) => (
+                  <div key={categoryIndex}>
+                    <h3 className='fs-5 text-muted m-0 pb-5' data-kt-search-element='category-title'>
+                      {category.name}
+                    </h3>
+                    {category.results.map((result, resultIndex) => (
+                      <a
+                        key={resultIndex}
+                        href='#'
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handleResultClick(result)
+                        }}
+                        className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
+                      >
+                        <div className='symbol symbol-40px me-4'>
+                          <span className='symbol-label bg-light'>
+                            <KTIcon iconName={result.icon || 'abstract-8'} className='fs-2 text-primary' />
+                          </span>
+                        </div>
 
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <img src={toAbsoluteUrl('media/avatars/300-6.jpg')} alt='' />
+                        <div className='d-flex flex-column justify-content-start fw-semibold'>
+                          <span className='fs-6 fw-semibold'>{result.title}</span>
+                          {result.subtitle && (
+                            <span className='fs-7 fw-semibold text-muted'>{result.subtitle}</span>
+                          )}
+                        </div>
+                      </a>
+                    ))}
                   </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Karina Clark</span>
-                    <span className='fs-7 fw-semibold text-muted'>Marketing Manager</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <img src={toAbsoluteUrl('media/avatars/300-2.jpg')} alt='' />
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Olivia Bold</span>
-                    <span className='fs-7 fw-semibold text-muted'>Software Engineer</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <img src={toAbsoluteUrl('media/avatars/300-9.jpg')} alt='' />
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Ana Clark</span>
-                    <span className='fs-7 fw-semibold text-muted'>UI/UX Designer</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <img src={toAbsoluteUrl('media/avatars/300-14.jpg')} alt='' />
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Nick Pitola</span>
-                    <span className='fs-7 fw-semibold text-muted'>Art Director</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <img src={toAbsoluteUrl('media/avatars/300-11.jpg')} alt='' />
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Edward Kulnic</span>
-                    <span className='fs-7 fw-semibold text-muted'>System Administrator</span>
-                  </div>
-                </a>
-
-                <h3
-                  className='fs-5 text-muted m-0 pt-5 pb-5'
-                  data-kt-search-element='category-title'
-                >
-                  Customers
-                </h3>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <img
-                        className='w-20px h-20px'
-                        src={toAbsoluteUrl('media/svg/brand-logos/volicity-9.svg')}
-                        alt=''
-                      />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Company Rbranding</span>
-                    <span className='fs-7 fw-semibold text-muted'>UI Design</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <img
-                        className='w-20px h-20px'
-                        src={toAbsoluteUrl('media/svg/brand-logos/tvit.svg')}
-                        alt=''
-                      />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Company Re-branding</span>
-                    <span className='fs-7 fw-semibold text-muted'>Web Development</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <img
-                        className='w-20px h-20px'
-                        src={toAbsoluteUrl('media/svg/misc/infography.svg')}
-                        alt=''
-                      />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Business Analytics App</span>
-                    <span className='fs-7 fw-semibold text-muted'>Administration</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <img
-                        className='w-20px h-20px'
-                        src={toAbsoluteUrl('media/svg/brand-logos/leaf.svg')}
-                        alt=''
-                      />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>EcoLeaf App Launch</span>
-                    <span className='fs-7 fw-semibold text-muted'>Marketing</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <img
-                        className='w-20px h-20px'
-                        src={toAbsoluteUrl('media/svg/brand-logos/tower.svg')}
-                        alt=''
-                      />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column justify-content-start fw-semibold'>
-                    <span className='fs-6 fw-semibold'>Tower Group Website</span>
-                    <span className='fs-7 fw-semibold text-muted'>Google Adwords</span>
-                  </div>
-                </a>
-
-                <h3
-                  className='fs-5 text-muted m-0 pt-5 pb-5'
-                  data-kt-search-element='category-title'
-                >
-                  Projects
-                </h3>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='document' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <span className='fs-6 fw-semibold'>Si-Fi Project by AU Themes</span>
-                    <span className='fs-7 fw-semibold text-muted'>#45670</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='chart-simple' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <span className='fs-6 fw-semibold'>Shopix Mobile App Planning</span>
-                    <span className='fs-7 fw-semibold text-muted'>#45690</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='message-text-2' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <span className='fs-6 fw-semibold'>Finance Monitoring SAAS Discussion</span>
-                    <span className='fs-7 fw-semibold text-muted'>#21090</span>
-                  </div>
-                </a>
-
-                <a
-                  href='/#'
-                  className='d-flex text-gray-900 text-hover-primary align-items-center mb-5'
-                >
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='profile-circle' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <span className='fs-6 fw-semibold'>Dashboard Analitics Launch</span>
-                    <span className='fs-7 fw-semibold text-muted'>#34560</span>
-                  </div>
-                </a>
+                ))}
               </div>
             </div>
 
             <div ref={suggestionsElement} className='mb-4' data-kt-search-element='main'>
               <div className='d-flex flex-stack fw-semibold mb-4'>
-                <span className='text-muted fs-6 me-2'>Recently Searched:</span>
+                <span className='text-muted fs-6 me-2'>Recently Viewed:</span>
               </div>
 
               <div className='scroll-y mh-200px mh-lg-325px'>
-                <div className='d-flex align-items-center mb-5'>
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='phone' className='fs-2 text-primary' />
-                    </span>
-                  </div>
+                {recentSearches.length > 0 ? (
+                  recentSearches.map((item, index) => (
+                    <div 
+                      key={index}
+                      className='d-flex align-items-center mb-5 cursor-pointer'
+                      onClick={() => handleResultClick(item)}
+                    >
+                      <div className='symbol symbol-40px me-4'>
+                        <span className='symbol-label bg-light'>
+                          <KTIcon iconName={item.icon || 'abstract-8'} className='fs-2 text-primary' />
+                        </span>
+                      </div>
 
-                  <div className='d-flex flex-column'>
-                    <a href='/#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
-                      BoomApp by Keenthemes
-                    </a>
-                    <span className='fs-7 text-muted fw-semibold'>#45789</span>
+                      <div className='d-flex flex-column'>
+                        <a href='#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
+                          {item.title}
+                        </a>
+                        {item.subtitle && (
+                          <span className='fs-7 text-muted fw-semibold'>{item.subtitle}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className='text-center text-muted py-10'>
+                    <p>No recent items</p>
+                    <p className='fs-7'>Start searching to see your recent items here</p>
                   </div>
-                </div>
-
-                <div className='d-flex align-items-center mb-5'>
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='chart-simple' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <a href='/#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
-                      "Kept API Project Meeting
-                    </a>
-                    <span className='fs-7 text-muted fw-semibold'>#84050</span>
-                  </div>
-                </div>
-
-                <div className='d-flex align-items-center mb-5'>
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='chart' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <a href='/#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
-                      "KPI Monitoring App Launch
-                    </a>
-                    <span className='fs-7 text-muted fw-semibold'>#84250</span>
-                  </div>
-                </div>
-
-                <div className='d-flex align-items-center mb-5'>
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='chart-simple-3' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <a href='/#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
-                      Project Reference FAQ
-                    </a>
-                    <span className='fs-7 text-muted fw-semibold'>#67945</span>
-                  </div>
-                </div>
-
-                <div className='d-flex align-items-center mb-5'>
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='sms' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <a href='/#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
-                      "FitPro App Development
-                    </a>
-                    <span className='fs-7 text-muted fw-semibold'>#84250</span>
-                  </div>
-                </div>
-
-                <div className='d-flex align-items-center mb-5'>
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='bank' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <a href='/#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
-                      Shopix Mobile App
-                    </a>
-                    <span className='fs-7 text-muted fw-semibold'>#45690</span>
-                  </div>
-                </div>
-
-                <div className='d-flex align-items-center mb-5'>
-                  <div className='symbol symbol-40px me-4'>
-                    <span className='symbol-label bg-light'>
-                      <KTIcon iconName='chart-simple-3' className='fs-2 text-primary' />
-                    </span>
-                  </div>
-
-                  <div className='d-flex flex-column'>
-                    <a href='/#' className='fs-6 text-gray-800 text-hover-primary fw-semibold'>
-                      "Landing UI Design" Launch
-                    </a>
-                    <span className='fs-7 text-muted fw-semibold'>#24005</span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -559,108 +317,25 @@ const Search: FC = () => {
                 </label>
 
                 <label>
-                  <input type='radio' className='btn-check' name='type' value='users' />
+                  <input type='radio' className='btn-check' name='type' value='contacts' />
                   <span className='btn btn-sm btn-color-muted btn-active btn-active-primary px-4'>
-                    Users
+                    Contacts
                   </span>
                 </label>
 
                 <label>
-                  <input type='radio' className='btn-check' name='type' value='orders' />
+                  <input type='radio' className='btn-check' name='type' value='accounts' />
                   <span className='btn btn-sm btn-color-muted btn-active btn-active-primary px-4'>
-                    Orders
+                    Accounts
                   </span>
                 </label>
 
                 <label>
-                  <input type='radio' className='btn-check' name='type' value='projects' />
+                  <input type='radio' className='btn-check' name='type' value='jobs' />
                   <span className='btn btn-sm btn-color-muted btn-active btn-active-primary px-4'>
-                    Projects
+                    Jobs
                   </span>
                 </label>
-              </div>
-            </div>
-
-            <div className='mb-5'>
-              <input
-                type='text'
-                name='assignedto'
-                className='form-control form-control-sm form-control-solid'
-                placeholder='Assigned to'
-              />
-            </div>
-
-            <div className='mb-5'>
-              <input
-                type='text'
-                name='collaborators'
-                className='form-control form-control-sm form-control-solid'
-                placeholder='Collaborators'
-              />
-            </div>
-
-            <div className='mb-5'>
-              <div className='nav-group nav-group-fluid'>
-                <label>
-                  <input
-                    type='radio'
-                    className='btn-check'
-                    name='attachment'
-                    value='has'
-                    defaultChecked
-                  />
-                  <span className='btn btn-sm btn-color-muted btn-active btn-active-primary'>
-                    Has attachment
-                  </span>
-                </label>
-
-                <label>
-                  <input type='radio' className='btn-check' name='attachment' value='any' />
-                  <span className='btn btn-sm btn-color-muted btn-active btn-active-primary px-4'>
-                    Any
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <div className='mb-5'>
-              <select
-                name='timezone'
-                aria-label='Select a Timezone'
-                data-control='select2'
-                data-placeholder='date_period'
-                className='form-select form-select-sm form-select-solid'
-              >
-                <option value='next'>Within the next</option>
-                <option value='last'>Within the last</option>
-                <option value='between'>Between</option>
-                <option value='on'>On</option>
-              </select>
-            </div>
-
-            <div className='row mb-8'>
-              <div className='col-6'>
-                <input
-                  type='number'
-                  name='date_number'
-                  className='form-control form-control-sm form-control-solid'
-                  placeholder='Lenght'
-                />
-              </div>
-
-              <div className='col-6'>
-                <select
-                  name='date_typer'
-                  aria-label='Select a Timezone'
-                  data-control='select2'
-                  data-placeholder='Period'
-                  className='form-select form-select-sm form-select-solid'
-                >
-                  <option value='days'>Days</option>
-                  <option value='weeks'>Weeks</option>
-                  <option value='months'>Months</option>
-                  <option value='years'>Years</option>
-                </select>
               </div>
             </div>
 
@@ -691,17 +366,7 @@ const Search: FC = () => {
             <div className='pb-4 border-bottom'>
               <label className='form-check form-switch form-switch-sm form-check-custom form-check-solid flex-stack'>
                 <span className='form-check-label text-gray-700 fs-6 fw-semibold ms-0 me-2'>
-                  Projects
-                </span>
-
-                <input className='form-check-input' type='checkbox' value='1' defaultChecked />
-              </label>
-            </div>
-
-            <div className='py-4 border-bottom'>
-              <label className='form-check form-switch form-switch-sm form-check-custom form-check-solid flex-stack'>
-                <span className='form-check-label text-gray-700 fs-6 fw-semibold ms-0 me-2'>
-                  Targets
+                  Contacts
                 </span>
                 <input className='form-check-input' type='checkbox' value='1' defaultChecked />
               </label>
@@ -710,16 +375,7 @@ const Search: FC = () => {
             <div className='py-4 border-bottom'>
               <label className='form-check form-switch form-switch-sm form-check-custom form-check-solid flex-stack'>
                 <span className='form-check-label text-gray-700 fs-6 fw-semibold ms-0 me-2'>
-                  Affiliate Programs
-                </span>
-                <input className='form-check-input' type='checkbox' value='1' />
-              </label>
-            </div>
-
-            <div className='py-4 border-bottom'>
-              <label className='form-check form-switch form-switch-sm form-check-custom form-check-solid flex-stack'>
-                <span className='form-check-label text-gray-700 fs-6 fw-semibold ms-0 me-2'>
-                  Referrals
+                  Accounts
                 </span>
                 <input className='form-check-input' type='checkbox' value='1' defaultChecked />
               </label>
@@ -728,9 +384,27 @@ const Search: FC = () => {
             <div className='py-4 border-bottom'>
               <label className='form-check form-switch form-switch-sm form-check-custom form-check-solid flex-stack'>
                 <span className='form-check-label text-gray-700 fs-6 fw-semibold ms-0 me-2'>
-                  Users
+                  Jobs
                 </span>
-                <input className='form-check-input' type='checkbox' />
+                <input className='form-check-input' type='checkbox' value='1' defaultChecked />
+              </label>
+            </div>
+
+            <div className='py-4 border-bottom'>
+              <label className='form-check form-switch form-switch-sm form-check-custom form-check-solid flex-stack'>
+                <span className='form-check-label text-gray-700 fs-6 fw-semibold ms-0 me-2'>
+                  Invoices
+                </span>
+                <input className='form-check-input' type='checkbox' value='1' defaultChecked />
+              </label>
+            </div>
+
+            <div className='py-4 border-bottom'>
+              <label className='form-check form-switch form-switch-sm form-check-custom form-check-solid flex-stack'>
+                <span className='form-check-label text-gray-700 fs-6 fw-semibold ms-0 me-2'>
+                  Estimates
+                </span>
+                <input className='form-check-input' type='checkbox' value='1' defaultChecked />
               </label>
             </div>
 

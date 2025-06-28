@@ -59,13 +59,16 @@ export interface Contact {
   id: string
   tenant_id: string
   account_id: string
+  name?: string
   first_name: string
   last_name: string
   title?: string
+  company?: string
+  job_title?: string
   email?: string
   phone?: string
   mobile?: string
-  is_primary?: boolean // Made optional since it doesn't exist in the database
+  is_primary?: boolean // Local storage only field
   notes?: string
   created_at: string
   updated_at: string

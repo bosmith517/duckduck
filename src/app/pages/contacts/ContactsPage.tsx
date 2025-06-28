@@ -122,10 +122,11 @@ const ContactsPage: React.FC = () => {
         updated_at: new Date().toISOString()
       }
 
-      // Try to save to database first (only with fields that exist in DB)
+      // Try to save to database first (with all available fields after schema fix)
       const dbContact = {
         first_name: newContact.first_name,
         last_name: newContact.last_name,
+        name: `${newContact.first_name} ${newContact.last_name}`.trim(),
         account_id: newContact.account_id,
         title: newContact.title,
         email: newContact.email,
@@ -133,7 +134,7 @@ const ContactsPage: React.FC = () => {
         mobile: newContact.mobile,
         notes: newContact.notes,
         tenant_id: newContact.tenant_id
-        // Removed is_primary as it doesn't exist in the database schema
+        // Note: is_primary is kept in local storage only
       }
 
       const { data, error } = await supabase

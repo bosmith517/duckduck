@@ -16,7 +16,6 @@ __tests__/
 supabase/
 scripts/
 docs/
-.env
 
 # Ignore large assets that aren't needed
 public/videos/

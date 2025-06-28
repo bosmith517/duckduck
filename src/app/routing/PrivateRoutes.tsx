@@ -507,11 +507,7 @@ const PrivateRoutes = () => {
         <Route path='settings/integrations' element={<Navigate to='/settings' />} />
         <Route path='settings/system' element={<Navigate to='/settings' />} />
         
-        <Route path='profile/overview' element={<Navigate to='/profile' />} />
-        <Route path='profile/projects' element={<Navigate to='/profile' />} />
-        <Route path='profile/campaigns' element={<Navigate to='/profile' />} />
-        <Route path='profile/documents' element={<Navigate to='/profile' />} />
-        <Route path='profile/connections' element={<Navigate to='/profile' />} />
+        {/* Profile sub-routes are handled by ProfilePage internally */}
         
         {/* Page Not Found */}
         <Route path='*' element={<Navigate to='/error/404' />} />

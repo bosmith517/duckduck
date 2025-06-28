@@ -1,4 +1,4 @@
-import {FC, useEffect} from 'react'
+import {FC, useEffect, useCallback} from 'react'
 import {Outlet, useLocation} from 'react-router-dom'
 import {Footer} from './components/Footer'
 import {HeaderWrapper} from './components/header/HeaderWrapper'
@@ -48,6 +48,11 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
     themeModeSwitchHelper(mode)
   }, [mode])
 
+  // Memoize the state setters to avoid unnecessary re-renders
+  const stableSetUserProfile = useCallback(setUserProfile, [])
+  const stableSetCurrentUser = useCallback(setCurrentUser, [])
+  const stableSetTenant = useCallback(setTenant, [])
+
   // Fetch detailed profile data after user is authenticated
   useEffect(() => {
     // If we have a user but we haven't fetched their detailed profile yet...
@@ -73,12 +78,12 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             }
-            setUserProfile(fallbackProfile)
+            stableSetUserProfile(fallbackProfile)
             return
           }
           
           if (profile) {
-            setUserProfile(profile)
+            stableSetUserProfile(profile)
 
             // Update the currentUser with proper profile data only if ID changed
             const newId = parseInt(profile.id) || 1
@@ -93,7 +98,7 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
               roles: profile.role === 'admin' ? [1] : [2],
             }
             // Only update if the user data actually changed to prevent infinite loops
-            setCurrentUser(prev => prev?.id !== newId ? userModel : prev)
+            stableSetCurrentUser(prev => prev?.id !== newId ? userModel : prev)
 
             // Fetch tenant data
             const { data: tenant } = await supabase
@@ -103,7 +108,7 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
               .single()
             
             if (tenant) {
-              setTenant(tenant)
+              stableSetTenant(tenant)
             }
           }
         } catch (error) {
@@ -113,7 +118,7 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
 
       fetchDetails()
     }
-  }, [user?.id]) // Only run when user ID changes
+  }, [user?.id, userProfile, stableSetUserProfile, stableSetCurrentUser, stableSetTenant])
 
   return (
     <PageDataProvider>
