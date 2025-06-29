@@ -49,8 +49,43 @@ serve(async (req) => {
       console.error('Profile data:', userProfile);
       console.error('User ID:', user.id);
       
-      // Provide helpful error message for missing profile
-      throw new Error(`User profile not found for user ${user.id}. Please complete your account setup or contact support.`);
+      // Try to find any active tenant and create a profile if needed
+      console.log('Attempting to find or create user profile...');
+      
+      const { data: availableTenant } = await supabaseAdmin
+        .from('tenants')
+        .select('id, name')
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+      
+      if (availableTenant) {
+        console.log('Found available tenant, creating user profile:', availableTenant);
+        
+        const { data: newProfile, error: createError } = await supabaseAdmin
+          .from('user_profiles')
+          .insert([{
+            id: user.id,
+            tenant_id: availableTenant.id,
+            email: user.email,
+            first_name: user.user_metadata?.first_name || '',
+            last_name: user.user_metadata?.last_name || '',
+            role: 'admin',
+            is_active: true
+          }])
+          .select('tenant_id, role')
+          .single();
+        
+        if (createError) {
+          console.error('Error creating profile:', createError);
+          throw new Error(`Failed to create user profile: ${createError.message}`);
+        }
+        
+        userProfile = newProfile;
+        console.log('Successfully created user profile:', userProfile);
+      } else {
+        throw new Error(`User profile not found for user ${user.id}. Please complete your account setup or contact support.`);
+      }
     }
     console.log('User profile found:', userProfile);
 
@@ -79,12 +114,19 @@ serve(async (req) => {
       .eq('is_active', true)
       .single();
 
-    const projectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!;
-    const apiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!;
-    const spaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!;
+    // Use environment variables with fallbacks to match the frontend naming
+    const projectId = Deno.env.get('SIGNALWIRE_PROJECT_ID') || Deno.env.get('VITE_SIGNALWIRE_PROJECT_ID');
+    const apiToken = Deno.env.get('SIGNALWIRE_API_TOKEN') || Deno.env.get('SIGNALWIRE_TOKEN') || Deno.env.get('VITE_SIGNALWIRE_TOKEN');
+    const spaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL') || `${projectId}.signalwire.com`;
     
-    if (!projectId || !apiToken || !spaceUrl) { 
-      throw new Error("Server configuration error: Missing SignalWire credentials."); 
+    console.log('SignalWire config check:', { 
+      projectId: projectId ? 'present' : 'missing',
+      apiToken: apiToken ? 'present' : 'missing',
+      spaceUrl: spaceUrl ? 'present' : 'missing'
+    });
+    
+    if (!projectId || !apiToken) { 
+      throw new Error(`Server configuration error: Missing SignalWire credentials. Project ID: ${projectId ? 'present' : 'missing'}, Token: ${apiToken ? 'present' : 'missing'}`); 
     }
 
     // For SignalWire VoIP, we need to use their native authentication

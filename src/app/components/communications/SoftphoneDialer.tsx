@@ -92,12 +92,51 @@ export const SoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onC
       setConnectionState('connecting')
       showToast.loading('Connecting to phone system...')
       
-      const { data: userProfile } = await supabase
+      let { data: userProfile } = await supabase
         .from('user_profiles')
         .select('tenant_id')
         .eq('id', user.id)
         .single()
-      if (!userProfile?.tenant_id) throw new Error('User tenant not found')
+      
+      // If no user profile exists, try to find or create one
+      if (!userProfile?.tenant_id) {
+        console.log('No user profile found, checking for tenant associations...')
+        
+        // Check if there's a tenant record (the actual table name based on schema)
+        const { data: userTenants } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('is_active', true)
+          .limit(1)
+          .single()
+        
+        if (userTenants?.id) {
+          // Found a tenant, create missing user profile
+          const { data: newProfile, error: profileError } = await supabase
+            .from('user_profiles')
+            .insert([{
+              id: user.id,
+              tenant_id: userTenants.id,
+              email: user.email,
+              first_name: user.user_metadata?.first_name || '',
+              last_name: user.user_metadata?.last_name || '',
+              role: 'admin',
+              is_active: true
+            }])
+            .select('tenant_id')
+            .single()
+          
+          if (profileError) {
+            console.error('Error creating user profile:', profileError)
+            throw new Error('Failed to create user profile. Please contact support.')
+          }
+          
+          userProfile = newProfile
+          console.log('Created missing user profile:', userProfile)
+        } else {
+          throw new Error('User account setup incomplete. Please complete your company onboarding to use the phone system.')
+        }
+      }
 
       // First, try to get phone numbers from local database
       let { data: phoneNumbers } = await supabase

@@ -163,3 +163,15 @@ entrypoint = "./functions/create-sip-configuration/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/create-sip-configuration/*.html" ]
+
+[functions.generate-signalwire-voice-token]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-signalwire-voice-token/deno.json"
+entrypoint = "./functions/generate-signalwire-voice-token/index.ts"
+
+[functions.generate-signalwire-token]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-signalwire-token/deno.json"
+entrypoint = "./functions/generate-signalwire-token/index.ts"
