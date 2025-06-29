@@ -5,8 +5,18 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY: string
   readonly VITE_SIGNALWIRE_PROJECT_ID: string
   readonly VITE_SIGNALWIRE_SPACE_URL: string
+  readonly VITE_SIGNALWIRE_TOKEN: string
   readonly VITE_RELAY_SERVICE_URL: string
   readonly VITE_DAILY_API_KEY: string
+  readonly VITE_STRIPE_PUBLISHABLE_KEY: string
+  readonly VITE_MAPBOX_ACCESS_TOKEN: string
+  readonly VITE_APP_I18N_CONFIG_KEY: string
+  readonly VITE_APP_BASE_LAYOUT_CONFIG_KEY: string
+  readonly VITE_APP_THEME_API_URL: string
+  readonly VITE_APP_API_URL: string
+  readonly VITE_BASE_URL: string
+  readonly BASE_URL: string
+  readonly DEV: boolean
 }
 
 interface ImportMeta {
