@@ -37,6 +37,11 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
   
   // Onboarding modal state
   const { showOnboarding, hasCheckedOnboarding, closeOnboarding, completeOnboarding } = useOnboardingModal()
+  
+  // Debug onboarding modal state
+  useEffect(() => {
+    console.log('MasterLayout: onboarding state changed', { showOnboarding, hasCheckedOnboarding })
+  }, [showOnboarding, hasCheckedOnboarding])
 
   useEffect(() => {
     setTimeout(() => {
@@ -156,6 +161,7 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
           onComplete={completeOnboarding}
         />
       )}
+      
       {/* end:: Modals */}
       <ScrollTop />
       

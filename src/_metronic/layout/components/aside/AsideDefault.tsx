@@ -63,10 +63,12 @@ const AsideDefault: FC = () => {
   const skipStatus = getSkipStatus()
   const isOnboardingCompleted = tenant?.onboarding_completed === true
   const completionPercentage = getOnboardingProgress()
-  const shouldShowReminder = !isOnboardingCompleted && (skipStatus.isSkipped || completionPercentage > 20)
+  const shouldShowReminder = !isOnboardingCompleted && (skipStatus.isSkipped || completionPercentage >= 0)
+  
 
   const handleCompleteOnboarding = () => {
-    openOnboarding()
+    // Signal OnboardingGuard to open its local modal
+    window.dispatchEvent(new CustomEvent('openOnboardingModal'))
   }
 
   return (

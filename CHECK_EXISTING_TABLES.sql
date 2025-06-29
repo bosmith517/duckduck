@@ -1,32 +1,22 @@
--- Check what tables and columns currently exist
--- Run this first to see what we're working with
+-- Check what already exists in the database
+-- Run this first to see what's already there
 
--- Check if tenants table exists and its structure
-SELECT 
-    table_name,
-    column_name,
-    data_type,
-    is_nullable,
-    column_default
+-- Check if estimate_templates table exists and what columns it has
+SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns 
-WHERE table_schema = 'public' 
-AND table_name = 'tenants'
+WHERE table_name = 'estimate_templates' 
+AND table_schema = 'public'
 ORDER BY ordinal_position;
 
--- Check if user_profiles table exists and its structure  
-SELECT 
-    table_name,
-    column_name,
-    data_type,
-    is_nullable,
-    column_default
-FROM information_schema.columns 
+-- Check if any of our target tables already exist
+SELECT table_name 
+FROM information_schema.tables 
 WHERE table_schema = 'public' 
-AND table_name = 'user_profiles'
-ORDER BY ordinal_position;
+AND table_name IN ('estimate_templates', 'estimate_variables', 'template_usage_analytics');
 
--- Show all public tables
-SELECT tablename, tableowner 
-FROM pg_tables 
-WHERE schemaname = 'public'
-ORDER BY tablename;
+-- Check what columns estimates table has
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns 
+WHERE table_name = 'estimates' 
+AND table_schema = 'public'
+ORDER BY ordinal_position;

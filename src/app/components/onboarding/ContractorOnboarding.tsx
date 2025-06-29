@@ -179,13 +179,13 @@ const ContractorOnboarding: React.FC = () => {
     setSearchingNumbers(true)
     try {
       const { data, error } = await supabase.functions.invoke('search-available-numbers', {
-        body: { areaCode: formData.desiredAreaCode }
+        body: { areacode: formData.desiredAreaCode }
       })
 
       if (error) throw error
       
-      setAvailableNumbers(data.numbers || [])
-      if (data.numbers.length === 0) {
+      setAvailableNumbers(data.available_numbers || [])
+      if ((data.available_numbers || []).length === 0) {
         alert('No numbers available in this area code. Try a different one.')
       }
     } catch (error) {
@@ -217,7 +217,7 @@ const ContractorOnboarding: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         businessPhone: formData.selectedPhoneNumber,
-        sipConfiguration: data.sipConfig
+        sipConfiguration: data.phone_number // Store the phone number record for now
       }))
 
       // Move to next step automatically
@@ -557,13 +557,14 @@ const ContractorOnboarding: React.FC = () => {
                   <div className='col-md-4'>
                     <label className='form-label required'>Preferred Area Code</label>
                     <input
-                      type='text'
+                      type='number'
                       className='form-control form-control-solid form-control-lg'
-                      placeholder='Enter 3 digits (e.g., 708)'
+                      placeholder='708'
                       value={formData.desiredAreaCode}
-                      maxLength={3}
+                      min='100'
+                      max='999'
                       onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '')
+                        const value = e.target.value.slice(0, 3) // Limit to 3 digits
                         setFormData(prev => ({ ...prev, desiredAreaCode: value }))
                       }}
                     />
@@ -603,19 +604,19 @@ const ContractorOnboarding: React.FC = () => {
                               type='radio'
                               className='d-none'
                               name='phoneNumber'
-                              value={number.phone_number}
-                              checked={formData.selectedPhoneNumber === number.phone_number}
+                              value={number.phone_number || number.number}
+                              checked={formData.selectedPhoneNumber === (number.phone_number || number.number)}
                               onChange={(e) => setFormData(prev => ({ ...prev, selectedPhoneNumber: e.target.value }))}
                             />
-                            <div className={`card w-100 ${formData.selectedPhoneNumber === number.phone_number ? 'border-primary bg-light-primary' : 'border-gray-300'}`}>
+                            <div className={`card w-100 ${formData.selectedPhoneNumber === (number.phone_number || number.number) ? 'border-primary bg-light-primary' : 'border-gray-300'}`}>
                               <div className='card-body text-center py-4'>
                                 <div className='fs-4 fw-bold text-primary mb-2'>
-                                  {number.friendly_name || number.phone_number}
+                                  {number.friendly_name || number.phone_number || number.number}
                                 </div>
                                 <div className='text-muted fs-7'>
-                                  {number.locality}, {number.region}
+                                  {number.locality || number.region || number.iso_country}, {number.region || number.iso_country}
                                 </div>
-                                {formData.selectedPhoneNumber === number.phone_number && (
+                                {formData.selectedPhoneNumber === (number.phone_number || number.number) && (
                                   <div className='mt-2'>
                                     <KTIcon iconName='check-circle' className='fs-4 text-success' />
                                   </div>

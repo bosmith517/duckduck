@@ -24,6 +24,8 @@ const PrivateRoutes = () => {
   const ContactsPage = lazy(() => import('../pages/contacts/ContactsPage'))
   const ContactDetailsPage = lazy(() => import('../pages/contacts/ContactDetailsPage'))
   const EstimatesPage = lazy(() => import('../pages/estimates/EstimatesPage'))
+  const TemplateDrivenEstimatesPage = lazy(() => import('../pages/estimates/TemplateDrivenEstimatesPage'))
+  const RealTimeJobCostingPage = lazy(() => import('../pages/job-costing/RealTimeJobCostingPage'))
   const InvoicesPage = lazy(() => import('../pages/invoices/InvoicesPage'))
   const InventoryPage = lazy(() => import('../pages/inventory/InventoryPage'))
   const SchedulePage = lazy(() => import('../pages/schedule/SchedulePage'))
@@ -97,6 +99,14 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path='jobs/costing'
+          element={
+            <SuspensedView>
+              <RealTimeJobCostingPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path='clients/*'
           element={
             <SuspensedView>
@@ -133,6 +143,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <EstimatesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='estimates/templates'
+          element={
+            <SuspensedView>
+              <TemplateDrivenEstimatesPage />
             </SuspensedView>
           }
         />
@@ -337,6 +355,14 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path='billing/estimates/templates'
+          element={
+            <SuspensedView>
+              <TemplateDrivenEstimatesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path='billing/customer-portal'
           element={
             <SuspensedView>
@@ -486,7 +512,6 @@ const PrivateRoutes = () => {
         />
         
         {/* MISSING NAVIGATION ROUTES - Redirect to existing pages */}
-        <Route path='jobs/costing' element={<Navigate to='/jobs' />} />
         <Route path='jobs/analytics' element={<Navigate to='/jobs' />} />
         <Route path='jobs/templates' element={<Navigate to='/jobs' />} />
         <Route path='jobs/planning' element={<Navigate to='/jobs' />} />

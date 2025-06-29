@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { useOnboardingModal } from '../../hooks/useOnboardingModal'
+import OnboardingModal from './OnboardingModal'
 
 interface OnboardingGuardProps {
   children: React.ReactNode
@@ -10,33 +12,48 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
   const { tenant } = useSupabaseAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const { openOnboarding } = useOnboardingModal()
   const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false)
   const [skipExpiry, setSkipExpiry] = useState<number | null>(null)
+  const [showLocalOnboardingModal, setShowLocalOnboardingModal] = useState(false)
   
   // Check if onboarding is completed (default to false if field doesn't exist)
   const isOnboardingCompleted = tenant?.onboarding_completed === true
   
+  
   useEffect(() => {
+    // Only run when we have a tenant loaded
+    if (!tenant) return
+    
+    console.log('OnboardingGuard: tenant loaded', { tenant, isOnboardingCompleted })
+    
+    // For testing: clear any existing skip data
+    localStorage.removeItem('onboarding_skip')
+    
     if (!isOnboardingCompleted) {
       // Check if user has temporarily skipped onboarding
       const skipData = localStorage.getItem('onboarding_skip')
+      
       if (skipData) {
         const { expiry } = JSON.parse(skipData)
         const now = Date.now()
         
         if (now < expiry) {
+          console.log('OnboardingGuard: Skip period active, setting expiry')
           setSkipExpiry(expiry)
           return
         } else {
           // Skip period expired, remove from storage
+          console.log('OnboardingGuard: Skip period expired, removing from storage')
           localStorage.removeItem('onboarding_skip')
         }
       }
       
       // Show onboarding prompt
+      console.log('OnboardingGuard: Showing onboarding prompt')
       setShowOnboardingPrompt(true)
     }
-  }, [isOnboardingCompleted])
+  }, [isOnboardingCompleted, tenant])
 
   // Check if skip period has expired
   useEffect(() => {
@@ -53,8 +70,19 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
     }
   }, [skipExpiry])
 
+  // Listen for sidebar button clicks
+  useEffect(() => {
+    const handleOpenModal = () => {
+      setShowLocalOnboardingModal(true)
+    }
+
+    window.addEventListener('openOnboardingModal', handleOpenModal)
+    return () => window.removeEventListener('openOnboardingModal', handleOpenModal)
+  }, [])
+
   const handleCompleteOnboarding = () => {
-    navigate('/onboarding')
+    setShowOnboardingPrompt(false)
+    setShowLocalOnboardingModal(true)
   }
 
   const handleSkipOnboarding = () => {
@@ -63,6 +91,16 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
     localStorage.setItem('onboarding_skip', JSON.stringify({ expiry }))
     setSkipExpiry(expiry)
     setShowOnboardingPrompt(false)
+  }
+
+  const handleCloseOnboardingModal = () => {
+    setShowLocalOnboardingModal(false)
+  }
+
+  const handleCompleteOnboardingModal = () => {
+    setShowLocalOnboardingModal(false)
+    // Refresh page to update tenant data
+    window.location.reload()
   }
 
   // Allow access to onboarding page itself
@@ -215,7 +253,18 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
   }
 
   // Allow access if onboarding is completed
-  return <>{children}</>
+  return (
+    <>
+      {children}
+      
+      {/* Local OnboardingModal controlled by welcome popup */}
+      <OnboardingModal 
+        isOpen={showLocalOnboardingModal}
+        onClose={handleCloseOnboardingModal}
+        onComplete={handleCompleteOnboardingModal}
+      />
+    </>
+  )
 }
 
 export default OnboardingGuard

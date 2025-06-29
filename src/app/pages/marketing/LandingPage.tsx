@@ -63,20 +63,20 @@ const LandingPage: React.FC = () => {
         </div>
       </nav>
 
-      {/* Hero Section - Direct Competition with HouseCall Pro */}
-      <section className="bg-gradient-primary py-20" style={{marginTop: '76px'}}>
+      {/* Hero Section */}
+      <section className="bg-primary py-20" style={{marginTop: '76px'}}>
         <div className="container">
           <div className="row align-items-center">
             <div className="col-lg-6">
               <div className="badge bg-light text-primary mb-4 px-3 py-2 fs-7 fw-bold">
                 🚀 SAVE TIME, EARN MORE, BUILD REPUTATION
               </div>
-              <h1 className="display-3 fw-bolder text-white mb-4 lh-1">
+              <h1 className="display-3 fw-bolder text-dark mb-4 lh-1">
                 Grow Your Service Business 
                 <span className="text-warning">50% Faster</span> 
                 Than Any Competitor
               </h1>
-              <p className="fs-4 text-white opacity-90 mb-6 lh-base">
+              <p className="fs-4 text-dark mb-6 lh-base">
                 Join 50,000+ service professionals using our all-in-one platform with built-in 
                 customer portals, AI-powered recommendations, and advanced communication tools 
                 that other platforms don't offer.
@@ -85,7 +85,7 @@ const LandingPage: React.FC = () => {
               {/* Key Benefits */}
               <div className="row g-4 mb-6">
                 <div className="col-md-6">
-                  <div className="d-flex align-items-center text-white">
+                  <div className="d-flex align-items-center text-dark">
                     <div className="symbol symbol-30px bg-success me-3">
                       <span className="symbol-label">
                         <i className="ki-duotone ki-chart-line-up fs-6 text-white">
@@ -98,7 +98,7 @@ const LandingPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="col-md-6">
-                  <div className="d-flex align-items-center text-white">
+                  <div className="d-flex align-items-center text-dark">
                     <div className="symbol symbol-30px bg-success me-3">
                       <span className="symbol-label">
                         <i className="ki-duotone ki-time fs-6 text-white">
@@ -111,7 +111,7 @@ const LandingPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="col-md-6">
-                  <div className="d-flex align-items-center text-white">
+                  <div className="d-flex align-items-center text-dark">
                     <div className="symbol symbol-30px bg-success me-3">
                       <span className="symbol-label">
                         <i className="ki-duotone ki-star fs-6 text-white">
@@ -124,7 +124,7 @@ const LandingPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="col-md-6">
-                  <div className="d-flex align-items-center text-white">
+                  <div className="d-flex align-items-center text-dark">
                     <div className="symbol symbol-30px bg-success me-3">
                       <span className="symbol-label">
                         <i className="ki-duotone ki-rocket fs-6 text-white">
@@ -155,7 +155,7 @@ const LandingPage: React.FC = () => {
                 </button>
               </div>
               
-              <div className="d-flex align-items-center gap-6 text-white opacity-75">
+              <div className="d-flex align-items-center gap-6 text-dark">
                 <div className="d-flex align-items-center">
                   <i className="ki-duotone ki-check-circle fs-4 text-success me-2">
                     <span className="path1"></span>
@@ -212,8 +212,8 @@ const LandingPage: React.FC = () => {
                           </i>
                         ))}
                       </div>
-                      <p className="fs-8 mb-2">"Switched from HouseCall Pro. Best decision ever!"</p>
-                      <div className="fs-9 text-muted">- Mike Johnson, HVAC Pro</div>
+                      <p className="fs-8 mb-2">"Switched from competitors. Best decision ever!"</p>
+                      <div className="fs-9 text-dark">- Mike Johnson, HVAC Pro</div>
                     </div>
                   </div>
                 </div>
@@ -227,36 +227,36 @@ const LandingPage: React.FC = () => {
       <section className="py-8 bg-light">
         <div className="container">
           <div className="text-center">
-            <p className="text-muted fs-6 mb-4">Trusted by service professionals across 50+ industries</p>
+            <p className="text-dark fs-6 mb-4">Trusted by service professionals across 50+ industries</p>
             <div className="row align-items-center justify-content-center g-8">
               <div className="col-6 col-md-2">
                 <div className="text-center">
                   <h4 className="fw-bold text-primary mb-1">50,000+</h4>
-                  <small className="text-muted">Active Users</small>
+                  <small className="text-dark">Active Users</small>
                 </div>
               </div>
               <div className="col-6 col-md-2">
                 <div className="text-center">
                   <h4 className="fw-bold text-primary mb-1">5M+</h4>
-                  <small className="text-muted">Jobs Completed</small>
+                  <small className="text-dark">Jobs Completed</small>
                 </div>
               </div>
               <div className="col-6 col-md-2">
                 <div className="text-center">
                   <h4 className="fw-bold text-primary mb-1">45%</h4>
-                  <small className="text-muted">Avg Revenue Growth</small>
+                  <small className="text-dark">Avg Revenue Growth</small>
                 </div>
               </div>
               <div className="col-6 col-md-2">
                 <div className="text-center">
                   <h4 className="fw-bold text-primary mb-1">4.9/5</h4>
-                  <small className="text-muted">Customer Rating</small>
+                  <small className="text-dark">Customer Rating</small>
                 </div>
               </div>
               <div className="col-6 col-md-2">
                 <div className="text-center">
                   <h4 className="fw-bold text-primary mb-1">12+</h4>
-                  <small className="text-muted">Hours Saved/Week</small>
+                  <small className="text-dark">Hours Saved/Week</small>
                 </div>
               </div>
             </div>
@@ -927,33 +927,33 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-15 bg-gradient-primary">
+      <section className="py-15 bg-primary">
         <div className="container text-center">
-          <h2 className="display-5 fw-bold text-white mb-4">
+          <h2 className="display-5 fw-bold text-dark mb-4">
             Ready to Beat Your Competition?
           </h2>
-          <p className="fs-4 text-white opacity-90 mb-8">
+          <p className="fs-4 text-dark mb-8">
             Join 50,000+ service professionals who chose TradeWorks Pro over the competition
           </p>
           
           <div className="row justify-content-center mb-8">
             <div className="col-md-8">
               <div className="d-flex justify-content-center gap-8 flex-wrap">
-                <div className="text-center text-white">
+                <div className="text-center text-dark">
                   <h4 className="fw-bold">14 Days</h4>
-                  <small className="opacity-75">Free Trial</small>
+                  <small>Free Trial</small>
                 </div>
-                <div className="text-center text-white">
+                <div className="text-center text-dark">
                   <h4 className="fw-bold">15 Min</h4>
-                  <small className="opacity-75">Setup Time</small>
+                  <small>Setup Time</small>
                 </div>
-                <div className="text-center text-white">
+                <div className="text-center text-dark">
                   <h4 className="fw-bold">24/7</h4>
-                  <small className="opacity-75">Support</small>
+                  <small>Support</small>
                 </div>
-                <div className="text-center text-white">
+                <div className="text-center text-dark">
                   <h4 className="fw-bold">$0</h4>
-                  <small className="opacity-75">Migration Cost</small>
+                  <small>Migration Cost</small>
                 </div>
               </div>
             </div>

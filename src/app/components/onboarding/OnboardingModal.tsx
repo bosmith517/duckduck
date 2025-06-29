@@ -157,15 +157,37 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
     switch (step.id) {
       case 'welcome':
         return (
-          <div className='text-center py-6'>
-            <div className='symbol symbol-100px mb-6 mx-auto'>
-              <div className='symbol-label bg-light-primary'>
-                <KTIcon iconName='rocket' className='fs-2x text-primary' />
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <h3 style={{ marginBottom: '20px', color: '#333', fontSize: '20px' }}>
+              Let's Get Your Business Set Up!
+            </h3>
+            
+            <p style={{ marginBottom: '32px', color: '#666', lineHeight: '1.6', fontSize: '16px' }}>
+              We'll customize TradeWorks Pro specifically for your business type and workflow. 
+              This quick setup will only take 3-4 minutes.
+            </p>
+            
+            <div style={{ marginBottom: '24px', textAlign: 'left', maxWidth: '400px', margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ color: '#007bff', marginRight: '8px', fontSize: '16px' }}>✓</span>
+                <strong style={{ color: '#007bff' }}>Industry-specific customization</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ color: '#007bff', marginRight: '8px', fontSize: '16px' }}>✓</span>
+                <strong style={{ color: '#007bff' }}>Workflow optimization</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ color: '#007bff', marginRight: '8px', fontSize: '16px' }}>✓</span>
+                <strong style={{ color: '#007bff' }}>Professional business phone setup</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ color: '#007bff', marginRight: '8px', fontSize: '16px' }}>✓</span>
+                <strong style={{ color: '#007bff' }}>Client communication tools</strong>
               </div>
             </div>
-            <h2 className='mb-4'>Welcome to TradeWorks Pro!</h2>
-            <p className='fs-5 text-muted mb-0'>
-              Let's set up your account in just a few quick steps. This will only take 3-4 minutes.
+            
+            <p style={{ fontSize: '14px', color: '#999', fontStyle: 'italic' }}>
+              You can always customize these settings later from your dashboard
             </p>
           </div>
         )
@@ -496,75 +518,198 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
   if (!isOpen) return null
 
   return (
-    <div className='modal fade show d-block' style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className='modal-dialog modal-lg modal-dialog-centered'>
-        <div className='modal-content'>
-          <div className='modal-header border-0 pb-0'>
-            <div className='d-flex align-items-center w-100'>
-              {/* Progress Steps */}
-              <div className='d-flex flex-grow-1'>
-                {STEPS.map((step, index) => (
-                  <div key={step.id} className='d-flex align-items-center'>
-                    <div className={`symbol symbol-30px ${index <= currentStep ? 'symbol-circle' : ''}`}>
-                      <div className={`symbol-label fs-8 fw-bold ${
-                        index < currentStep 
-                          ? 'bg-success text-white' 
-                          : index === currentStep 
-                            ? 'bg-primary text-white'
-                            : 'bg-light-muted text-muted'
-                      }`}>
-                        {index < currentStep ? (
-                          <KTIcon iconName='check' className='fs-7' />
-                        ) : (
-                          index + 1
-                        )}
-                      </div>
-                    </div>
-                    {index < STEPS.length - 1 && (
-                      <div className={`w-30px h-2px mx-2 ${index < currentStep ? 'bg-success' : 'bg-light-muted'}`}></div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <button
-                type='button'
-                className='btn btn-sm btn-icon btn-light-muted'
-                onClick={onClose}
-              >
-                <KTIcon iconName='cross' className='fs-6' />
-              </button>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999
+      }}
+    >
+      <div 
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '0px',
+          maxWidth: '600px',
+          width: '90%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          margin: '20px',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+        }}
+      >
+        {/* Header with current step info */}
+        <div 
+          style={{
+            background: 'linear-gradient(135deg, #007bff 0%, #0056b3 100%)',
+            color: 'white',
+            padding: '24px 32px',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px',
+            position: 'relative'
+          }}
+        >
+          <button
+            type='button'
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+          >
+            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>×</span>
+          </button>
+          
+          <div style={{ textAlign: 'center' }}>
+            <div 
+              style={{
+                width: '60px',
+                height: '60px',
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                fontSize: '24px'
+              }}
+            >
+              {currentStep === 0 && '🚀'}
+              {currentStep === 1 && '🏢'}
+              {currentStep === 2 && '🔧'}
+              {currentStep === 3 && '📞'}
+              {currentStep === 4 && '⚙️'}
+              {currentStep === 5 && '✅'}
             </div>
-          </div>
-
-          <div className='modal-body px-8 py-6'>
-            {renderStepContent()}
-          </div>
-
-          <div className='modal-footer border-0 pt-0 px-8 pb-8'>
-            <div className='d-flex justify-content-between w-100'>
-              <button
-                className='btn btn-light text-dark'
-                onClick={handleBack}
-                disabled={currentStep === 0}
-              >
-                <KTIcon iconName='arrow-left' className='fs-6 me-2' />
-                Back
-              </button>
-
-              <button
-                className='btn btn-primary'
-                onClick={handleNext}
-                disabled={!canContinue() || loading}
-              >
-                {loading && <span className='spinner-border spinner-border-sm me-2'></span>}
-                {currentStep === STEPS.length - 1 ? 'Complete Setup' : 'Continue'}
-                {currentStep < STEPS.length - 1 && (
-                  <KTIcon iconName='arrow-right' className='fs-6 ms-2' />
-                )}
-              </button>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '24px', fontWeight: 'bold' }}>
+              {STEPS[currentStep]?.title}
+            </h3>
+            <div style={{ fontSize: '14px', opacity: '0.9' }}>
+              Step {currentStep + 1} of {STEPS.length}
             </div>
           </div>
         </div>
+
+        {/* Content Area */}
+        <div style={{ padding: '32px' }}>
+          {renderStepContent()}
+        </div>
+
+        {/* Footer with navigation */}
+        <div 
+          style={{
+            padding: '24px 32px',
+            borderTop: '1px solid #f0f0f0',
+            borderBottomLeftRadius: '12px',
+            borderBottomRightRadius: '12px',
+            backgroundColor: '#f8f9fa'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={handleBack}
+              disabled={currentStep === 0}
+              style={{
+                backgroundColor: currentStep === 0 ? 'transparent' : '#f8f9fa',
+                color: currentStep === 0 ? '#ccc' : '#666',
+                border: currentStep === 0 ? 'none' : '1px solid #ddd',
+                padding: '10px 20px',
+                borderRadius: '6px',
+                fontSize: '14px',
+                cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+              onMouseOver={(e) => {
+                if (currentStep !== 0) {
+                  e.currentTarget.style.backgroundColor = '#e9ecef'
+                  e.currentTarget.style.borderColor = '#adb5bd'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (currentStep !== 0) {
+                  e.currentTarget.style.backgroundColor = '#f8f9fa'
+                  e.currentTarget.style.borderColor = '#ddd'
+                }
+              }}
+            >
+              <span>←</span> Back
+            </button>
+
+            <button
+              onClick={handleNext}
+              disabled={!canContinue() || loading}
+              style={{
+                backgroundColor: (!canContinue() || loading) ? '#ccc' : '#007bff',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '6px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                cursor: (!canContinue() || loading) ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+              onMouseOver={(e) => {
+                if (canContinue() && !loading) {
+                  e.currentTarget.style.backgroundColor = '#0056b3'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (canContinue() && !loading) {
+                  e.currentTarget.style.backgroundColor = '#007bff'
+                }
+              }}
+            >
+              {loading && (
+                <div 
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTop: '2px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }}
+                />
+              )}
+              {currentStep === STEPS.length - 1 ? 'Complete Setup' : 'Continue'}
+              {currentStep < STEPS.length - 1 && <span>→</span>}
+            </button>
+          </div>
+        </div>
+        
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     </div>
   )
