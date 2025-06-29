@@ -14,12 +14,6 @@ verify_jwt = true
 import_map = "./functions/purchase-phone-number/deno.json"
 entrypoint = "./functions/purchase-phone-number/index.ts"
 
-[functions.list-signalwire-phone-numbers]
-enabled = true
-verify_jwt = true
-import_map = "./functions/list-signalwire-phone-numbers/deno.json"
-entrypoint = "./functions/list-signalwire-phone-numbers/index.ts"
-
 # WebRTC Voice Calling
 [functions.generate-signalwire-voice-token]
 enabled = true
@@ -32,18 +26,6 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/start-outbound-call/deno.json"
 entrypoint = "./functions/start-outbound-call/index.ts"
-
-[functions.handle-call-control]
-enabled = true
-verify_jwt = true
-import_map = "./functions/handle-call-control/deno.json"
-entrypoint = "./functions/handle-call-control/index.ts"
-
-[functions.send-dtmf]
-enabled = true
-verify_jwt = true
-import_map = "./functions/send-dtmf/deno.json"
-entrypoint = "./functions/send-dtmf/index.ts"
 
 # SMS Messaging
 [functions.send-sms]
@@ -83,12 +65,6 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/update-technician-location/deno.json"
 entrypoint = "./functions/update-technician-location/index.ts"
-
-[functions.get-technician-location]
-enabled = true
-verify_jwt = true
-import_map = "./functions/get-technician-location/deno.json"
-entrypoint = "./functions/get-technician-location/index.ts"
 
 # Subproject Management (if using subproject system)
 [functions.create-signalwire-subproject]

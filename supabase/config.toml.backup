@@ -1,0 +1,195 @@
+
+[functions.search-available-numbers]
+enabled = true
+verify_jwt = true
+import_map = "./functions/search-available-numbers/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/search-available-numbers/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/search-available-numbers/*.html" ]
+
+[functions.purchase-phone-number]
+enabled = true
+verify_jwt = true
+import_map = "./functions/purchase-phone-number/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/purchase-phone-number/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/purchase-phone-number/*.html" ]
+
+[functions.start-outbound-call]
+enabled = true
+verify_jwt = true
+import_map = "./functions/start-outbound-call/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/start-outbound-call/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/start-outbound-call/*.html" ]
+
+[functions.send-sms]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-sms/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/send-sms/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/send-sms/*.html" ]
+
+[functions.create-video-room]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-video-room/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/create-video-room/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/create-video-room/*.html" ]
+
+[functions.handle-call-control]
+enabled = true
+verify_jwt = true
+import_map = "./functions/handle-call-control/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/handle-call-control/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/handle-call-control/*.html" ]
+
+[functions.create-signalwire-video-room]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-signalwire-video-room/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/create-signalwire-video-room/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/create-signalwire-video-room/*.html" ]
+
+[functions.start-technician-tracking]
+enabled = true
+verify_jwt = true
+import_map = "./functions/start-technician-tracking/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/start-technician-tracking/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/start-technician-tracking/*.html" ]
+
+[functions.update-technician-location]
+enabled = true
+verify_jwt = true
+import_map = "./functions/update-technician-location/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/update-technician-location/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/update-technician-location/*.html" ]
+
+[functions.get-technician-location]
+enabled = true
+verify_jwt = true
+import_map = "./functions/get-technician-location/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/get-technician-location/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/get-technician-location/*.html" ]
+
+[functions.handle-incoming-sms]
+enabled = true
+verify_jwt = true
+import_map = "./functions/handle-incoming-sms/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/handle-incoming-sms/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/handle-incoming-sms/*.html" ]
+
+[functions.provision-signalwire-endpoint]
+enabled = true
+verify_jwt = true
+import_map = "./functions/provision-signalwire-endpoint/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/provision-signalwire-endpoint/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/provision-signalwire-endpoint/*.html" ]
+
+[functions.list-signalwire-sip-endpoints]
+enabled = true
+verify_jwt = true
+import_map = "./functions/list-signalwire-sip-endpoints/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/list-signalwire-sip-endpoints/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/list-signalwire-sip-endpoints/*.html" ]
+
+[functions.test-jwt-generation]
+enabled = true
+verify_jwt = true
+import_map = "./functions/test-jwt-generation/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/test-jwt-generation/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/test-jwt-generation/*.html" ]
+
+[functions.create-sip-configuration]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-sip-configuration/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/create-sip-configuration/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/create-sip-configuration/*.html" ]
+
+[functions.generate-signalwire-voice-token]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-signalwire-voice-token/deno.json"
+entrypoint = "./functions/generate-signalwire-voice-token/index.ts"
+
+[functions.generate-signalwire-token]
+enabled = true
+verify_jwt = true
+import_map = "./functions/generate-signalwire-token/deno.json"
+entrypoint = "./functions/generate-signalwire-token/index.ts"
+
+[functions.create-signalwire-subproject]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-signalwire-subproject/deno.json"
+entrypoint = "./functions/create-signalwire-subproject/index.ts"
+
+[functions.retry-subproject-creation]
+enabled = true
+verify_jwt = true
+import_map = "./functions/retry-subproject-creation/deno.json"
+entrypoint = "./functions/retry-subproject-creation/index.ts"
+
+[functions.complete-full-onboarding]
+enabled = true
+verify_jwt = true
+import_map = "./functions/complete-full-onboarding/deno.json"
+entrypoint = "./functions/complete-full-onboarding/index.ts"
