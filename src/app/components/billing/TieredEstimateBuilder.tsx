@@ -625,7 +625,7 @@ const TieredEstimateBuilder: React.FC<TieredEstimateBuilderProps> = ({
           </div>
 
           <div className="modal-footer">
-            <button type="button" className="btn btn-light" onClick={onCancel}>
+            <button type="button" className="btn btn-light text-dark" onClick={onCancel}>
               Cancel
             </button>
             <button

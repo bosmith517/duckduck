@@ -360,7 +360,7 @@ export const PreCallLobby: React.FC = () => {
               </div>
             </div>
             <button 
-              className="btn btn-icon btn-light-secondary"
+              className="btn btn-icon btn-light-secondary text-dark"
               title="Meeting Information"
             >
               <i className="ki-duotone ki-information fs-1">

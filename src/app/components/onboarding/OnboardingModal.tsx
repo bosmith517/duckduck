@@ -543,7 +543,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
           <div className='modal-footer border-0 pt-0 px-8 pb-8'>
             <div className='d-flex justify-content-between w-100'>
               <button
-                className='btn btn-light'
+                className='btn btn-light text-dark'
                 onClick={handleBack}
                 disabled={currentStep === 0}
               >

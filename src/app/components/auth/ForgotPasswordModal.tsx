@@ -114,7 +114,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ show, 
           <Modal.Footer>
             <button
               type="button"
-              className="btn btn-light"
+              className="btn btn-light text-dark"
               onClick={handleClose}
               disabled={loading}
             >

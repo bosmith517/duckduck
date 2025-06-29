@@ -600,7 +600,7 @@ export const DigitalTwin: React.FC<DigitalTwinProps> = ({ customerId }) => {
                     Manual Not Available
                   </button>
                 )}
-                <button className="btn btn-secondary" onClick={closeModal}>Close</button>
+                <button className="btn btn-secondary text-dark" onClick={closeModal}>Close</button>
               </div>
             </div>
           </div>

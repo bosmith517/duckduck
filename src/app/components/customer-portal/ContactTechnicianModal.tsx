@@ -171,7 +171,7 @@ const ContactTechnicianModal: React.FC<ContactTechnicianModalProps> = ({
 
           <div className="modal-footer">
             <div className="d-flex justify-content-between w-100">
-              <button className="btn btn-secondary" onClick={onClose}>
+              <button className="btn btn-secondary text-dark" onClick={onClose}>
                 Cancel
               </button>
               

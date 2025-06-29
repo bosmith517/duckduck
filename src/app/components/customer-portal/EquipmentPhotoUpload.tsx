@@ -540,7 +540,7 @@ const EquipmentPhotoUpload: React.FC<EquipmentPhotoUploadProps> = ({
                           Back to Questions
                         </button>
                         <div className="d-flex gap-2">
-                          <button className="btn btn-secondary" onClick={resetForm}>
+                          <button className="btn btn-secondary text-dark" onClick={resetForm}>
                             Start Over
                           </button>
                           <button 

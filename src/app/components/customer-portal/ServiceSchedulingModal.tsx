@@ -446,7 +446,7 @@ const ServiceSchedulingModal: React.FC<ServiceSchedulingModalProps> = ({
               <div>
                 {currentStep > 1 && (
                   <button 
-                    className="btn btn-light"
+                    className="btn btn-light text-dark"
                     onClick={() => setCurrentStep(currentStep - 1)}
                     disabled={submitting}
                   >
@@ -460,7 +460,7 @@ const ServiceSchedulingModal: React.FC<ServiceSchedulingModalProps> = ({
               </div>
               
               <div className="d-flex gap-2">
-                <button className="btn btn-secondary" onClick={onClose} disabled={submitting}>
+                <button className="btn btn-secondary text-dark" onClick={onClose} disabled={submitting}>
                   Cancel
                 </button>
                 
