@@ -2,17 +2,14 @@ import { supabase } from '../../supabaseClient'
 
 export interface CallLog {
   id: string
-  tenant_id: string
-  contact_id?: string
-  user_id?: string
-  from_number: string
-  to_number: string
-  direction: 'inbound' | 'outbound'
-  status: 'initiated' | 'ringing' | 'answered' | 'completed' | 'failed' | 'busy' | 'no-answer'
-  duration?: number
-  provider_id?: string
   created_at: string
-  ended_at?: string
+  tenant_id: string
+  user_id?: string
+  contact_id?: string
+  call_sid: string
+  direction?: string
+  recording_url?: string
+  is_read: boolean
 }
 
 export interface SMSMessage {
@@ -132,8 +129,7 @@ class CommunicationsService {
 
   async getCallLogs(filters?: {
     contact_id?: string
-    direction?: 'inbound' | 'outbound'
-    status?: string
+    direction?: string
     date_from?: string
     date_to?: string
   }): Promise<CallLog[]> {
@@ -176,9 +172,6 @@ class CommunicationsService {
       }
       if (filters?.direction) {
         query = query.eq('direction', filters.direction)
-      }
-      if (filters?.status) {
-        query = query.eq('status', filters.status)
       }
       if (filters?.date_from) {
         query = query.gte('created_at', filters.date_from)

@@ -91,7 +91,7 @@ export const VoicemailInbox: React.FC = () => {
         throw new Error('User tenant not found')
       }
 
-      // Start with the base query using correct Supabase methods
+      // Use call_logs table which has proper contact relationships
       let query = supabase
         .from('call_logs')
         .select(`
@@ -108,8 +108,7 @@ export const VoicemailInbox: React.FC = () => {
         `)
         .eq('tenant_id', userProfile.tenant_id) // Add tenant filter
         .eq('direction', 'inbound')
-        .eq('status', 'completed')
-        .not('provider_id', 'is', null) // Only fetch logs that have recordings
+        .not('recording_url', 'is', null) // Only fetch calls that have recordings
         .order('created_at', { ascending: false })
 
       // === CORRECT FILTERING METHODS ===
@@ -143,7 +142,7 @@ export const VoicemailInbox: React.FC = () => {
           ? `${call.contact.first_name} ${call.contact.last_name}`
           : 'Unknown Caller',
         recording_duration: call.duration || 0,
-        recording_url: `https://example.com/recordings/${call.id}.mp3` // TODO: Use actual recording URL from provider
+        recording_url: call.recording_url || `https://example.com/recordings/${call.id}.mp3` // Use actual recording URL or fallback
       }))
 
       setVoicemails(voicemailData)

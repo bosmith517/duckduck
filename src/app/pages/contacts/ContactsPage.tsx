@@ -4,6 +4,7 @@ import { supabase, Contact, Account } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { ContactForm } from './components/ContactForm'
 import { ContactsList } from './components/ContactsList'
+import { QuickAddClient } from '../../components/clients/QuickAddClient'
 
 const ContactsPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
@@ -13,6 +14,7 @@ const ContactsPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
 
   useEffect(() => {
     if (userProfile?.tenant_id) {
@@ -287,6 +289,18 @@ const ContactsPage: React.FC = () => {
     setEditingContact(null)
   }
 
+  const handleQuickAddSuccess = (clientId: string, projectId?: string) => {
+    setShowQuickAdd(false)
+    // Refresh the contacts list
+    fetchContacts()
+    // Navigate to the created client or project if desired
+    if (projectId) {
+      window.location.href = `/jobs/${projectId}`
+    } else {
+      window.location.href = `/contacts/${clientId}`
+    }
+  }
+
   const filteredContacts = contacts.filter(contact =>
     contact.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -318,6 +332,14 @@ const ContactsPage: React.FC = () => {
           
           <div className='card-toolbar'>
             <div className='d-flex justify-content-end'>
+              <button
+                type='button'
+                className='btn btn-light btn-light-primary me-3'
+                onClick={() => setShowQuickAdd(true)}
+              >
+                <i className='ki-duotone ki-rocket fs-2'></i>
+                Quick Add Client
+              </button>
               <button
                 type='button'
                 className='btn btn-primary'
@@ -356,6 +378,13 @@ const ContactsPage: React.FC = () => {
             handleCreateContact
           }
           onCancel={handleCloseForm}
+        />
+      )}
+
+      {showQuickAdd && (
+        <QuickAddClient
+          onClose={() => setShowQuickAdd(false)}
+          onSuccess={handleQuickAddSuccess}
         />
       )}
     </>

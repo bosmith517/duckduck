@@ -5,8 +5,17 @@ import TopBarProgress from 'react-topbar-progress-indicator'
 import {DashboardWrapper} from '../pages/dashboard/DashboardWrapper'
 import {getCSSVariableValue} from '../../_metronic/assets/ts/_utils'
 import {WithChildren} from '../../_metronic/helpers'
+import {useSupabaseAuth} from '../modules/auth/core/SupabaseAuth'
+import ProtectedLayout from '../components/onboarding/ProtectedLayout'
 
 const PrivateRoutes = () => {
+  const { currentUser } = useSupabaseAuth()
+  
+  // Redirect to login if not authenticated
+  if (!currentUser) {
+    return <Navigate to='/auth/login' replace />
+  }
+
   // TradeWorks Pro Pages
   const JobsPage = lazy(() => import('../pages/jobs/JobsPage'))
   const JobDetailsPage = lazy(() => import('../pages/jobs/JobDetailsPage'))
@@ -54,25 +63,41 @@ const PrivateRoutes = () => {
   // Profile and Account Pages
   const ProfilePage = lazy(() => import('../modules/profile/ProfilePage'))
   const AccountPage = lazy(() => import('../modules/accounts/AccountPage'))
+  
+  // Onboarding
+  const ContractorOnboarding = lazy(() => import('../components/onboarding/ContractorOnboarding'))
 
   return (
     <Routes>
+      {/* Onboarding - Outside main layout */}
+      <Route
+        path='onboarding'
+        element={
+          <SuspensedView>
+            <ContractorOnboarding />
+          </SuspensedView>
+        }
+      />
+      
+      {/* Main application with onboarding protection */}
       <Route element={<MasterLayout />}>
+        <Route element={<ProtectedLayout />}>
         {/* Redirect to Dashboard after success login/registartion */}
         <Route path='auth/*' element={<Navigate to='/dashboard' />} />
         
-        {/* Main Dashboard */}
-        <Route path='dashboard' element={<DashboardWrapper />} />
         
-        {/* TradeWorks Pro Core Pages */}
-        <Route
-          path='jobs'
-          element={
-            <SuspensedView>
-              <JobsPage />
-            </SuspensedView>
-          }
-        />
+          {/* Main Dashboard */}
+          <Route path='dashboard' element={<DashboardWrapper />} />
+        
+          {/* TradeWorks Pro Core Pages */}
+          <Route
+            path='jobs'
+            element={
+              <SuspensedView>
+                <JobsPage />
+              </SuspensedView>
+            }
+          />
         <Route
           path='jobs/:id'
           element={
@@ -97,14 +122,14 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        <Route
-          path='contacts'
-          element={
-            <SuspensedView>
-              <ContactsPage />
-            </SuspensedView>
-          }
-        />
+          <Route
+            path='contacts'
+            element={
+              <SuspensedView>
+                <ContactsPage />
+              </SuspensedView>
+            }
+          />
         <Route
           path='contacts/:id'
           element={
@@ -509,8 +534,9 @@ const PrivateRoutes = () => {
         
         {/* Profile sub-routes are handled by ProfilePage internally */}
         
-        {/* Page Not Found */}
-        <Route path='*' element={<Navigate to='/error/404' />} />
+          {/* Page Not Found */}
+          <Route path='*' element={<Navigate to='/error/404' />} />
+        </Route>
       </Route>
     </Routes>
   )

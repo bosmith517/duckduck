@@ -59,7 +59,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   }
 ]
 
-export const ContractorOnboarding: React.FC = () => {
+const ContractorOnboarding: React.FC = () => {
   const navigate = useNavigate()
   const { userProfile, tenant } = useSupabaseAuth()
   const [currentStep, setCurrentStep] = useState(0)
@@ -596,14 +596,190 @@ export const ContractorOnboarding: React.FC = () => {
           <div>
             <h3 className='mb-5'>Add Your Team</h3>
             <p className='text-muted mb-8'>
-              You can add team members now or do this later from the Team page.
+              Add team members who will be using TradeWorks Pro. You can always add more later.
             </p>
-            <div className='text-center py-10'>
-              <KTIcon iconName='people' className='fs-4x text-muted mb-5' />
-              <p className='fs-5 text-muted'>
-                Skip for now and add team members later
-              </p>
+            
+            {formData.teamMembers.map((member, index) => (
+              <div key={index} className='card mb-5'>
+                <div className='card-body'>
+                  <div className='d-flex justify-content-between align-items-center mb-3'>
+                    <h5 className='mb-0'>Team Member {index + 1}</h5>
+                    {formData.teamMembers.length > 1 && (
+                      <button
+                        type='button'
+                        className='btn btn-sm btn-light-danger'
+                        onClick={() => {
+                          const newMembers = formData.teamMembers.filter((_, i) => i !== index)
+                          setFormData(prev => ({ ...prev, teamMembers: newMembers }))
+                        }}
+                      >
+                        <KTIcon iconName='trash' className='fs-7' />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className='row'>
+                    <div className='col-md-6 mb-4'>
+                      <label className='form-label required'>Full Name</label>
+                      <input
+                        type='text'
+                        className='form-control form-control-solid'
+                        placeholder='Enter full name'
+                        value={member.name}
+                        onChange={(e) => {
+                          const newMembers = [...formData.teamMembers]
+                          newMembers[index].name = e.target.value
+                          setFormData(prev => ({ ...prev, teamMembers: newMembers }))
+                        }}
+                      />
+                    </div>
+                    
+                    <div className='col-md-6 mb-4'>
+                      <label className='form-label required'>Email</label>
+                      <input
+                        type='email'
+                        className='form-control form-control-solid'
+                        placeholder='Enter email address'
+                        value={member.email}
+                        onChange={(e) => {
+                          const newMembers = [...formData.teamMembers]
+                          newMembers[index].email = e.target.value
+                          setFormData(prev => ({ ...prev, teamMembers: newMembers }))
+                        }}
+                      />
+                    </div>
+                    
+                    <div className='col-md-6 mb-4'>
+                      <label className='form-label'>Phone</label>
+                      <input
+                        type='tel'
+                        className='form-control form-control-solid'
+                        placeholder='(555) 123-4567'
+                        value={member.phone}
+                        onChange={(e) => {
+                          const newMembers = [...formData.teamMembers]
+                          newMembers[index].phone = e.target.value
+                          setFormData(prev => ({ ...prev, teamMembers: newMembers }))
+                        }}
+                      />
+                    </div>
+                    
+                    <div className='col-md-6 mb-4'>
+                      <label className='form-label required'>Role</label>
+                      <select
+                        className='form-select form-select-solid'
+                        value={member.role}
+                        onChange={(e) => {
+                          const newMembers = [...formData.teamMembers]
+                          newMembers[index].role = e.target.value
+                          setFormData(prev => ({ ...prev, teamMembers: newMembers }))
+                        }}
+                      >
+                        <option value=''>Select role</option>
+                        <option value='Project Manager'>Project Manager</option>
+                        <option value='Lead Technician'>Lead Technician</option>
+                        <option value='Field Technician'>Field Technician</option>
+                        <option value='Estimator'>Estimator</option>
+                        <option value='Office Administrator'>Office Administrator</option>
+                        <option value='Sales Representative'>Sales Representative</option>
+                        <option value='Foreman'>Foreman</option>
+                        <option value='Helper'>Helper</option>
+                      </select>
+                    </div>
+                    
+                    <div className='col-md-6 mb-4'>
+                      <label className='form-label'>Department</label>
+                      <select
+                        className='form-select form-select-solid'
+                        value={member.department}
+                        onChange={(e) => {
+                          const newMembers = [...formData.teamMembers]
+                          newMembers[index].department = e.target.value
+                          setFormData(prev => ({ ...prev, teamMembers: newMembers }))
+                        }}
+                      >
+                        <option value=''>Select department</option>
+                        <option value='Operations'>Operations</option>
+                        <option value='Construction'>Construction</option>
+                        <option value='Sales'>Sales</option>
+                        <option value='Administration'>Administration</option>
+                        <option value='Service'>Service</option>
+                        <option value='Maintenance'>Maintenance</option>
+                      </select>
+                    </div>
+                    
+                    <div className='col-md-6 mb-4'>
+                      <label className='form-label'>Access Level</label>
+                      <select
+                        className='form-select form-select-solid'
+                        value={member.accessLevel || 'agent'}
+                        onChange={(e) => {
+                          const newMembers = [...formData.teamMembers]
+                          newMembers[index].accessLevel = e.target.value
+                          setFormData(prev => ({ ...prev, teamMembers: newMembers }))
+                        }}
+                      >
+                        <option value='agent'>Agent - Full access to jobs and customers</option>
+                        <option value='viewer'>Viewer - Read-only access</option>
+                        <option value='admin'>Admin - Full system access</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            <div className='d-flex justify-content-between mb-8'>
+              <button
+                type='button'
+                className='btn btn-light-primary'
+                onClick={() => {
+                  const newMember = {
+                    name: '',
+                    email: '',
+                    phone: '',
+                    role: '',
+                    department: '',
+                    accessLevel: 'agent'
+                  }
+                  setFormData(prev => ({ ...prev, teamMembers: [...prev.teamMembers, newMember] }))
+                }}
+              >
+                <KTIcon iconName='plus' className='fs-6 me-2' />
+                Add Another Team Member
+              </button>
+              
+              <div className='text-muted'>
+                <small>💡 Team members will receive invitation emails after setup</small>
+              </div>
             </div>
+            
+            {formData.teamMembers.length === 0 && (
+              <div className='text-center py-10'>
+                <KTIcon iconName='people' className='fs-4x text-muted mb-5' />
+                <p className='fs-5 text-muted mb-5'>
+                  No team members added yet
+                </p>
+                <button
+                  type='button'
+                  className='btn btn-primary'
+                  onClick={() => {
+                    const newMember = {
+                      name: '',
+                      email: '',
+                      phone: '',
+                      role: '',
+                      department: '',
+                      accessLevel: 'agent'
+                    }
+                    setFormData(prev => ({ ...prev, teamMembers: [newMember] }))
+                  }}
+                >
+                  <KTIcon iconName='plus' className='fs-6 me-2' />
+                  Add First Team Member
+                </button>
+              </div>
+            )}
           </div>
         )
 
@@ -699,3 +875,5 @@ export const ContractorOnboarding: React.FC = () => {
     </div>
   )
 }
+
+export default ContractorOnboarding

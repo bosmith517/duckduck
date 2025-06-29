@@ -47,7 +47,10 @@ serve(async (req) => {
     if (profileError || !userProfile) {
       console.error('Profile error:', profileError);
       console.error('Profile data:', userProfile);
-      throw new Error('User profile not found');
+      console.error('User ID:', user.id);
+      
+      // Provide helpful error message for missing profile
+      throw new Error(`User profile not found for user ${user.id}. Please complete your account setup or contact support.`);
     }
     console.log('User profile found:', userProfile);
 

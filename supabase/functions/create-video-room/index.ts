@@ -1,6 +1,6 @@
 // supabase/functions/create-video-room/index.ts
 //
-// This Edge Function securely creates a video conference room via Daily.co
+// This Edge Function securely creates a video conference room via SignalWire
 // and logs the meeting to the database.
 //
 
@@ -18,59 +18,88 @@ serve(async (req) => {
   }
 
   try {
-    // Step 1: Securely retrieve the Daily.co API key
-    const dailyApiKey = Deno.env.get('DAILY_API_KEY')
-
-    if (!dailyApiKey) {
-      throw new Error('Server configuration error: Missing Daily.co API key.')
+    // Step 1: Authenticate the user
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) {
+      throw new Error('Authentication required')
     }
 
-    // Step 2: Get parameters from the frontend request
-    const { tenantId, createdByUserId, jobId } = await req.json()
-    if (!tenantId || !createdByUserId) {
-      throw new Error('Missing required parameters: tenantId or createdByUserId.')
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      throw new Error('Invalid authentication')
     }
 
-    // Step 3: Call the Daily.co API to create a new private room
-    const dailyApiUrl = 'https://api.daily.co/v1/rooms'
-    const roomResponse = await fetch(dailyApiUrl, {
+    // Step 2: Get user's tenant information
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('tenant_id, role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !userProfile) {
+      throw new Error('User profile not found')
+    }
+
+    // Step 3: Get parameters from the frontend request
+    const { contact_id, job_id, participants, room_name } = await req.json()
+
+    // Step 4: Get SignalWire credentials
+    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
+    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
+    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+
+    if (!signalwireProjectId || !signalwireApiToken || !signalwireSpaceUrl) {
+      throw new Error('Server configuration error: Missing SignalWire credentials.')
+    }
+
+    // Step 5: Create a SignalWire video room
+    const roomNameGenerated = room_name || `TradeWorks-Meeting-${Date.now()}`
+    const signalwireApiUrl = `https://${signalwireSpaceUrl}/api/video/rooms`
+    
+    const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
+    const roomResponse = await fetch(signalwireApiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${dailyApiKey}`,
+        'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',
       },
-      // Setting privacy to 'private' is recommended for one-on-one or sensitive meetings
       body: JSON.stringify({
-        privacy: 'private',
-        properties: {
-            // Room will expire 1 hour after the last participant leaves
-            exp: Math.floor(Date.now() / 1000) + 3600, 
-        },
+        name: roomNameGenerated,
+        display_name: roomNameGenerated,
+        max_participants: 10
       }),
     })
 
     if (!roomResponse.ok) {
-      const errorBody = await roomResponse.json()
-      throw new Error(`Daily.co API error: ${errorBody.error}: ${errorBody.info}`)
+      const errorBody = await roomResponse.text()
+      throw new Error(`SignalWire API error: ${roomResponse.status} ${errorBody}`)
     }
 
     const roomData = await roomResponse.json()
     
-    // Step 4: Log the new video meeting to our own database
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    // Step 6: Log the new video meeting to our database
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: meetingRecord, error: dbError } = await supabaseClient
+    const { data: meetingRecord, error: dbError } = await supabaseAdmin
       .from('video_meetings')
       .insert({
-        tenant_id: tenantId,
-        job_id: jobId, // Can be null
-        created_by_user_id: createdByUserId,
-        room_url: roomData.url, // The unique URL for the new room
-        provider: 'Daily.co',
-        start_time: new Date(roomData.created_at).toISOString(),
+        tenant_id: userProfile.tenant_id,
+        job_id: job_id || null,
+        contact_id: contact_id || null,
+        created_by_user_id: user.id,
+        room_url: `https://${signalwireSpaceUrl}/room/${roomData.id}`,
+        room_name: roomNameGenerated,
+        provider: 'SignalWire',
+        start_time: new Date().toISOString(),
       })
       .select()
       .single()
@@ -80,8 +109,11 @@ serve(async (req) => {
       throw new Error('Failed to save the new video meeting to the database.')
     }
 
-    // Step 5: Return the newly created meeting record to the frontend
-    return new Response(JSON.stringify(meetingRecord), {
+    // Step 7: Return the newly created meeting record to the frontend
+    return new Response(JSON.stringify({
+      meeting: meetingRecord,
+      room_data: roomData
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

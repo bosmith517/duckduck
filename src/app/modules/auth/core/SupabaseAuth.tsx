@@ -135,9 +135,26 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
         return { error: new Error('User creation failed') }
       }
 
-      console.log('User created successfully!')
-      // The database trigger will automatically create the tenant and profile
-      // No need to manually insert - this is the standard Supabase multi-tenant pattern
+      console.log('User created successfully, setting up profile...')
+      
+      // Step 2: Call the Edge Function to create tenant and user profile
+      const { data: setupData, error: setupError } = await supabase.functions.invoke('handle-new-user-signup', {
+        body: {
+          email,
+          firstName,
+          lastName,
+          companyName,
+          userId: authData.user.id
+        }
+      })
+
+      if (setupError || !setupData?.success) {
+        console.error('Profile setup error:', setupError)
+        setAuthLoading(false)
+        return { error: setupError || new Error('Failed to set up user profile') }
+      }
+
+      console.log('Profile setup completed:', setupData)
       setAuthLoading(false)
       return { error: null }
       

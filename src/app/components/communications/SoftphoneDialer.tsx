@@ -149,6 +149,12 @@ export const SoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onC
 
       if (voiceError || !voiceConfig?.project) {
         console.error('SignalWire config error:', voiceError)
+        
+        // Check if this is a missing profile error
+        if (voiceError?.message?.includes('User profile not found')) {
+          throw new Error('Account setup incomplete. Please complete your company onboarding to use the phone system.')
+        }
+        
         throw new Error('Failed to get SignalWire configuration')
       }
 

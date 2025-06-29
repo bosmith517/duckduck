@@ -30,6 +30,12 @@ export interface UserProfile {
 export interface Tenant {
   id: string
   name: string
+  company_name?: string
+  service_type?: string
+  service_subtypes?: string[]
+  onboarding_completed?: boolean
+  workflow_preferences?: any
+  business_info?: any
   created_at: string
   updated_at: string
 }

@@ -331,12 +331,12 @@ class VideoService {
   }
 
   /**
-   * Validate Daily.co room URL
+   * Validate SignalWire room URL
    */
   isValidRoomUrl(url: string): boolean {
     try {
       const urlObj = new URL(url)
-      return urlObj.hostname.includes('daily.co') || urlObj.hostname.includes('daily')
+      return urlObj.hostname.includes('signalwire.com') || urlObj.hostname.includes('signalwire')
     } catch {
       return false
     }

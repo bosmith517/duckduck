@@ -46,8 +46,19 @@ const PhoneNumbersSettingsPage: React.FC = () => {
   const [searchingNumbers, setSearchingNumbers] = useState(false)
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
   const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(null)
-  const [areaCode, setAreaCode] = useState('')
   const [teamMembers, setTeamMembers] = useState<any[]>([])
+  
+  // Enhanced search parameters matching SignalWire API
+  const [searchParams, setSearchParams] = useState({
+    areacode: '',
+    number_type: 'local',
+    starts_with: '',
+    contains: '',
+    ends_with: '',
+    region: '',
+    city: '',
+    max_results: 10
+  })
 
   useEffect(() => {
     loadPhoneNumbers()
@@ -61,13 +72,45 @@ const PhoneNumbersSettingsPage: React.FC = () => {
       // Load existing phone numbers from database
       const { data: numbers, error } = await supabase
         .from('signalwire_phone_numbers')
-        .select(`
-          *,
-          user_profiles!assigned_to(first_name, last_name)
-        `)
+        .select('*')
+        .eq('tenant_id', userProfile?.tenant_id)
+      
+      // Load team members separately for assignment lookup
+      const { data: teamMembers } = await supabase
+        .from('user_profiles')
+        .select('id, first_name, last_name')
         .eq('tenant_id', userProfile?.tenant_id)
       
       if (error) throw error
+
+      // Create lookup map for team members
+      const teamMemberMap = new Map(teamMembers?.map(member => [member.id, member]) || [])
+
+      // Transform database records to UI format
+      const transformedNumbers: PhoneNumber[] = numbers?.map(dbNumber => {
+        const assignedUser = dbNumber.assigned_to ? teamMemberMap.get(dbNumber.assigned_to) : null
+        
+        return {
+          id: dbNumber.id,
+          number: dbNumber.number,
+          friendly_name: dbNumber.friendly_name || `${dbNumber.number}`.replace(/(\+1)(\d{3})(\d{3})(\d{4})/, '($2) $3-$4'),
+          type: dbNumber.number_type || 'local',
+          capabilities: {
+            voice: dbNumber.voice_enabled,
+            sms: dbNumber.sms_enabled,
+            fax: dbNumber.fax_enabled
+          },
+          status: dbNumber.status || (dbNumber.is_active ? 'active' : 'inactive'),
+          monthly_cost: dbNumber.monthly_cost || 1.00,
+          assigned_to: dbNumber.assigned_to,
+          assigned_to_name: assignedUser ? `${assignedUser.first_name} ${assignedUser.last_name}` : 'Unassigned',
+          forwarding_enabled: dbNumber.forwarding_enabled || false,
+          forwarding_number: dbNumber.forwarding_number,
+          voicemail_enabled: dbNumber.voicemail_enabled !== false, // Default to true
+          auto_attendant: dbNumber.auto_attendant || false,
+          created_at: dbNumber.created_at
+        }
+      }) || []
 
       // Mock data if no real data available
       const mockNumbers: PhoneNumber[] = [
@@ -116,7 +159,7 @@ const PhoneNumbersSettingsPage: React.FC = () => {
         }
       ]
 
-      setPhoneNumbers(numbers?.length ? numbers : mockNumbers)
+      setPhoneNumbers(transformedNumbers?.length ? transformedNumbers : mockNumbers)
     } catch (error: any) {
       console.error('Error loading phone numbers:', error)
       showToast.error('Failed to load phone numbers')
@@ -148,16 +191,24 @@ const PhoneNumbersSettingsPage: React.FC = () => {
   }
 
   const searchAvailableNumbers = async () => {
-    if (!areaCode || areaCode.length !== 3) {
-      showToast.error('Please enter a valid 3-digit area code')
+    // Validate that at least one search criteria is provided
+    const hasSearchCriteria = searchParams.areacode || 
+                             searchParams.starts_with || 
+                             searchParams.contains || 
+                             searchParams.ends_with || 
+                             searchParams.region || 
+                             searchParams.city
+
+    if (!hasSearchCriteria) {
+      showToast.error('Please provide at least one search criteria')
       return
     }
 
     setSearchingNumbers(true)
     try {
-      // Call SignalWire API to search for available numbers
+      // Call SignalWire API to search for available numbers with all parameters
       const { data: result, error } = await supabase.functions.invoke('search-available-numbers', {
-        body: { areaCode }
+        body: searchParams
       })
 
       if (error) throw error
@@ -408,39 +459,174 @@ const PhoneNumbersSettingsPage: React.FC = () => {
           <h3 className="card-title">Add New Phone Number</h3>
         </div>
         <KTCardBody>
-          <div className="row align-items-end">
-            <div className="col-md-3">
-              <label className="form-label">Area Code</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="e.g., 555"
-                maxLength={3}
-                value={areaCode}
-                onChange={(e) => setAreaCode(e.target.value.replace(/\D/g, ''))}
-              />
+          <div className="row g-4">
+            <div className="col-12">
+              <div className="row g-4">
+                {/* Row 1 */}
+                <div className="col-md-3">
+                  <label className="form-label">Area Code</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g., 555"
+                    maxLength={3}
+                    value={searchParams.areacode}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      areacode: e.target.value.replace(/\D/g, '')
+                    }))}
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Number Type</label>
+                  <select
+                    className="form-select"
+                    value={searchParams.number_type}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      number_type: e.target.value
+                    }))}
+                  >
+                    <option value="local">Local</option>
+                    <option value="mobile">Mobile</option>
+                    <option value="toll_free">Toll Free</option>
+                  </select>
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Region/State</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g., CA, NY"
+                    maxLength={2}
+                    value={searchParams.region}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      region: e.target.value.toUpperCase()
+                    }))}
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">City</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g., Los Angeles"
+                    value={searchParams.city}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      city: e.target.value
+                    }))}
+                  />
+                </div>
+
+                {/* Row 2 - Pattern Matching */}
+                <div className="col-12">
+                  <hr className="my-2" />
+                  <h6 className="fw-bold text-gray-800 mb-3">Pattern Matching</h6>
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Starts With</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g., 555"
+                    value={searchParams.starts_with}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      starts_with: e.target.value.replace(/\D/g, '')
+                    }))}
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Contains</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g., 123"
+                    value={searchParams.contains}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      contains: e.target.value.replace(/\D/g, '')
+                    }))}
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Ends With</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g., 000"
+                    value={searchParams.ends_with}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      ends_with: e.target.value.replace(/\D/g, '')
+                    }))}
+                  />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Max Results</label>
+                  <select
+                    className="form-select"
+                    value={searchParams.max_results}
+                    onChange={(e) => setSearchParams(prev => ({
+                      ...prev,
+                      max_results: parseInt(e.target.value)
+                    }))}
+                  >
+                    <option value={5}>5 results</option>
+                    <option value={10}>10 results</option>
+                    <option value={25}>25 results</option>
+                    <option value={50}>50 results</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="col-md-3">
-              <button
-                className="btn btn-primary"
-                onClick={searchAvailableNumbers}
-                disabled={searchingNumbers || !areaCode}
-              >
-                {searchingNumbers ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2"></span>
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <i className="ki-duotone ki-magnifier fs-4 me-2">
-                      <span className="path1"></span>
-                      <span className="path2"></span>
-                    </i>
-                    Search Numbers
-                  </>
-                )}
-              </button>
+
+            {/* Search Actions */}
+            <div className="col-12">
+              <div className="d-flex justify-content-between align-items-center">
+                <button
+                  className="btn btn-light"
+                  onClick={() => setSearchParams({
+                    areacode: '',
+                    number_type: 'local',
+                    starts_with: '',
+                    contains: '',
+                    ends_with: '',
+                    region: '',
+                    city: '',
+                    max_results: 10
+                  })}
+                >
+                  <i className="ki-duotone ki-arrows-circle fs-4 me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  Clear Filters
+                </button>
+                
+                <button
+                  className="btn btn-primary"
+                  onClick={searchAvailableNumbers}
+                  disabled={searchingNumbers}
+                >
+                  {searchingNumbers ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Searching SignalWire...
+                    </>
+                  ) : (
+                    <>
+                      <i className="ki-duotone ki-magnifier fs-4 me-2">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      Search Available Numbers
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
