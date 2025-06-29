@@ -214,24 +214,25 @@ const PhoneNumbersSettingsPage: React.FC = () => {
       if (error) throw error
 
       // Mock data for demonstration
+      const mockAreaCode = searchParams.areacode || '555'
       const mockAvailable: AvailableNumber[] = [
         {
-          number: `+1${areaCode}5551234`,
-          friendly_name: `(${areaCode}) 555-1234`,
+          number: `+1${mockAreaCode}5551234`,
+          friendly_name: `(${mockAreaCode}) 555-1234`,
           type: 'local',
           monthly_cost: 1.00,
           capabilities: { voice: true, sms: true, fax: false }
         },
         {
-          number: `+1${areaCode}5555678`,
-          friendly_name: `(${areaCode}) 555-5678`,
+          number: `+1${mockAreaCode}5555678`,
+          friendly_name: `(${mockAreaCode}) 555-5678`,
           type: 'local',
           monthly_cost: 1.00,
           capabilities: { voice: true, sms: true, fax: false }
         },
         {
-          number: `+1${areaCode}5559012`,
-          friendly_name: `(${areaCode}) 555-9012`,
+          number: `+1${mockAreaCode}5559012`,
+          friendly_name: `(${mockAreaCode}) 555-9012`,
           type: 'local',
           monthly_cost: 1.00,
           capabilities: { voice: true, sms: true, fax: false }

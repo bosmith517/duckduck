@@ -175,3 +175,21 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/generate-signalwire-token/deno.json"
 entrypoint = "./functions/generate-signalwire-token/index.ts"
+
+[functions.create-signalwire-subproject]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-signalwire-subproject/deno.json"
+entrypoint = "./functions/create-signalwire-subproject/index.ts"
+
+[functions.retry-subproject-creation]
+enabled = true
+verify_jwt = true
+import_map = "./functions/retry-subproject-creation/deno.json"
+entrypoint = "./functions/retry-subproject-creation/index.ts"
+
+[functions.complete-full-onboarding]
+enabled = true
+verify_jwt = true
+import_map = "./functions/complete-full-onboarding/deno.json"
+entrypoint = "./functions/complete-full-onboarding/index.ts"

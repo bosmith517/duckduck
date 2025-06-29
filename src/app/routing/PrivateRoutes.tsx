@@ -49,6 +49,7 @@ const PrivateRoutes = () => {
   const TechnicianProfilesPage = lazy(() => import('../pages/settings/TechnicianProfilesPage'))
   const PhoneNumbersPage = lazy(() => import('../pages/settings/PhoneNumbersPage'))
   const PhoneNumbersSettingsPage = lazy(() => import('../pages/settings/PhoneNumbersSettingsPage'))
+  const SubprojectManagementPage = lazy(() => import('../pages/settings/SubprojectManagementPage'))
   
   // New Hub Pages
   const BillingDashboardPage = lazy(() => import('../pages/billing/BillingDashboardPage'))
@@ -64,22 +65,11 @@ const PrivateRoutes = () => {
   const ProfilePage = lazy(() => import('../modules/profile/ProfilePage'))
   const AccountPage = lazy(() => import('../modules/accounts/AccountPage'))
   
-  // Onboarding
-  const ContractorOnboarding = lazy(() => import('../components/onboarding/ContractorOnboarding'))
+  // Note: Onboarding is now handled via modal in MasterLayout
 
   return (
     <Routes>
-      {/* Onboarding - Outside main layout */}
-      <Route
-        path='onboarding'
-        element={
-          <SuspensedView>
-            <ContractorOnboarding />
-          </SuspensedView>
-        }
-      />
-      
-      {/* Main application with onboarding protection */}
+      {/* Main application */}
       <Route element={<MasterLayout />}>
         <Route element={<ProtectedLayout />}>
         {/* Redirect to Dashboard after success login/registartion */}
@@ -429,6 +419,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <PhoneNumbersSettingsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='settings/subprojects'
+          element={
+            <SuspensedView>
+              <SubprojectManagementPage />
             </SuspensedView>
           }
         />

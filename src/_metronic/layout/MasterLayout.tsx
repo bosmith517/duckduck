@@ -19,8 +19,10 @@ import {WithChildren} from '../helpers'
 import { AsideDefault } from './components/aside/AsideDefault'
 import { useSupabaseAuth } from '../../app/modules/auth/core/SupabaseAuth'
 import { supabase } from '../../supabaseClient'
-import { SoftphoneDialer } from '../../app/components/communications/SoftphoneDialer'
+import { WebRTCSoftphoneDialer } from '../../app/components/communications/WebRTCSoftphoneDialer'
 import { SoftphoneProvider, useSoftphoneContext } from '../../app/contexts/SoftphoneContext'
+import OnboardingModal from '../../app/components/onboarding/OnboardingModal'
+import { useOnboardingModal } from '../../app/hooks/useOnboardingModal'
 
 const MasterLayout: FC<WithChildren> = ({children}) => {
   const {classes} = useLayout()
@@ -32,6 +34,9 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
   
   // Global softphone state
   const { isVisible, hideDialer } = useSoftphoneContext()
+  
+  // Onboarding modal state
+  const { showOnboarding, hasCheckedOnboarding, closeOnboarding, completeOnboarding } = useOnboardingModal()
 
   useEffect(() => {
     setTimeout(() => {
@@ -142,11 +147,20 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
       {/* begin:: Modals */}
       <InviteUsers />
       <UpgradePlan />
+      
+      {/* Onboarding Modal */}
+      {hasCheckedOnboarding && (
+        <OnboardingModal 
+          isOpen={showOnboarding}
+          onClose={closeOnboarding}
+          onComplete={completeOnboarding}
+        />
+      )}
       {/* end:: Modals */}
       <ScrollTop />
       
-      {/* Global Softphone Dialer */}
-      <SoftphoneDialer isVisible={isVisible} onClose={hideDialer} />
+      {/* Global WebRTC Softphone Dialer */}
+      <WebRTCSoftphoneDialer isVisible={isVisible} onClose={hideDialer} />
     </PageDataProvider>
   )
 }

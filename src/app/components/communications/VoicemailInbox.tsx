@@ -5,9 +5,8 @@ import { supabase } from '../../../supabaseClient'
 
 interface VoicemailItem extends CallLog {
   caller_name?: string
-  is_read?: boolean
   recording_duration?: number
-  recording_url?: string
+  from_number?: string
 }
 
 export const VoicemailInbox: React.FC = () => {
@@ -362,7 +361,7 @@ export const VoicemailInbox: React.FC = () => {
                     {voicemail.caller_name}
                   </div>
                   <div className={`fs-7 ${voicemail.is_read ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {communicationsService.formatPhoneNumber(voicemail.from_number)}
+                    {communicationsService.formatPhoneNumber(voicemail.from_number || '')}
                   </div>
                 </div>
 

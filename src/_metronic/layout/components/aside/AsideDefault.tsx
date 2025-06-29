@@ -7,12 +7,14 @@ import {KTIcon} from '../../../helpers'
 import {AsideMenu} from './AsideMenu'
 import {useSupabaseAuth} from '../../../../app/modules/auth/core/SupabaseAuth'
 import {useNavigate} from 'react-router-dom'
+import {useOnboardingModal} from '../../../../app/hooks/useOnboardingModal'
 
 const AsideDefault: FC = () => {
   const {config, classes} = useLayout()
   const {aside} = config
   const {tenant} = useSupabaseAuth()
   const navigate = useNavigate()
+  const {openOnboarding} = useOnboardingModal()
 
   // Check if user has skipped onboarding temporarily
   const getSkipStatus = () => {
@@ -64,7 +66,7 @@ const AsideDefault: FC = () => {
   const shouldShowReminder = !isOnboardingCompleted && (skipStatus.isSkipped || completionPercentage > 20)
 
   const handleCompleteOnboarding = () => {
-    navigate('/onboarding')
+    openOnboarding()
   }
 
   return (
@@ -112,7 +114,7 @@ const AsideDefault: FC = () => {
             
             {skipStatus.isSkipped ? (
               <p className='text-dark fs-8 mb-2 lh-sm'>
-                Time remaining: {Math.floor(skipStatus.remaining / (60 * 60 * 1000))}h {Math.floor((skipStatus.remaining % (60 * 60 * 1000)) / (60 * 1000))}m
+                Time remaining: {Math.floor((skipStatus.remaining || 0) / (60 * 60 * 1000))}h {Math.floor(((skipStatus.remaining || 0) % (60 * 60 * 1000)) / (60 * 1000))}m
               </p>
             ) : (
               <p className='text-dark fs-8 mb-2 lh-sm'>

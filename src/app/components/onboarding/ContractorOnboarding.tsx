@@ -34,6 +34,12 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     icon: 'briefcase'
   },
   {
+    id: 'phone_setup',
+    title: 'Business Phone',
+    description: 'Get your dedicated business line',
+    icon: 'phone'
+  },
+  {
     id: 'service_type',
     title: 'Service Type',
     description: 'What type of work do you do?',
@@ -44,6 +50,18 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     title: 'Customization',
     description: 'Tailor the system to your needs',
     icon: 'setting-2'
+  },
+  {
+    id: 'company_branding',
+    title: 'Company Branding',
+    description: 'Make it yours with your logo',
+    icon: 'color-swatch'
+  },
+  {
+    id: 'payment_setup',
+    title: 'Payment Setup',
+    description: 'Get paid seamlessly',
+    icon: 'dollar'
   },
   {
     id: 'team_setup',
@@ -73,8 +91,24 @@ const ContractorOnboarding: React.FC = () => {
     businessWebsite: '',
     licenseNumber: '',
     insuranceNumber: '',
+    // Phone provisioning
+    desiredAreaCode: '',
+    selectedPhoneNumber: '',
+    sipConfiguration: null as any,
+    // Service type
     selectedServiceType: '',
     selectedSubtypes: [] as string[],
+    // Branding
+    companyLogo: null as File | null,
+    companyLogoUrl: '',
+    brandColors: {
+      primary: '#1b84ff',
+      secondary: '#7239ea'
+    },
+    // Payment setup
+    stripeConnected: false,
+    stripeAccountId: '',
+    // Preferences
     preferences: {
       requirePermits: false,
       trackWarranties: false,
@@ -87,6 +121,11 @@ const ContractorOnboarding: React.FC = () => {
     },
     teamMembers: [] as any[]
   })
+  
+  // Phone number search state
+  const [availableNumbers, setAvailableNumbers] = useState<any[]>([])
+  const [searchingNumbers, setSearchingNumbers] = useState(false)
+  const [provisioningPhone, setProvisioningPhone] = useState(false)
 
   useEffect(() => {
     loadServiceTypes()
@@ -131,6 +170,94 @@ const ContractorOnboarding: React.FC = () => {
     }
   }
 
+  const searchAvailableNumbers = async () => {
+    if (!formData.desiredAreaCode || formData.desiredAreaCode.length !== 3) {
+      alert('Please enter a valid 3-digit area code')
+      return
+    }
+
+    setSearchingNumbers(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('search-available-numbers', {
+        body: { areaCode: formData.desiredAreaCode }
+      })
+
+      if (error) throw error
+      
+      setAvailableNumbers(data.numbers || [])
+      if (data.numbers.length === 0) {
+        alert('No numbers available in this area code. Try a different one.')
+      }
+    } catch (error) {
+      console.error('Error searching numbers:', error)
+      alert('Failed to search for phone numbers. Please try again.')
+    } finally {
+      setSearchingNumbers(false)
+    }
+  }
+
+  const provisionPhoneNumber = async () => {
+    if (!formData.selectedPhoneNumber) {
+      alert('Please select a phone number')
+      return
+    }
+
+    setProvisioningPhone(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('purchase-phone-number', {
+        body: { 
+          phoneNumber: formData.selectedPhoneNumber,
+          tenantId: tenant?.id 
+        }
+      })
+
+      if (error) throw error
+      
+      // Update form data with provisioned number
+      setFormData(prev => ({
+        ...prev,
+        businessPhone: formData.selectedPhoneNumber,
+        sipConfiguration: data.sipConfig
+      }))
+
+      // Move to next step automatically
+      handleNext()
+    } catch (error) {
+      console.error('Error provisioning phone:', error)
+      alert('Failed to provision phone number. Please try again.')
+    } finally {
+      setProvisioningPhone(false)
+    }
+  }
+
+  const handleLogoUpload = async (file: File) => {
+    setFormData(prev => ({ ...prev, companyLogo: file }))
+    
+    // Create preview URL
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, companyLogoUrl: reader.result as string }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const connectStripe = async () => {
+    try {
+      // In real implementation, this would redirect to Stripe Connect OAuth
+      const { data, error } = await supabase.functions.invoke('create-stripe-connect-account', {
+        body: { tenantId: tenant?.id }
+      })
+
+      if (error) throw error
+      
+      // Redirect to Stripe OAuth
+      window.location.href = data.url
+    } catch (error) {
+      console.error('Error connecting Stripe:', error)
+      alert('Failed to connect payment processing. You can set this up later.')
+    }
+  }
+
   const saveProgress = async () => {
     if (!tenant?.id) return
 
@@ -171,33 +298,33 @@ const ContractorOnboarding: React.FC = () => {
   const completeOnboarding = async () => {
     if (!tenant?.id) return
 
+    setLoading(true)
     try {
-      // Update tenant with service type and preferences
-      await supabase
-        .from('tenants')
-        .update({
-          service_type: formData.selectedServiceType,
-          service_subtypes: formData.selectedSubtypes,
-          workflow_preferences: formData.preferences,
-          business_info: {
-            phone: formData.businessPhone,
-            email: formData.businessEmail,
-            address: formData.businessAddress,
-            website: formData.businessWebsite,
-            license: formData.licenseNumber,
-            insurance: formData.insuranceNumber
-          },
-          onboarding_completed: true
-        })
-        .eq('id', tenant.id)
+      // Call the centralized onboarding function
+      const { data, error } = await supabase.functions.invoke('complete-full-onboarding', {
+        body: {
+          tenantId: tenant.id,
+          onboardingData: {
+            ...formData,
+            companyLogo: formData.companyLogoUrl // Send base64 URL instead of File object
+          }
+        }
+      })
 
-      // Create default templates based on service type
-      await createDefaultTemplates()
+      if (error) throw error
 
-      // Navigate to dashboard
-      navigate('/dashboard')
+      // Show success message with their new phone number
+      if (formData.selectedPhoneNumber) {
+        alert(`🎉 Congratulations! Your business is all set up. Your new business line ${formData.selectedPhoneNumber} is active and ready to use!`)
+      }
+
+      // Navigate to dashboard with guided tour flag
+      navigate('/dashboard?firstTime=true')
     } catch (error) {
       console.error('Error completing onboarding:', error)
+      alert('There was an error completing setup. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -356,13 +483,15 @@ const ContractorOnboarding: React.FC = () => {
                 />
               </div>
               <div className='col-md-6 mb-5'>
-                <label className='form-label required'>Business Phone</label>
+                <label className='form-label'>Current Phone (optional)</label>
                 <input
                   type='tel'
                   className='form-control form-control-solid'
+                  placeholder="We'll set up a new business line for you"
                   value={formData.businessPhone}
                   onChange={(e) => setFormData(prev => ({ ...prev, businessPhone: e.target.value }))}
                 />
+                <div className='form-text'>You'll get a dedicated business line in the next step</div>
               </div>
               <div className='col-md-6 mb-5'>
                 <label className='form-label'>Business Email</label>
@@ -410,6 +539,182 @@ const ContractorOnboarding: React.FC = () => {
                 />
               </div>
             </div>
+          </div>
+        )
+
+      case 'phone_setup':
+        return (
+          <div>
+            <h3 className='mb-5'>Get Your Dedicated Business Phone</h3>
+            <p className='text-muted mb-8'>
+              Your professional phone line with VoIP calling, SMS, and call management - all integrated into TradeWorks Pro.
+            </p>
+
+            {!formData.selectedPhoneNumber ? (
+              <div>
+                {/* Area Code Selection */}
+                <div className='row mb-6'>
+                  <div className='col-md-4'>
+                    <label className='form-label required'>Preferred Area Code</label>
+                    <input
+                      type='text'
+                      className='form-control form-control-solid form-control-lg'
+                      placeholder='Enter 3 digits (e.g., 708)'
+                      value={formData.desiredAreaCode}
+                      maxLength={3}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '')
+                        setFormData(prev => ({ ...prev, desiredAreaCode: value }))
+                      }}
+                    />
+                    <div className='form-text'>We'll find available numbers in your area</div>
+                  </div>
+                  <div className='col-md-4 d-flex align-items-end'>
+                    <button
+                      type='button'
+                      className='btn btn-primary btn-lg'
+                      onClick={searchAvailableNumbers}
+                      disabled={!formData.desiredAreaCode || formData.desiredAreaCode.length !== 3 || searchingNumbers}
+                    >
+                      {searchingNumbers ? (
+                        <>
+                          <span className='spinner-border spinner-border-sm me-2' />
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <KTIcon iconName='magnifier' className='fs-6 me-2' />
+                          Search Numbers
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Available Numbers */}
+                {availableNumbers.length > 0 && (
+                  <div className='mb-8'>
+                    <h4 className='mb-4'>Available Numbers</h4>
+                    <div className='row'>
+                      {availableNumbers.slice(0, 6).map((number, index) => (
+                        <div key={index} className='col-md-4 mb-4'>
+                          <label className='d-flex cursor-pointer'>
+                            <input
+                              type='radio'
+                              className='d-none'
+                              name='phoneNumber'
+                              value={number.phone_number}
+                              checked={formData.selectedPhoneNumber === number.phone_number}
+                              onChange={(e) => setFormData(prev => ({ ...prev, selectedPhoneNumber: e.target.value }))}
+                            />
+                            <div className={`card w-100 ${formData.selectedPhoneNumber === number.phone_number ? 'border-primary bg-light-primary' : 'border-gray-300'}`}>
+                              <div className='card-body text-center py-4'>
+                                <div className='fs-4 fw-bold text-primary mb-2'>
+                                  {number.friendly_name || number.phone_number}
+                                </div>
+                                <div className='text-muted fs-7'>
+                                  {number.locality}, {number.region}
+                                </div>
+                                {formData.selectedPhoneNumber === number.phone_number && (
+                                  <div className='mt-2'>
+                                    <KTIcon iconName='check-circle' className='fs-4 text-success' />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+
+                    {formData.selectedPhoneNumber && (
+                      <div className='text-center mt-6'>
+                        <button
+                          type='button'
+                          className='btn btn-success btn-lg'
+                          onClick={provisionPhoneNumber}
+                          disabled={provisioningPhone}
+                        >
+                          {provisioningPhone ? (
+                            <>
+                              <span className='spinner-border spinner-border-sm me-2' />
+                              Setting up your phone line...
+                            </>
+                          ) : (
+                            <>
+                              <KTIcon iconName='phone' className='fs-6 me-2' />
+                              Get This Number - {formData.selectedPhoneNumber}
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {availableNumbers.length === 0 && formData.desiredAreaCode && (
+                  <div className='alert alert-info d-flex align-items-center'>
+                    <KTIcon iconName='information-5' className='fs-2 text-info me-4' />
+                    <div>
+                      <h4 className='alert-heading mb-1'>Start by searching for numbers</h4>
+                      <p className='mb-0'>Enter your preferred area code above and click "Search Numbers" to see available business phone numbers.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Phone Successfully Provisioned */
+              <div className='text-center py-10'>
+                <div className='symbol symbol-150px mb-8'>
+                  <div className='symbol-label bg-light-success'>
+                    <KTIcon iconName='phone' className='fs-2tx text-success' />
+                  </div>
+                </div>
+                <h2 className='text-success mb-4'>🎉 Your Business Line is Ready!</h2>
+                <div className='fs-1 fw-bold text-primary mb-4'>{formData.selectedPhoneNumber}</div>
+                <p className='fs-4 text-muted mb-8'>
+                  Your new business phone number is active and ready to use. You can make and receive calls, send SMS, and manage everything from TradeWorks Pro.
+                </p>
+                
+                <div className='row text-center'>
+                  <div className='col-md-4'>
+                    <div className='card border-0 bg-light-primary'>
+                      <div className='card-body'>
+                        <KTIcon iconName='phone' className='fs-2x text-primary mb-3' />
+                        <h5>VoIP Calling</h5>
+                        <p className='text-muted fs-7 mb-0'>Make calls directly from your browser</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-4'>
+                    <div className='card border-0 bg-light-primary'>
+                      <div className='card-body'>
+                        <KTIcon iconName='sms' className='fs-2x text-primary mb-3' />
+                        <h5>SMS Integration</h5>
+                        <p className='text-muted fs-7 mb-0'>Text customers and track conversations</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-4'>
+                    <div className='card border-0 bg-light-primary'>
+                      <div className='card-body'>
+                        <KTIcon iconName='chart-line' className='fs-2x text-primary mb-3' />
+                        <h5>Call Analytics</h5>
+                        <p className='text-muted fs-7 mb-0'>Track calls and performance metrics</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className='alert alert-success d-flex align-items-center mt-8'>
+                  <KTIcon iconName='check-circle' className='fs-2 text-success me-4' />
+                  <div className='text-start'>
+                    <h4 className='alert-heading mb-1'>Professional Image Complete</h4>
+                    <p className='mb-0'>Customers will see your dedicated business number on all communications. No more personal phone mixing with business!</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )
 
@@ -588,6 +893,298 @@ const ContractorOnboarding: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        )
+
+      case 'company_branding':
+        return (
+          <div>
+            <h3 className='mb-5'>Brand Your Business</h3>
+            <p className='text-muted mb-8'>
+              Add your company logo and customize colors to make TradeWorks Pro reflect your brand.
+            </p>
+
+            <div className='row'>
+              <div className='col-md-6'>
+                <h4 className='mb-5'>Company Logo</h4>
+                <div className='d-flex flex-column align-items-center'>
+                  {formData.companyLogoUrl ? (
+                    <div className='symbol symbol-150px mb-5'>
+                      <img src={formData.companyLogoUrl} alt='Company Logo' className='w-100 h-100 object-fit-cover' />
+                    </div>
+                  ) : (
+                    <div className='symbol symbol-150px mb-5'>
+                      <div className='symbol-label bg-light-primary'>
+                        <KTIcon iconName='picture' className='fs-2tx text-primary' />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <input
+                    type='file'
+                    id='logoUpload'
+                    className='d-none'
+                    accept='image/*'
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleLogoUpload(file)
+                    }}
+                  />
+                  <label htmlFor='logoUpload' className='btn btn-primary btn-sm'>
+                    <KTIcon iconName='cloud-upload' className='fs-6 me-2' />
+                    {formData.companyLogoUrl ? 'Change Logo' : 'Upload Logo'}
+                  </label>
+                  <div className='form-text mt-2 text-center'>
+                    Recommended: Square image, PNG or JPG, max 2MB
+                  </div>
+                </div>
+              </div>
+
+              <div className='col-md-6'>
+                <h4 className='mb-5'>Brand Colors</h4>
+                <div className='mb-5'>
+                  <label className='form-label'>Primary Color</label>
+                  <div className='d-flex align-items-center gap-3'>
+                    <input
+                      type='color'
+                      className='form-control form-control-solid w-75px h-40px p-1'
+                      value={formData.brandColors.primary}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        brandColors: { ...prev.brandColors, primary: e.target.value }
+                      }))}
+                    />
+                    <input
+                      type='text'
+                      className='form-control form-control-solid'
+                      value={formData.brandColors.primary}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        brandColors: { ...prev.brandColors, primary: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className='form-text'>Main brand color for buttons and highlights</div>
+                </div>
+
+                <div className='mb-5'>
+                  <label className='form-label'>Secondary Color</label>
+                  <div className='d-flex align-items-center gap-3'>
+                    <input
+                      type='color'
+                      className='form-control form-control-solid w-75px h-40px p-1'
+                      value={formData.brandColors.secondary}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        brandColors: { ...prev.brandColors, secondary: e.target.value }
+                      }))}
+                    />
+                    <input
+                      type='text'
+                      className='form-control form-control-solid'
+                      value={formData.brandColors.secondary}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        brandColors: { ...prev.brandColors, secondary: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className='form-text'>Accent color for secondary elements</div>
+                </div>
+
+                <div className='alert alert-info d-flex align-items-center'>
+                  <KTIcon iconName='information-5' className='fs-2 text-info me-4' />
+                  <div>
+                    <h5 className='alert-heading mb-1'>Professional Appearance</h5>
+                    <p className='mb-0'>Your logo and colors will appear on invoices, estimates, and the customer portal.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Brand Preview */}
+            <div className='mt-8'>
+              <h4 className='mb-5'>Preview</h4>
+              <div className='card border-2' style={{ borderColor: formData.brandColors.primary }}>
+                <div className='card-header' style={{ backgroundColor: formData.brandColors.primary, color: 'white' }}>
+                  <div className='d-flex align-items-center'>
+                    {formData.companyLogoUrl && (
+                      <img src={formData.companyLogoUrl} alt='Logo' className='me-3' style={{ width: '32px', height: '32px', objectFit: 'cover' }} />
+                    )}
+                    <h5 className='mb-0'>{formData.businessName || 'Your Business Name'}</h5>
+                  </div>
+                </div>
+                <div className='card-body'>
+                  <p className='text-muted mb-3'>Sample invoice or estimate header</p>
+                  <button 
+                    className='btn btn-sm me-3' 
+                    style={{ backgroundColor: formData.brandColors.primary, borderColor: formData.brandColors.primary, color: 'white' }}
+                  >
+                    Primary Button
+                  </button>
+                  <button 
+                    className='btn btn-sm' 
+                    style={{ backgroundColor: formData.brandColors.secondary, borderColor: formData.brandColors.secondary, color: 'white' }}
+                  >
+                    Secondary Button
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+
+      case 'payment_setup':
+        return (
+          <div>
+            <h3 className='mb-5'>Payment Processing</h3>
+            <p className='text-muted mb-8'>
+              Set up secure payment processing to get paid faster. Accept credit cards, ACH, and online payments.
+            </p>
+
+            {!formData.stripeConnected ? (
+              <div>
+                <div className='row mb-8'>
+                  <div className='col-md-4'>
+                    <div className='card h-100 border-primary'>
+                      <div className='card-body text-center'>
+                        <div className='symbol symbol-60px mb-4 mx-auto'>
+                          <div className='symbol-label bg-light-primary'>
+                            <KTIcon iconName='credit-cart' className='fs-2x text-primary' />
+                          </div>
+                        </div>
+                        <h5>Credit Cards</h5>
+                        <p className='text-muted fs-7'>Accept Visa, Mastercard, American Express, and Discover</p>
+                        <div className='badge badge-light-primary'>2.9% + 30¢</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-4'>
+                    <div className='card h-100 border-success'>
+                      <div className='card-body text-center'>
+                        <div className='symbol symbol-60px mb-4 mx-auto'>
+                          <div className='symbol-label bg-light-success'>
+                            <KTIcon iconName='bank' className='fs-2x text-success' />
+                          </div>
+                        </div>
+                        <h5>ACH/Bank Transfer</h5>
+                        <p className='text-muted fs-7'>Direct bank transfers for larger amounts</p>
+                        <div className='badge badge-light-success'>0.8% (max $5)</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-4'>
+                    <div className='card h-100 border-info'>
+                      <div className='card-body text-center'>
+                        <div className='symbol symbol-60px mb-4 mx-auto'>
+                          <div className='symbol-label bg-light-info'>
+                            <KTIcon iconName='wallet' className='fs-2x text-info' />
+                          </div>
+                        </div>
+                        <h5>Digital Wallets</h5>
+                        <p className='text-muted fs-7'>Apple Pay, Google Pay, and more</p>
+                        <div className='badge badge-light-info'>2.9% + 30¢</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className='text-center mb-8'>
+                  <button
+                    type='button'
+                    className='btn btn-primary btn-lg'
+                    onClick={connectStripe}
+                  >
+                    <KTIcon iconName='connect' className='fs-6 me-2' />
+                    Connect Stripe Account
+                  </button>
+                  <div className='form-text mt-3'>
+                    Secure setup powered by Stripe. Takes 2-3 minutes to complete.
+                  </div>
+                </div>
+
+                <div className='alert alert-warning d-flex align-items-center'>
+                  <KTIcon iconName='information-5' className='fs-2 text-warning me-4' />
+                  <div>
+                    <h5 className='alert-heading mb-1'>Optional Setup</h5>
+                    <p className='mb-0'>You can skip this step and set up payments later. However, connecting now means you'll be ready to accept payments immediately.</p>
+                  </div>
+                </div>
+
+                <div className='text-center'>
+                  <button
+                    type='button'
+                    className='btn btn-light-secondary'
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, stripeConnected: false }))
+                      handleNext()
+                    }}
+                  >
+                    Skip for Now
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Stripe Connected */
+              <div className='text-center py-10'>
+                <div className='symbol symbol-150px mb-8 mx-auto'>
+                  <div className='symbol-label bg-light-success'>
+                    <KTIcon iconName='check-circle' className='fs-2tx text-success' />
+                  </div>
+                </div>
+                <h2 className='text-success mb-4'>🎉 Payment Processing Connected!</h2>
+                <p className='fs-4 text-muted mb-8'>
+                  Your Stripe account is connected and ready to process payments. You can now accept credit cards, ACH, and digital wallet payments.
+                </p>
+                
+                <div className='row text-center mb-8'>
+                  <div className='col-md-3'>
+                    <div className='card border-0 bg-light-success'>
+                      <div className='card-body'>
+                        <KTIcon iconName='check-circle' className='fs-2x text-success mb-3' />
+                        <h6>Credit Cards</h6>
+                        <p className='text-muted fs-8 mb-0'>Ready</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-3'>
+                    <div className='card border-0 bg-light-success'>
+                      <div className='card-body'>
+                        <KTIcon iconName='check-circle' className='fs-2x text-success mb-3' />
+                        <h6>ACH Transfers</h6>
+                        <p className='text-muted fs-8 mb-0'>Ready</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-3'>
+                    <div className='card border-0 bg-light-success'>
+                      <div className='card-body'>
+                        <KTIcon iconName='check-circle' className='fs-2x text-success mb-3' />
+                        <h6>Digital Wallets</h6>
+                        <p className='text-muted fs-8 mb-0'>Ready</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className='col-md-3'>
+                    <div className='card border-0 bg-light-success'>
+                      <div className='card-body'>
+                        <KTIcon iconName='check-circle' className='fs-2x text-success mb-3' />
+                        <h6>Invoicing</h6>
+                        <p className='text-muted fs-8 mb-0'>Ready</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className='alert alert-success d-flex align-items-center'>
+                  <KTIcon iconName='check-circle' className='fs-2 text-success me-4' />
+                  <div className='text-start'>
+                    <h4 className='alert-heading mb-1'>Get Paid Faster</h4>
+                    <p className='mb-0'>Customers can now pay invoices online, reducing your collection time from weeks to days!</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )
 

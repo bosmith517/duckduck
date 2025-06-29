@@ -10,6 +10,11 @@ export interface CallLog {
   direction?: string
   recording_url?: string
   is_read: boolean
+  status?: string
+  from_number?: string
+  to_number?: string
+  duration?: number
+  provider_id?: string
 }
 
 export interface SMSMessage {

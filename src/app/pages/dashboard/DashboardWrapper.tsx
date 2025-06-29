@@ -18,9 +18,47 @@ import {
   TilesWidget5,
 } from '../../../_metronic/partials/widgets'
 import NewFeaturesWidget from '../../components/dashboard/NewFeaturesWidget'
+import { useOnboardingModal } from '../../hooks/useOnboardingModal'
+import { useSupabaseAuth } from '../../../app/modules/auth/core/SupabaseAuth'
+import { KTIcon } from '../../../_metronic/helpers'
 
-const DashboardPage = () => (
+const DashboardPage = () => {
+  const { openOnboarding } = useOnboardingModal()
+  const { tenant } = useSupabaseAuth()
+  
+  // Show quick setup if onboarding not completed
+  const showQuickSetup = !tenant?.onboarding_completed
+
+  return (
   <>
+    {/* Quick Setup Banner */}
+    {showQuickSetup && (
+      <div className='row g-5 g-xl-8 mb-8'>
+        <div className='col-12'>
+          <div className='alert alert-primary d-flex align-items-center p-5'>
+            <div className='symbol symbol-40px me-4'>
+              <div className='symbol-label bg-white'>
+                <KTIcon iconName='rocket' className='fs-2 text-primary' />
+              </div>
+            </div>
+            <div className='d-flex flex-column flex-grow-1'>
+              <h4 className='mb-1 text-dark'>Complete Your Account Setup</h4>
+              <span className='fw-semibold fs-6 text-gray-600'>
+                Get the most out of TradeWorks Pro by completing your business setup
+              </span>
+            </div>
+            <button 
+              className='btn btn-light-primary btn-sm'
+              onClick={openOnboarding}
+            >
+              <KTIcon iconName='setting-3' className='fs-6 me-2' />
+              Quick Setup
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* KPI Cards Row */}
     <div className='row g-5 g-xl-8 mb-8'>
       <div className='col-xl-3'>
@@ -172,7 +210,8 @@ const DashboardPage = () => (
       </div>
     </div>
   </>
-)
+  )
+}
 
 const DashboardWrapper = () => {
   const intl = useIntl()

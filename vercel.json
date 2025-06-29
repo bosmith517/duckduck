@@ -1,12 +1,55 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "npm install --force --omit=dev",
+  "devCommand": "npm run dev",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "VITE_VERCEL_DEPLOYMENT": "true"
+    }
+  },
   "rewrites": [
-    { "source": "/((?!api/|_next/|favicon.ico).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/|_next/|favicon.ico).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    },
+    {
       "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }

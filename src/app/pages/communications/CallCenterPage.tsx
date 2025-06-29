@@ -96,15 +96,15 @@ const CallCenterPage: React.FC = () => {
         const activeInboundCall: ActiveCall = {
           id: newCall.id,
           contact_id: newCall.contact_id,
-          phone_number: newCall.from_number,
+          phone_number: newCall.from_number || '',
           direction: 'inbound',
           status: 'ringing',
           started_at: newCall.created_at,
-          provider_call_id: newCall.provider_id
+          provider_call_id: newCall.provider_id || ''
         }
         
         setInboundCalls(prev => [...prev, activeInboundCall])
-        showToast.info(`Incoming call from ${communicationsService.formatPhoneNumber(newCall.from_number)}`)
+        showToast.info(`Incoming call from ${communicationsService.formatPhoneNumber(newCall.from_number || '')}`)
         
         // Play notification sound (if available)
         playNotificationSound()
@@ -454,12 +454,12 @@ const CallCenterPage: React.FC = () => {
                                 <td>
                                   <span className='text-dark fw-bold fs-6'>
                                     {communicationsService.formatPhoneNumber(
-                                      call.direction === 'inbound' ? call.from_number : call.to_number
+                                      call.direction === 'inbound' ? (call.from_number || '') : (call.to_number || '')
                                     )}
                                   </span>
                                 </td>
                                 <td>
-                                  <span className={getStatusBadge(call.status)}>
+                                  <span className={getStatusBadge(call.status || '')}>
                                     {call.status}
                                   </span>
                                 </td>

@@ -9,6 +9,144 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to generate a random password
+function generateRandomPassword(length = 24): string {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+}
+
+// Helper function to create a unique SIP endpoint for a tenant
+async function createSipEndpoint(tenantId: string, projectId: string, apiToken: string, spaceUrl: string): Promise<{username: string, password: string}> {
+  try {
+    console.log('Creating SIP endpoint for tenant:', tenantId)
+    
+    const sipUsername = `tenant-${tenantId.substring(0, 8)}-${Date.now()}`
+    const sipPassword = generateRandomPassword()
+    const auth = btoa(`${projectId}:${apiToken}`)
+    
+    // Create SIP endpoint via SignalWire API
+    const endpointUrl = `https://${spaceUrl}/api/relay/rest/sip_endpoints`
+    const endpointResponse = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        username: sipUsername,
+        password: sipPassword,
+        codecs: ['OPUS', 'PCMU', 'PCMA'],
+        enabled: true
+      })
+    })
+
+    if (!endpointResponse.ok) {
+      const errorText = await endpointResponse.text()
+      throw new Error(`Failed to create SIP endpoint: ${errorText}`)
+    }
+
+    const endpointData = await endpointResponse.json()
+    console.log('Successfully created SIP endpoint:', sipUsername)
+    
+    return {
+      username: sipUsername,
+      password: sipPassword
+    }
+  } catch (error) {
+    console.error('Error creating SIP endpoint:', error)
+    throw new Error(`Failed to create SIP endpoint: ${error.message}`)
+  }
+}
+
+// Helper function to auto-provision a phone number from SignalWire
+async function autoProvisionPhoneNumber(tenantId: string, projectId: string, apiToken: string, spaceUrl: string): Promise<string> {
+  try {
+    console.log('Auto-provisioning phone number for tenant:', tenantId)
+    
+    // First, try to find available phone numbers in the area
+    const searchUrl = `https://${spaceUrl}/api/laml/2010-04-01/Accounts/${projectId}/AvailablePhoneNumbers/US/Local.json?AreaCode=555&Limit=1`
+    const auth = btoa(`${projectId}:${apiToken}`)
+    
+    const searchResponse = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json'
+      }
+    })
+    
+    if (!searchResponse.ok) {
+      console.log('Search failed, trying without area code restriction...')
+      // Fallback: search without area code restriction
+      const fallbackUrl = `https://${spaceUrl}/api/laml/2010-04-01/Accounts/${projectId}/AvailablePhoneNumbers/US/Local.json?Limit=1`
+      const fallbackResponse = await fetch(fallbackUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Accept': 'application/json'
+        }
+      })
+      
+      if (!fallbackResponse.ok) {
+        throw new Error('No phone numbers available for provisioning')
+      }
+      
+      const fallbackData = await fallbackResponse.json()
+      if (!fallbackData.available_phone_numbers || fallbackData.available_phone_numbers.length === 0) {
+        throw new Error('No phone numbers available for provisioning')
+      }
+      
+      const phoneNumber = fallbackData.available_phone_numbers[0].phone_number
+      return await purchasePhoneNumber(phoneNumber, projectId, apiToken, spaceUrl)
+    }
+    
+    const searchData = await searchResponse.json()
+    if (!searchData.available_phone_numbers || searchData.available_phone_numbers.length === 0) {
+      throw new Error('No phone numbers available in the requested area')
+    }
+    
+    const phoneNumber = searchData.available_phone_numbers[0].phone_number
+    return await purchasePhoneNumber(phoneNumber, projectId, apiToken, spaceUrl)
+    
+  } catch (error) {
+    console.error('Error auto-provisioning phone number:', error)
+    throw new Error(`Failed to auto-provision phone number: ${error.message}`)
+  }
+}
+
+// Helper function to purchase a phone number from SignalWire
+async function purchasePhoneNumber(phoneNumber: string, projectId: string, apiToken: string, spaceUrl: string): Promise<string> {
+  const purchaseUrl = `https://${spaceUrl}/api/laml/2010-04-01/Accounts/${projectId}/IncomingPhoneNumbers.json`
+  const auth = btoa(`${projectId}:${apiToken}`)
+  
+  const purchaseResponse = await fetch(purchaseUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json'
+    },
+    body: new URLSearchParams({
+      PhoneNumber: phoneNumber,
+      FriendlyName: `Auto-provisioned for tenant ${phoneNumber}`
+    })
+  })
+  
+  if (!purchaseResponse.ok) {
+    const errorText = await purchaseResponse.text()
+    throw new Error(`Failed to purchase phone number: ${errorText}`)
+  }
+  
+  const purchaseData = await purchaseResponse.json()
+  console.log('Successfully provisioned phone number:', purchaseData.phone_number)
+  return purchaseData.phone_number
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -49,9 +187,9 @@ serve(async (req) => {
     }
 
     // Step 3: Get request data and validate
-    const { to, from, tenantId, contactId } = await req.json()
-    if (!to || !from) {
-      throw new Error('Missing "to" or "from" phone numbers in the request.')
+    const { to, tenantId, contactId } = await req.json()
+    if (!to) {
+      throw new Error('Missing "to" phone number in the request.')
     }
 
     // Validate user belongs to the specified tenant (if provided)
@@ -61,7 +199,16 @@ serve(async (req) => {
 
     const finalTenantId = tenantId || userProfile.tenant_id
 
-    // Step 4: Validate tenant and get phone number permissions
+    // Step 4: Get SignalWire credentials
+    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
+    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
+    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+
+    if (!signalwireProjectId || !signalwireApiToken || !signalwireSpaceUrl) {
+      throw new Error('Server configuration error: Missing SignalWire credentials.')
+    }
+
+    // Step 5: Validate tenant
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -78,31 +225,74 @@ serve(async (req) => {
       throw new Error('Invalid or inactive tenant')
     }
 
-    // Step 5: Validate the "from" number belongs to this tenant
-    const { data: fromNumber, error: numberError } = await supabaseAdmin
-      .from('signalwire_phone_numbers')
-      .select('id, number, is_active, voice_enabled')
+    // Step 6: Get or auto-provision tenant's SIP configuration and phone number
+    let { data: sipConfig, error: sipError } = await supabaseAdmin
+      .from('sip_configurations')
+      .select('sip_username, sip_password_encrypted, primary_phone_number')
       .eq('tenant_id', finalTenantId)
-      .eq('number', from)
       .eq('is_active', true)
-      .eq('voice_enabled', true)
       .single()
 
-    if (numberError || !fromNumber) {
-      throw new Error(`Phone number ${from} is not available for your organization or not enabled for voice calls`)
+    // If no SIP config exists, auto-create one with unique SIP endpoint
+    if (sipError || !sipConfig) {
+      console.log('No SIP configuration found, auto-creating for tenant:', finalTenantId)
+      
+      // Create unique SIP endpoint for this tenant
+      const sipEndpoint = await createSipEndpoint(finalTenantId, signalwireProjectId, signalwireApiToken, signalwireSpaceUrl)
+      
+      // Auto-provision phone number from SignalWire
+      const phoneNumber = await autoProvisionPhoneNumber(finalTenantId, signalwireProjectId, signalwireApiToken, signalwireSpaceUrl)
+      
+      // Create SIP configuration with unique credentials and phone number
+      const { data: newSipConfig, error: createError } = await supabaseAdmin
+        .from('sip_configurations')
+        .insert({
+          tenant_id: finalTenantId,
+          sip_username: sipEndpoint.username,
+          sip_password_encrypted: sipEndpoint.password,
+          sip_domain: 'taurustech-015b3ce9166a.sip.signalwire.com',
+          sip_proxy: 'taurustech-015b3ce9166a.sip.signalwire.com',
+          primary_phone_number: phoneNumber,
+          signalwire_project_id: signalwireProjectId,
+          is_active: true
+        })
+        .select('sip_username, sip_password_encrypted, primary_phone_number')
+        .single()
+
+      if (createError || !newSipConfig) {
+        throw new Error('Failed to auto-provision phone service for your organization.')
+      }
+      
+      sipConfig = newSipConfig
+      console.log('Auto-provisioned SIP config with unique endpoint:', sipEndpoint.username, 'and phone number:', phoneNumber)
     }
 
-    // Step 6: Get SignalWire credentials
-    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
-    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
-    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+    // If SIP config exists but no phone number, auto-provision one
+    if (!sipConfig.primary_phone_number) {
+      console.log('SIP config exists but no phone number, auto-provisioning...')
+      
+      const phoneNumber = await autoProvisionPhoneNumber(finalTenantId, signalwireProjectId, signalwireApiToken, signalwireSpaceUrl)
+      
+      // Update SIP config with phone number
+      const { error: updateError } = await supabaseAdmin
+        .from('sip_configurations')
+        .update({ primary_phone_number: phoneNumber })
+        .eq('tenant_id', finalTenantId)
+
+      if (updateError) {
+        throw new Error('Failed to update configuration with auto-provisioned phone number.')
+      }
+      
+      sipConfig.primary_phone_number = phoneNumber
+      console.log('Updated SIP config with auto-provisioned phone number:', phoneNumber)
+    }
+
+    const from = sipConfig.primary_phone_number
+
+    // Step 7: Get base function URL
     const baseFunctionUrl = Deno.env.get('SUPABASE_URL')!
 
-    if (!signalwireProjectId || !signalwireApiToken || !signalwireSpaceUrl) {
-      throw new Error('Server configuration error: Missing SignalWire credentials.')
-    }
-
-    // Step 7: Log the call attempt in database BEFORE making the call
+    // Step 8: Log the call attempt in database BEFORE making the call
     const agentName = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || user.email
 
     const { data: callRecord, error: logError } = await supabaseAdmin
@@ -124,24 +314,13 @@ serve(async (req) => {
       throw new Error('Failed to log call in database')
     }
 
-    // Step 8: For browser-based calling, we can optionally use SIP configuration
-    // But for now, let's make it work without requiring SIP config
-    const { data: sipConfig } = await supabaseAdmin
-      .from('sip_configurations')
-      .select('sip_username, sip_password_encrypted')
-      .eq('tenant_id', finalTenantId)
-      .eq('is_active', true)
-      .single()
-
-    // Create a simple LaML URL - use SIP endpoint if available, otherwise use basic handler
-    const callHandlerUrl = sipConfig?.sip_username 
-      ? `${baseFunctionUrl}/functions/v1/handle-call-control?agent=${encodeURIComponent(sipConfig.sip_username)}`
-      : `${baseFunctionUrl}/functions/v1/handle-call-control`
-
-    console.log('SIP config:', sipConfig ? 'Found' : 'Not found')
+    // Step 9: Create call handler URL with SIP configuration
+    const callHandlerUrl = `${baseFunctionUrl}/functions/v1/handle-call-control?agent=${encodeURIComponent(sipConfig.sip_username)}`
+    
+    console.log('Using SIP username for call routing:', sipConfig.sip_username)
     console.log('Call handler URL:', callHandlerUrl)
 
-    // Step 9: Initiate the call via SignalWire
+    // Step 10: Initiate the call via SignalWire
     const callUrl = `https://${signalwireSpaceUrl}/api/laml/2010-04-01/Accounts/${signalwireProjectId}/Calls.json`
     const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`);
 
@@ -176,7 +355,7 @@ serve(async (req) => {
     
     const callData = await callResponse.json()
     
-    // Step 10: Update call record with SignalWire call SID
+    // Step 11: Update call record with SignalWire call SID
     const { error: updateError } = await supabaseAdmin
       .from('calls')
       .update({ 

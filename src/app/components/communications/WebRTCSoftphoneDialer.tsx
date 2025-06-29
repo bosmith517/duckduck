@@ -79,14 +79,72 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
         setConnectionState('connecting')
         showToast.loading('Connecting to VoIP system...')
 
+        // Check for user profile first, create if needed
+        let { data: userProfile } = await supabase
+          .from('user_profiles')
+          .select('tenant_id')
+          .eq('id', user.id)
+          .single()
+        
+        if (!userProfile?.tenant_id) {
+          console.log('No user profile found, checking for tenant associations...')
+          
+          const { data: userTenants } = await supabase
+            .from('tenants')
+            .select('id')
+            .eq('is_active', true)
+            .limit(1)
+            .single()
+          
+          if (userTenants?.id) {
+            const { data: newProfile, error: profileError } = await supabase
+              .from('user_profiles')
+              .insert([{
+                id: user.id,
+                tenant_id: userTenants.id,
+                email: user.email,
+                first_name: user.user_metadata?.first_name || '',
+                last_name: user.user_metadata?.last_name || '',
+                role: 'admin',
+                is_active: true
+              }])
+              .select('tenant_id')
+              .single()
+            
+            if (profileError) {
+              throw new Error('Failed to create user profile. Please contact support.')
+            }
+            
+            userProfile = newProfile
+            console.log('Created missing user profile:', userProfile)
+          } else {
+            throw new Error('User account setup incomplete. Please complete your company onboarding to use the phone system.')
+          }
+        }
+
         // Get WebRTC credentials
         const { data: credentials, error } = await supabase.functions.invoke('generate-signalwire-voice-token', {})
         
         if (error || !credentials) {
+          console.error('WebRTC credentials error:', error)
+          if (error?.message?.includes('User profile not found')) {
+            throw new Error('Account setup incomplete. Please complete your company onboarding to use the phone system.')
+          }
           throw new Error('Failed to get WebRTC credentials')
         }
 
         console.log('WebRTC credentials received:', credentials)
+
+        // Validate that we have all required credentials
+        if (!credentials.sip?.username || !credentials.sip?.password || !credentials.sip?.domain) {
+          console.error('Missing required SIP credentials:', credentials)
+          throw new Error('Incomplete SIP credentials received from server')
+        }
+
+        if (!credentials.websocket?.server) {
+          console.error('Missing WebSocket server URL:', credentials)
+          throw new Error('WebSocket server URL not provided')
+        }
 
         // Create audio element for remote audio
         if (!audioRef.current) {
@@ -95,17 +153,24 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
           document.body.appendChild(audioRef.current)
         }
 
-        // Configure UserAgent with proper credentials format
-        const sipUsername = credentials.sip?.username || credentials.identity
-        const sipDomain = credentials.sip?.domain || credentials.space_url?.replace('wss://', '')
-        const sipPassword = credentials.sip?.password || credentials.token
-        const wsServer = credentials.websocket?.server || `wss://${sipDomain}`
+        // Use the exact credentials from the server
+        const sipUsername = credentials.sip.username
+        const sipDomain = credentials.sip.domain
+        const sipPassword = credentials.sip.password
+        const wsServer = credentials.websocket.server
 
         console.log('SIP Configuration:', { sipUsername, sipDomain, wsServer })
 
+        // Validate WebSocket URL format
+        if (!wsServer.startsWith('wss://')) {
+          throw new Error(`Invalid WebSocket URL format: ${wsServer}`)
+        }
+
         const uri = new URI('sip', sipUsername, sipDomain)
         const transportOptions = {
-          server: wsServer
+          server: wsServer,
+          traceSip: true,
+          connectionTimeout: 10
         }
 
         const userAgentOptions = {
@@ -129,17 +194,41 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
           }
         }
 
-        // Create and start UserAgent
+        // Create UserAgent
         const userAgent = new UserAgent(userAgentOptions)
         userAgentRef.current = userAgent
 
+        // Add a small delay to ensure everything is ready
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        console.log('Starting UserAgent...')
         await userAgent.start()
+        
+        // Wait for transport to be connected
+        let attempts = 0
+        const maxAttempts = 10
+        while (attempts < maxAttempts) {
+          if (userAgent.transport && userAgent.transport.state === 'Connected') {
+            console.log('Transport connected successfully')
+            break
+          }
+          console.log(`Waiting for transport connection... (attempt ${attempts + 1}/${maxAttempts})`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          attempts++
+        }
+
+        if (!userAgent.transport || userAgent.transport.state !== 'Connected') {
+          throw new Error('Failed to establish WebSocket connection to SignalWire')
+        }
 
         // Create and start Registerer
+        console.log('Creating SIP registerer...')
         const registerer = new Registerer(userAgent)
         registererRef.current = registerer
 
+        console.log('Registering with SIP server...')
         await registerer.register()
+        console.log('SIP registration successful!')
 
         // Set up incoming call handler
         userAgent.delegate = {
@@ -188,10 +277,16 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
     // Set up session event handlers
     setupSessionHandlers(session)
 
-    // Auto-answer for now (you might want to add a UI for accepting/rejecting)
-    if ('accept' in session && typeof session.accept === 'function') {
-      (session as any).accept()
-    }
+    // TODO: Add UI for accepting/rejecting calls
+    // For now, show notification that there's an incoming call
+    showToast.info(`Incoming call from ${session.remoteIdentity?.uri?.user || 'Unknown'}. Auto-accepting...`)
+    
+    // Auto-accept incoming calls (you can modify this later to show accept/reject buttons)
+    setTimeout(() => {
+      if ('accept' in session && typeof session.accept === 'function') {
+        (session as any).accept()
+      }
+    }, 1000)
   }
 
   // Set up session event handlers
@@ -269,13 +364,10 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
 
       showToast.loading(`Calling ${name}...`)
 
-      // Also log the call in database
-      const fromUri = userAgentRef.current.configuration.uri.toString()
-      const fromUser = fromUri.split('@')[0].replace('sip:', '')
+      // Also log the call in database using tenant's configured phone number
       supabase.functions.invoke('start-outbound-call', {
         body: {
           to: phoneNumber,
-          from: fromUser,
           tenantId: null, // Will use user's tenant
           userId: currentUser?.id,
           contactId
@@ -476,7 +568,184 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
           max-width: 20rem !important;
           border: 1px solid #E5E7EB !important;
         }
-        /* ... rest of the styles from original SoftphoneDialer ... */
+        .softphone-header {
+          display: flex !important;
+          justify-content: space-between !important;
+          align-items: center !important;
+          margin-bottom: 1rem !important;
+        }
+        .softphone-title {
+          font-size: 1.125rem !important;
+          font-weight: 600 !important;
+          margin: 0 !important;
+          color: #1F2937 !important;
+        }
+        .status-indicator {
+          display: flex !important;
+          align-items: center !important;
+          gap: 0.5rem !important;
+        }
+        .status-text {
+          font-size: 0.75rem !important;
+          color: #6B7280 !important;
+        }
+        .status-dot {
+          width: 0.5rem !important;
+          height: 0.5rem !important;
+          border-radius: 50% !important;
+        }
+        .status-dot.pulse {
+          animation: pulse 2s infinite !important;
+        }
+        .close-btn {
+          background: none !important;
+          border: none !important;
+          font-size: 1.25rem !important;
+          color: #6B7280 !important;
+          cursor: pointer !important;
+          padding: 0.25rem !important;
+          width: 1.5rem !important;
+          height: 1.5rem !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+        .close-btn:hover {
+          color: #374151 !important;
+        }
+        .connection-status {
+          padding: 0.75rem !important;
+          border-radius: 0.5rem !important;
+          margin-bottom: 1rem !important;
+          text-align: center !important;
+          font-size: 0.875rem !important;
+        }
+        .connection-status.connecting {
+          background-color: #FEF3C7 !important;
+          color: #92400E !important;
+        }
+        .connection-status.error {
+          background-color: #FEE2E2 !important;
+          color: #991B1B !important;
+        }
+        .connection-status.disconnected {
+          background-color: #E5E7EB !important;
+          color: #4B5563 !important;
+        }
+        .call-display {
+          text-align: center !important;
+          margin-bottom: 1.5rem !important;
+          padding: 1rem !important;
+          border-radius: 0.5rem !important;
+          background-color: #F9FAFB !important;
+        }
+        .callee-name {
+          font-size: 1rem !important;
+          font-weight: 600 !important;
+          margin: 0 0 0.25rem 0 !important;
+          color: #1F2937 !important;
+        }
+        .callee-number {
+          font-size: 0.875rem !important;
+          margin: 0 0 0.5rem 0 !important;
+          color: #6B7280 !important;
+        }
+        .call-timer {
+          font-size: 1.25rem !important;
+          font-weight: 700 !important;
+          margin: 0 !important;
+          color: #059669 !important;
+        }
+        .keypad {
+          display: grid !important;
+          grid-template-columns: repeat(3, 1fr) !important;
+          gap: 0.5rem !important;
+          margin-bottom: 1rem !important;
+        }
+        .keypad-btn {
+          aspect-ratio: 1 !important;
+          border: 1px solid #D1D5DB !important;
+          border-radius: 0.5rem !important;
+          background: white !important;
+          font-size: 1.125rem !important;
+          font-weight: 600 !important;
+          color: #374151 !important;
+          cursor: pointer !important;
+          transition: all 0.15s ease !important;
+        }
+        .keypad-btn:hover:not(:disabled) {
+          background-color: #F3F4F6 !important;
+          border-color: #9CA3AF !important;
+        }
+        .keypad-btn:active:not(:disabled) {
+          transform: scale(0.95) !important;
+          background-color: #E5E7EB !important;
+        }
+        .keypad-btn:disabled {
+          opacity: 0.5 !important;
+          cursor: not-allowed !important;
+        }
+        .action-buttons {
+          display: flex !important;
+          justify-content: space-around !important;
+          align-items: center !important;
+          gap: 0.5rem !important;
+        }
+        .control-btn {
+          width: 3rem !important;
+          height: 3rem !important;
+          border-radius: 50% !important;
+          border: none !important;
+          font-size: 1.25rem !important;
+          cursor: pointer !important;
+          transition: all 0.15s ease !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+        .mute-btn {
+          background-color: #F3F4F6 !important;
+          color: #374151 !important;
+        }
+        .mute-btn:hover:not(:disabled) {
+          background-color: #E5E7EB !important;
+        }
+        .hangup-btn {
+          background-color: #EF4444 !important;
+          color: white !important;
+        }
+        .hangup-btn:hover:not(:disabled) {
+          background-color: #DC2626 !important;
+        }
+        .call-btn {
+          background-color: #10B981 !important;
+          color: white !important;
+        }
+        .call-btn:hover:not(:disabled) {
+          background-color: #059669 !important;
+        }
+        .clear-btn {
+          background-color: #F3F4F6 !important;
+          color: #374151 !important;
+        }
+        .clear-btn:hover:not(:disabled) {
+          background-color: #E5E7EB !important;
+        }
+        .reconnect-btn {
+          background-color: #3B82F6 !important;
+          color: white !important;
+        }
+        .reconnect-btn:hover:not(:disabled) {
+          background-color: #2563EB !important;
+        }
+        .control-btn:disabled {
+          opacity: 0.5 !important;
+          cursor: not-allowed !important;
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
       `}</style>
       <div id="tradeworks-softphone">
         <div className="softphone-header">
