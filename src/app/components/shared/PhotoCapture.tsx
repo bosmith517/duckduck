@@ -152,13 +152,31 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   }
 
   const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return
+    console.log('Attempting to capture photo...')
+    
+    if (!videoRef.current || !canvasRef.current) {
+      console.error('Video or canvas ref is null:', { video: !!videoRef.current, canvas: !!canvasRef.current })
+      showToast.error('Camera not ready. Please try again.')
+      return
+    }
 
     const video = videoRef.current
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
 
-    if (!context) return
+    if (!context) {
+      console.error('Could not get canvas context')
+      showToast.error('Canvas error. Please try again.')
+      return
+    }
+
+    console.log('Video dimensions:', { width: video.videoWidth, height: video.videoHeight })
+
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.error('Video dimensions are zero - video may not be ready')
+      showToast.error('Camera not ready. Please wait a moment and try again.')
+      return
+    }
 
     // Set canvas size to video size
     canvas.width = video.videoWidth
@@ -167,19 +185,30 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     // Draw video frame to canvas
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
+    console.log('Canvas capture completed, converting to blob...')
+
     // Convert canvas to blob
     canvas.toBlob(async (blob) => {
-      if (!blob) return
+      if (!blob) {
+        console.error('Failed to create blob from canvas')
+        showToast.error('Failed to capture photo. Please try again.')
+        return
+      }
+
+      console.log('Blob created successfully:', { size: blob.size, type: blob.type })
 
       const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
       const preview = URL.createObjectURL(blob)
       
+      console.log('Getting location...')
       // Get current location
       const position = await getLocation()
       const location = position ? {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
       } : undefined
+
+      console.log('Location obtained:', location)
 
       const newPhoto: CapturedPhoto = {
         file,
@@ -188,40 +217,82 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
         location
       }
 
-      setPhotos(prev => [...prev, newPhoto])
+      console.log('Adding photo to state...')
+      setPhotos(prev => {
+        const updated = [...prev, newPhoto]
+        console.log('Photos updated, new count:', updated.length)
+        return updated
+      })
+      
+      showToast.success('Photo captured successfully!')
       stopCamera()
     }, 'image/jpeg', 0.9)
   }
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File selection started...')
     const files = Array.from(event.target.files || [])
+    console.log('Files selected:', files.length)
+    
+    if (files.length === 0) {
+      console.log('No files selected')
+      return
+    }
+
+    let addedCount = 0
     
     for (const file of files) {
+      console.log('Processing file:', { name: file.name, type: file.type, size: file.size })
+      
       if (file.type.startsWith('image/')) {
-        const preview = URL.createObjectURL(file)
-        
-        // Get current location
-        const position = await getLocation()
-        const location = position ? {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        } : undefined
+        try {
+          const preview = URL.createObjectURL(file)
+          console.log('Preview URL created:', preview)
+          
+          // Get current location
+          console.log('Getting location for uploaded file...')
+          const position = await getLocation()
+          const location = position ? {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          } : undefined
 
-        const newPhoto: CapturedPhoto = {
-          file,
-          preview,
-          description: '',
-          location
+          console.log('Location obtained for uploaded file:', location)
+
+          const newPhoto: CapturedPhoto = {
+            file,
+            preview,
+            description: '',
+            location
+          }
+
+          setPhotos(prev => {
+            const updated = [...prev, newPhoto]
+            console.log('File added to photos, new count:', updated.length)
+            return updated
+          })
+          
+          addedCount++
+        } catch (error) {
+          console.error('Error processing file:', file.name, error)
+          showToast.error(`Failed to process file: ${file.name}`)
         }
-
-        setPhotos(prev => [...prev, newPhoto])
+      } else {
+        console.log('Skipping non-image file:', file.type)
+        showToast.error(`File ${file.name} is not an image file`)
       }
+    }
+
+    if (addedCount > 0) {
+      showToast.success(`${addedCount} photo(s) selected successfully`)
     }
 
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+    
+    console.log('File selection completed')
   }
 
   const removePhoto = (index: number) => {
@@ -243,8 +314,18 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
 
   const uploadPhoto = async (photo: CapturedPhoto): Promise<string | null> => {
     try {
+      console.log('Starting photo upload...', {
+        tenantId: userProfile?.tenant_id,
+        jobId,
+        photoType,
+        fileSize: photo.file.size,
+        fileType: photo.file.type
+      })
+
       const fileName = `${userProfile?.tenant_id}/${jobId || 'general'}/${photoType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.jpg`
+      console.log('Generated filename:', fileName)
       
+      console.log('Uploading to Supabase storage...')
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('job-photos')
         .upload(fileName, photo.file, {
@@ -252,12 +333,19 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
           upsert: false
         })
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError)
+        throw uploadError
+      }
+
+      console.log('Storage upload successful:', uploadData)
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('job-photos')
         .getPublicUrl(fileName)
+
+      console.log('Public URL generated:', publicUrl)
 
       // Save photo record to database
       const photoRecord = {
@@ -274,17 +362,25 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
         taken_at: new Date().toISOString()
       }
 
+      console.log('Saving photo record to database:', photoRecord)
+
       const { data: savedPhoto, error: saveError } = await supabase
         .from('job_photos')
         .insert(photoRecord)
         .select()
         .single()
 
-      if (saveError) throw saveError
+      if (saveError) {
+        console.error('Database save error:', saveError)
+        throw saveError
+      }
+
+      console.log('Photo record saved successfully:', savedPhoto)
 
       return savedPhoto.id
     } catch (error) {
       console.error('Error uploading photo:', error)
+      showToast.error(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       return null
     }
   }
