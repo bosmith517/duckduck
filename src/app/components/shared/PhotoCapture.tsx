@@ -97,7 +97,8 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
         constraints = {
           video: { 
             width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            height: { ideal: 1080 },
+            facingMode: 'user' // Front camera as fallback
           }
         }
         stream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -136,7 +137,8 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     } catch (error) {
       console.error('Error accessing camera:', error)
       setCameraLoading(false)
-      showToast.error(`Could not access camera: ${error.message}. Please check permissions and try again.`)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      showToast.error(`Could not access camera: ${errorMessage}. Please check permissions and try again.`)
     }
   }
 
