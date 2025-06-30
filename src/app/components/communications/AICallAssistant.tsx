@@ -21,6 +21,49 @@ interface AIAssistantConfig {
   transferNumbers: Array<{ name: string; number: string; department: string }>
 }
 
+// Voice options - moved outside component to avoid hoisting issues
+const voices = [
+  // Amazon Polly Voices
+  { value: 'polly.amy', label: 'Amy (British Female)', accent: 'British', provider: 'Amazon Polly' },
+  { value: 'polly.brian', label: 'Brian (British Male)', accent: 'British', provider: 'Amazon Polly' },
+  { value: 'polly.emma', label: 'Emma (British Female)', accent: 'British', provider: 'Amazon Polly' },
+  { value: 'polly.joanna', label: 'Joanna (American Female)', accent: 'American', provider: 'Amazon Polly' },
+  { value: 'polly.joey', label: 'Joey (American Male)', accent: 'American', provider: 'Amazon Polly' },
+  { value: 'polly.kendra', label: 'Kendra (American Female)', accent: 'American', provider: 'Amazon Polly' },
+  { value: 'polly.kimberly', label: 'Kimberly (American Female)', accent: 'American', provider: 'Amazon Polly' },
+  { value: 'polly.matthew', label: 'Matthew (American Male)', accent: 'American', provider: 'Amazon Polly' },
+  { value: 'polly.salli', label: 'Salli (American Female)', accent: 'American', provider: 'Amazon Polly' },
+  { value: 'polly.russell', label: 'Russell (Australian Male)', accent: 'Australian', provider: 'Amazon Polly' },
+  { value: 'polly.nicole', label: 'Nicole (Australian Female)', accent: 'Australian', provider: 'Amazon Polly' },
+  
+  // Google Cloud Voices
+  { value: 'google.en-US-Wavenet-A', label: 'Wavenet A (American Male)', accent: 'American', provider: 'Google Cloud' },
+  { value: 'google.en-US-Wavenet-B', label: 'Wavenet B (American Male)', accent: 'American', provider: 'Google Cloud' },
+  { value: 'google.en-US-Wavenet-C', label: 'Wavenet C (American Female)', accent: 'American', provider: 'Google Cloud' },
+  { value: 'google.en-US-Wavenet-D', label: 'Wavenet D (American Male)', accent: 'American', provider: 'Google Cloud' },
+  { value: 'google.en-US-Wavenet-E', label: 'Wavenet E (American Female)', accent: 'American', provider: 'Google Cloud' },
+  { value: 'google.en-US-Wavenet-F', label: 'Wavenet F (American Female)', accent: 'American', provider: 'Google Cloud' },
+  { value: 'google.en-GB-Wavenet-A', label: 'Wavenet A (British Female)', accent: 'British', provider: 'Google Cloud' },
+  { value: 'google.en-GB-Wavenet-B', label: 'Wavenet B (British Male)', accent: 'British', provider: 'Google Cloud' },
+  
+  // Microsoft Azure Voices
+  { value: 'azure.en-US-JennyNeural', label: 'Jenny (American Female)', accent: 'American', provider: 'Microsoft Azure' },
+  { value: 'azure.en-US-GuyNeural', label: 'Guy (American Male)', accent: 'American', provider: 'Microsoft Azure' },
+  { value: 'azure.en-US-AriaNeural', label: 'Aria (American Female)', accent: 'American', provider: 'Microsoft Azure' },
+  { value: 'azure.en-US-DavisNeural', label: 'Davis (American Male)', accent: 'American', provider: 'Microsoft Azure' },
+  { value: 'azure.en-GB-SoniaNeural', label: 'Sonia (British Female)', accent: 'British', provider: 'Microsoft Azure' },
+  { value: 'azure.en-GB-RyanNeural', label: 'Ryan (British Male)', accent: 'British', provider: 'Microsoft Azure' },
+  
+  // ElevenLabs Voices (Premium Natural Voices)
+  { value: 'elevenlabs.rachel', label: 'Rachel (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
+  { value: 'elevenlabs.josh', label: 'Josh (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
+  { value: 'elevenlabs.bella', label: 'Bella (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
+  { value: 'elevenlabs.antoni', label: 'Antoni (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
+  { value: 'elevenlabs.arnold', label: 'Arnold (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
+  { value: 'elevenlabs.domi', label: 'Domi (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
+  { value: 'elevenlabs.elli', label: 'Elli (Natural Female)', accent: 'American', provider: 'ElevenLabs' }
+]
+
 export const AICallAssistant: React.FC = () => {
   const { tenant } = useSupabaseAuth()
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -61,48 +104,6 @@ export const AICallAssistant: React.FC = () => {
 
   const [loading, setLoading] = useState(false)
   const [testMode, setTestMode] = useState(false)
-
-  const voices = [
-    // Amazon Polly Voices
-    { value: 'polly.amy', label: 'Amy (British Female)', accent: 'British', provider: 'Amazon Polly' },
-    { value: 'polly.brian', label: 'Brian (British Male)', accent: 'British', provider: 'Amazon Polly' },
-    { value: 'polly.emma', label: 'Emma (British Female)', accent: 'British', provider: 'Amazon Polly' },
-    { value: 'polly.joanna', label: 'Joanna (American Female)', accent: 'American', provider: 'Amazon Polly' },
-    { value: 'polly.joey', label: 'Joey (American Male)', accent: 'American', provider: 'Amazon Polly' },
-    { value: 'polly.kendra', label: 'Kendra (American Female)', accent: 'American', provider: 'Amazon Polly' },
-    { value: 'polly.kimberly', label: 'Kimberly (American Female)', accent: 'American', provider: 'Amazon Polly' },
-    { value: 'polly.matthew', label: 'Matthew (American Male)', accent: 'American', provider: 'Amazon Polly' },
-    { value: 'polly.salli', label: 'Salli (American Female)', accent: 'American', provider: 'Amazon Polly' },
-    { value: 'polly.russell', label: 'Russell (Australian Male)', accent: 'Australian', provider: 'Amazon Polly' },
-    { value: 'polly.nicole', label: 'Nicole (Australian Female)', accent: 'Australian', provider: 'Amazon Polly' },
-    
-    // Google Cloud Voices
-    { value: 'google.en-US-Wavenet-A', label: 'Wavenet A (American Male)', accent: 'American', provider: 'Google Cloud' },
-    { value: 'google.en-US-Wavenet-B', label: 'Wavenet B (American Male)', accent: 'American', provider: 'Google Cloud' },
-    { value: 'google.en-US-Wavenet-C', label: 'Wavenet C (American Female)', accent: 'American', provider: 'Google Cloud' },
-    { value: 'google.en-US-Wavenet-D', label: 'Wavenet D (American Male)', accent: 'American', provider: 'Google Cloud' },
-    { value: 'google.en-US-Wavenet-E', label: 'Wavenet E (American Female)', accent: 'American', provider: 'Google Cloud' },
-    { value: 'google.en-US-Wavenet-F', label: 'Wavenet F (American Female)', accent: 'American', provider: 'Google Cloud' },
-    { value: 'google.en-GB-Wavenet-A', label: 'Wavenet A (British Female)', accent: 'British', provider: 'Google Cloud' },
-    { value: 'google.en-GB-Wavenet-B', label: 'Wavenet B (British Male)', accent: 'British', provider: 'Google Cloud' },
-    
-    // Microsoft Azure Voices
-    { value: 'azure.en-US-JennyNeural', label: 'Jenny (American Female)', accent: 'American', provider: 'Microsoft Azure' },
-    { value: 'azure.en-US-GuyNeural', label: 'Guy (American Male)', accent: 'American', provider: 'Microsoft Azure' },
-    { value: 'azure.en-US-AriaNeural', label: 'Aria (American Female)', accent: 'American', provider: 'Microsoft Azure' },
-    { value: 'azure.en-US-DavisNeural', label: 'Davis (American Male)', accent: 'American', provider: 'Microsoft Azure' },
-    { value: 'azure.en-GB-SoniaNeural', label: 'Sonia (British Female)', accent: 'British', provider: 'Microsoft Azure' },
-    { value: 'azure.en-GB-RyanNeural', label: 'Ryan (British Male)', accent: 'British', provider: 'Microsoft Azure' },
-    
-    // ElevenLabs Voices (Premium Natural Voices)
-    { value: 'elevenlabs.rachel', label: 'Rachel (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
-    { value: 'elevenlabs.josh', label: 'Josh (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
-    { value: 'elevenlabs.bella', label: 'Bella (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
-    { value: 'elevenlabs.antoni', label: 'Antoni (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
-    { value: 'elevenlabs.arnold', label: 'Arnold (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
-    { value: 'elevenlabs.domi', label: 'Domi (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
-    { value: 'elevenlabs.elli', label: 'Elli (Natural Female)', accent: 'American', provider: 'ElevenLabs' }
-  ]
 
   const personalities = [
     { value: 'professional', label: 'Professional', description: 'Formal and business-focused' },
@@ -163,13 +164,13 @@ export const AICallAssistant: React.FC = () => {
                           config.voice.includes('kimberly') || config.voice.includes('salli') || 
                           config.voice.includes('nicole')
       
-      const voices = speechSynthesis.getVoices()
+      const browserVoices = speechSynthesis.getVoices()
       if (config.voice.includes('british')) {
-        utterance.voice = voices.find(v => v.lang.includes('en-GB')) || voices[0]
+        utterance.voice = browserVoices.find(v => v.lang.includes('en-GB')) || browserVoices[0]
       } else if (config.voice.includes('australian')) {
-        utterance.voice = voices.find(v => v.lang.includes('en-AU')) || voices[0]
+        utterance.voice = browserVoices.find(v => v.lang.includes('en-AU')) || browserVoices[0]
       } else {
-        utterance.voice = voices.find(v => v.lang.includes('en-US')) || voices[0]
+        utterance.voice = browserVoices.find(v => v.lang.includes('en-US')) || browserVoices[0]
       }
       
       utterance.rate = config.personality === 'concise' ? 1.1 : 0.9

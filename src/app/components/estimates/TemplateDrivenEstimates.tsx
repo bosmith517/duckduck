@@ -1122,14 +1122,36 @@ const TemplateDrivenEstimates: React.FC = () => {
 
       {/* Template Builder Modal */}
       {editingTemplate && (
-        <EstimateTemplateBuilder
-          template={editingTemplate.id ? editingTemplate as EstimateTemplate : undefined}
-          onSave={(savedTemplate) => {
-            setEditingTemplate(null)
-            fetchData()
-          }}
-          onCancel={() => setEditingTemplate(null)}
-        />
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Template Builder</h5>
+                <button 
+                  className="btn-close"
+                  onClick={() => setEditingTemplate(null)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-info">
+                  <KTIcon iconName="information" className="fs-2 me-3" />
+                  <div>
+                    <h5 className="mb-1">Template Builder Coming Soon</h5>
+                    <p className="mb-0">Advanced template builder with drag-and-drop interface is under development.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => setEditingTemplate(null)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

@@ -206,7 +206,7 @@ export const MyDayDashboard: React.FC = () => {
         // Start location tracking when technician is en route
         locationTriggerService.startLocationTracking(jobId)
         alert('🚨 Location tracking started! Customers will be notified when you\'re nearby.')
-      } else if (newStatus === 'completed' || newStatus === 'cancelled') {
+      } else if (newStatus === 'completed') {
         // Stop location tracking when job is done
         locationTriggerService.stopLocationTracking()
       }

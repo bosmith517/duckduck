@@ -209,13 +209,13 @@ const FleetTrackingPage: React.FC = () => {
               </div>
             `)
         )
-        .addTo(map.current)
+        .addTo(map.current!)
     })
   }
 
   return (
     <>
-      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isSeparator: false}, {title: 'Fleet Tracking', path: '/tracking/overview', isSeparator: true}]}>Fleet Tracking Overview</PageTitle>
+      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isActive: false, isSeparator: false}, {title: 'Fleet Tracking', path: '/tracking/overview', isActive: true, isSeparator: true}]}>Fleet Tracking Overview</PageTitle>
       
       <div className='row g-5 g-xl-8'>
         {/* Stats Cards */}
@@ -583,7 +583,7 @@ const FleetTrackingPage: React.FC = () => {
 const RouteOptimizationPage: React.FC = () => {
   return (
     <>
-      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isSeparator: false}, {title: 'Route Optimization', path: '/tracking/routes', isSeparator: true}]}>Route Optimization</PageTitle>
+      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isActive: false, isSeparator: false}, {title: 'Route Optimization', path: '/tracking/routes', isActive: true, isSeparator: true}]}>Route Optimization</PageTitle>
       
       <div className='row g-5 g-xl-8'>
         <div className='col-xl-12'>
@@ -629,7 +629,7 @@ const RouteOptimizationPage: React.FC = () => {
 const LiveMonitoringPage: React.FC = () => {
   return (
     <>
-      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isSeparator: false}, {title: 'Live Monitoring', path: '/tracking/live', isSeparator: true}]}>Live Monitoring</PageTitle>
+      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isActive: false, isSeparator: false}, {title: 'Live Monitoring', path: '/tracking/live', isActive: true, isSeparator: true}]}>Live Monitoring</PageTitle>
       
       <div className='row g-5 g-xl-8'>
         <div className='col-xl-12'>
@@ -674,7 +674,7 @@ const LiveMonitoringPage: React.FC = () => {
 const TechnicianDispatchPage: React.FC = () => {
   return (
     <>
-      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isSeparator: false}, {title: 'Technician Dispatch', path: '/tracking/dispatch', isSeparator: true}]}>Technician Dispatch</PageTitle>
+      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isActive: false, isSeparator: false}, {title: 'Technician Dispatch', path: '/tracking/dispatch', isActive: true, isSeparator: true}]}>Technician Dispatch</PageTitle>
       
       <div className='row g-5 g-xl-8'>
         <div className='col-xl-12'>

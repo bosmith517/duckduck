@@ -8,7 +8,7 @@ import {WithChildren} from '../../helpers'
 export interface PageLink {
   title: string
   path: string
-  isActive: boolean
+  isActive?: boolean
   isSeparator?: boolean
 }
 

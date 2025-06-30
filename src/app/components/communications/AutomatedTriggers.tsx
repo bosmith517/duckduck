@@ -227,7 +227,7 @@ export const AutomatedTriggers: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('test-communication-trigger', {
         body: {
           trigger_id: trigger.id,
-          test_phone: userProfile?.phone || '+1234567890',
+          test_phone: '+1234567890', // Default test phone number
           test_email: userProfile?.email || 'test@example.com'
         }
       })

@@ -16,7 +16,7 @@ interface SignalWireApiResponse {
   [key: string]: any; // Allow other properties
 }
 
-export const SignalWireTestPage: React.FC = () => {
+const SignalWireTestPage: React.FC = () => {
   // --- Consolidated State ---
   const [loading, setLoading] = useState(false)
   const [apiResponse, setApiResponse] = useState<SignalWireApiResponse | null>(null) // Renamed to avoid conflicts
@@ -523,3 +523,5 @@ export const SignalWireTestPage: React.FC = () => {
     </div>
   )
 }
+
+export default SignalWireTestPage
