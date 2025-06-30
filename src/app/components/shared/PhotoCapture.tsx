@@ -37,6 +37,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   const [photos, setPhotos] = useState<CapturedPhoto[]>([])
   const [uploading, setUploading] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
+  const [cameraLoading, setCameraLoading] = useState(false)
   const [description, setDescription] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -74,22 +75,68 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      console.log('Starting camera...')
+      setCameraLoading(true)
+      
+      // First try with environment camera, fallback to any available camera
+      let constraints = {
         video: { 
           facingMode: 'environment', // Use back camera on mobile
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
-      })
+      }
+
+      let stream: MediaStream
+      
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints)
+      } catch (envError) {
+        console.log('Environment camera failed, trying any camera:', envError)
+        // Fallback to any available camera
+        constraints = {
+          video: { 
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        }
+        stream = await navigator.mediaDevices.getUserMedia(constraints)
+      }
+      
+      console.log('Camera stream obtained:', stream)
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         streamRef.current = stream
-        setShowCamera(true)
+        
+        // Wait for video metadata to load
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded')
+          setCameraLoading(false)
+          setShowCamera(true)
+        }
+        
+        // Add timeout fallback in case metadata never loads
+        setTimeout(() => {
+          if (cameraLoading) {
+            console.log('Camera timeout - showing camera anyway')
+            setCameraLoading(false)
+            setShowCamera(true)
+          }
+        }, 3000)
+        
+        // Force play the video
+        await videoRef.current.play().catch(e => {
+          console.error('Error playing video:', e)
+        })
+      } else {
+        console.error('Video ref is null')
+        setCameraLoading(false)
       }
     } catch (error) {
       console.error('Error accessing camera:', error)
-      showToast.error('Could not access camera. Please check permissions.')
+      setCameraLoading(false)
+      showToast.error(`Could not access camera: ${error.message}. Please check permissions and try again.`)
     }
   }
 
@@ -99,6 +146,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       streamRef.current = null
     }
     setShowCamera(false)
+    setCameraLoading(false)
   }
 
   const capturePhoto = async () => {
@@ -321,6 +369,16 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                     muted
                     className="w-100 rounded"
                     style={{ maxHeight: '400px', objectFit: 'cover' }}
+                    onError={(e) => {
+                      console.error('Video element error:', e)
+                      showToast.error('Video display error. Please try again.')
+                    }}
+                    onCanPlay={() => {
+                      console.log('Video can play')
+                    }}
+                    onLoadStart={() => {
+                      console.log('Video load started')
+                    }}
                   />
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
                   
@@ -371,13 +429,26 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                     <button
                       className="btn btn-primary w-100 py-4"
                       onClick={startCamera}
+                      disabled={cameraLoading}
                     >
-                      <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
-                        <span className="path1"></span>
-                        <span className="path2"></span>
-                      </i>
-                      <div className="fw-bold">Take New Photo</div>
-                      <small className="text-white-75">Use your camera</small>
+                      {cameraLoading ? (
+                        <>
+                          <div className="spinner-border spinner-border-sm mb-2" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </div>
+                          <div className="fw-bold">Starting Camera...</div>
+                          <small className="text-white-75">Please wait</small>
+                        </>
+                      ) : (
+                        <>
+                          <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
+                            <span className="path1"></span>
+                            <span className="path2"></span>
+                          </i>
+                          <div className="fw-bold">Take New Photo</div>
+                          <small className="text-white-75">Use your camera</small>
+                        </>
+                      )}
                     </button>
                   </div>
                   <div className="col-md-6">

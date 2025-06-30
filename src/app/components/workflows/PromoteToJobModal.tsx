@@ -136,30 +136,61 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
 
       if (leadUpdateError) throw leadUpdateError
 
-      // Step 2: Create Account Record
-      const accountData = {
-        tenant_id: userProfile.tenant_id,
-        name: `${leadData.caller_name} - ${values.property_address}`,
-        type: 'residential',
-        phone: leadData.phone_number,
-        email: leadData.email,
-        address_line1: values.property_address,
-        city: values.property_city,
-        state: values.property_state,
-        zip_code: values.property_zip,
-        account_status: 'active',
-        notes: `Created from lead: ${leadData.initial_request}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      const { data: account, error: accountError } = await supabase
+      // Step 2: Check if Account already exists, if not create one
+      // Try to find existing account by phone number or email first
+      let account = null
+      
+      const { data: existingAccount } = await supabase
         .from('accounts')
-        .insert(accountData)
-        .select()
+        .select('*')
+        .eq('tenant_id', userProfile.tenant_id)
+        .or(`phone.eq.${leadData.phone_number},email.eq.${leadData.email}`)
         .single()
 
-      if (accountError) throw accountError
+      if (existingAccount) {
+        // Update existing account with latest information
+        const { data: updatedAccount, error: updateError } = await supabase
+          .from('accounts')
+          .update({
+            address_line1: values.property_address,
+            city: values.property_city,
+            state: values.property_state,
+            zip_code: values.property_zip,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingAccount.id)
+          .select()
+          .single()
+
+        if (updateError) throw updateError
+        account = updatedAccount
+      } else {
+        // Create new account
+        const accountData = {
+          tenant_id: userProfile.tenant_id,
+          name: `${leadData.caller_name} - ${values.property_address}`,
+          type: 'residential',
+          phone: leadData.phone_number,
+          email: leadData.email,
+          address_line1: values.property_address,
+          city: values.property_city,
+          state: values.property_state,
+          zip_code: values.property_zip,
+          account_status: 'active',
+          notes: `Created from lead: ${leadData.initial_request}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        const { data: newAccount, error: accountError } = await supabase
+          .from('accounts')
+          .insert(accountData)
+          .select()
+          .single()
+
+        if (accountError) throw accountError
+        account = newAccount
+      }
 
       // Step 3: Create Contact Record
       const contactData = {
