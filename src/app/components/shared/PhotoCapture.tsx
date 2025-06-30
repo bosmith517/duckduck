@@ -518,50 +518,40 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                     <span className="path3"></span>
                   </i>
                   <div>
-                    <strong>Two ways to add photos:</strong> Take new photos with your camera or upload existing photos from your device.
+                    <strong>Add photos:</strong> Take photos directly with your camera or select from your gallery.
                   </div>
                 </div>
                 
                 <div className="row g-3 mb-6">
-                  <div className="col-md-6">
-                    <button
-                      className="btn btn-primary w-100 py-4"
-                      onClick={startCamera}
-                      disabled={cameraLoading}
-                    >
-                      {cameraLoading ? (
-                        <>
-                          <div className="spinner-border spinner-border-sm mb-2" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                          </div>
-                          <div className="fw-bold">Starting Camera...</div>
-                          <small className="text-white-75">Please wait</small>
-                        </>
-                      ) : (
-                        <>
-                          <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
-                            <span className="path1"></span>
-                            <span className="path2"></span>
-                          </i>
-                          <div className="fw-bold">Take New Photo</div>
-                          <small className="text-white-75">Use your camera</small>
-                        </>
-                      )}
-                    </button>
+                  <div className="col-12 col-md-6">
+                    <label htmlFor="camera-input" className="btn btn-primary w-100 py-4 mb-0">
+                      <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <div className="fw-bold">Take Photo</div>
+                      <small className="text-white-75">Open camera</small>
+                    </label>
+                    <input
+                      id="camera-input"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      style={{ display: 'none' }}
+                      onChange={handleFileSelect}
+                    />
                   </div>
-                  <div className="col-md-6">
-                    <button
-                      className="btn btn-light-primary w-100 py-4"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
+                  <div className="col-12 col-md-6">
+                    <label htmlFor="gallery-input" className="btn btn-light-primary w-100 py-4 mb-0">
                       <i className="ki-duotone ki-folder-up fs-2x mb-2 text-primary">
                         <span className="path1"></span>
                         <span className="path2"></span>
                       </i>
-                      <div className="fw-bold">Upload Photos</div>
-                      <small className="text-primary">From gallery or files</small>
-                    </button>
+                      <div className="fw-bold">Choose from Gallery</div>
+                      <small className="text-primary">Select photos</small>
+                    </label>
                     <input
+                      id="gallery-input"
                       ref={fileInputRef}
                       type="file"
                       accept="image/*"
