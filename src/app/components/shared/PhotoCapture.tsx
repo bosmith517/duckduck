@@ -355,13 +355,12 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
         console.error('Storage upload error:', {
           error: uploadError,
           message: uploadError.message,
-          statusCode: uploadError.statusCode,
           fileName,
           bucketName: 'job-photos'
         })
         
         // Check if it's a bucket not found error
-        if (uploadError.message?.includes('not found') || uploadError.statusCode === 404) {
+        if (uploadError.message?.includes('not found') || uploadError.message?.includes('404')) {
           throw new Error('Storage bucket "job-photos" not found. Please create the bucket in Supabase.')
         }
         
