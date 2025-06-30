@@ -46,7 +46,9 @@ const ProfitMarginAlerts: React.FC<ProfitMarginAlertsProps> = ({ onAlertClick, s
       )
       .subscribe()
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [userProfile?.tenant_id])
 
   const fetchAlerts = async () => {

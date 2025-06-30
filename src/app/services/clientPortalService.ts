@@ -117,7 +117,7 @@ export class ClientPortalService {
 
       // Generate portal URL 
       const baseUrl = window.location.origin
-      const portalUrl = `${baseUrl}/portal/${portalToken.token}`
+      const portalUrl = `${baseUrl}/portal/${portalToken?.token}`
       const companyName = job.tenants?.company_name || 'TradeWorks Pro'
 
       // Send welcome SMS with portal link
@@ -166,7 +166,7 @@ export class ClientPortalService {
       }
 
       // Log the portal creation activity
-      await this.logPortalActivity(portalToken.id, 'login', {
+      await this.logPortalActivity(portalToken?.id, 'login', {
         activity_description: 'Portal token generated and welcome message sent',
         customer_name: customerName,
         job_id: jobId
