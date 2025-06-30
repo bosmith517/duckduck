@@ -242,10 +242,23 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     let addedCount = 0
     
     for (const file of files) {
-      console.log('Processing file:', { name: file.name, type: file.type, size: file.size })
+      console.log('Processing file:', { 
+        name: file.name, 
+        type: file.type, 
+        size: file.size,
+        sizeMB: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+      })
       
-      if (file.type.startsWith('image/')) {
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        console.error('File too large:', file.name)
+        showToast.error(`File ${file.name} is too large. Maximum size is 10MB.`)
+        continue
+      }
+      
+      if (file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
         try {
+          // For mobile, sometimes the type is empty, so we check the extension too
           const preview = URL.createObjectURL(file)
           console.log('Preview URL created:', preview)
           
@@ -326,6 +339,11 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       console.log('Generated filename:', fileName)
       
       console.log('Uploading to Supabase storage...')
+      
+      // First check if the bucket exists
+      const { data: buckets } = await supabase.storage.listBuckets()
+      console.log('Available storage buckets:', buckets?.map(b => b.name))
+      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('job-photos')
         .upload(fileName, photo.file, {
@@ -334,7 +352,19 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
         })
 
       if (uploadError) {
-        console.error('Storage upload error:', uploadError)
+        console.error('Storage upload error:', {
+          error: uploadError,
+          message: uploadError.message,
+          statusCode: uploadError.statusCode,
+          fileName,
+          bucketName: 'job-photos'
+        })
+        
+        // Check if it's a bucket not found error
+        if (uploadError.message?.includes('not found') || uploadError.statusCode === 404) {
+          throw new Error('Storage bucket "job-photos" not found. Please create the bucket in Supabase.')
+        }
+        
         throw uploadError
       }
 
@@ -380,7 +410,22 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       return savedPhoto.id
     } catch (error) {
       console.error('Error uploading photo:', error)
-      showToast.error(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      
+      // Provide specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('bucket')) {
+          showToast.error('Storage not configured. Please contact support.')
+        } else if (error.message.includes('size')) {
+          showToast.error('Photo too large. Please reduce size and try again.')
+        } else if (error.message.includes('network')) {
+          showToast.error('Network error. Please check your connection.')
+        } else {
+          showToast.error(`Upload failed: ${error.message}`)
+        }
+      } else {
+        showToast.error('Upload failed. Please try again.')
+      }
+      
       return null
     }
   }
