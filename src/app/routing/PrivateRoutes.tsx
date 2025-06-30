@@ -31,6 +31,9 @@ const PrivateRoutes = () => {
   const SchedulePage = lazy(() => import('../pages/schedule/SchedulePage'))
   const ReportsPage = lazy(() => import('../pages/reports/ReportsPage'))
   const TeamPage = lazy(() => import('../pages/team/TeamPage'))
+  const PerformancePage = lazy(() => import('../pages/team/PerformancePage'))
+  const TrainingPage = lazy(() => import('../pages/team/TrainingPage'))
+  const TeamAnalyticsPage = lazy(() => import('../pages/team/TeamAnalyticsPage'))
   const SettingsPage = lazy(() => import('../pages/settings/SettingsPage'))
   const CallCenterPage = lazy(() => import('../pages/communications/CallCenterPage'))
   const VideoPage = lazy(() => import('../pages/communications/VideoPage'))
@@ -67,6 +70,27 @@ const PrivateRoutes = () => {
   const ProfilePage = lazy(() => import('../modules/profile/ProfilePage'))
   const AccountPage = lazy(() => import('../modules/accounts/AccountPage'))
   
+  // Missing Critical Pages
+  const BrandingSettingsPage = lazy(() => import('../pages/settings/BrandingSettingsPage'))
+  const SupplierBrandingPage = lazy(() => import('../pages/settings/SupplierBrandingPage'))
+  const BillingPage = lazy(() => import('../pages/settings/BillingPage'))
+  const MobileTrackingPage = lazy(() => import('../pages/mobile/MobileTrackingPage'))
+  const HomeownerPortalPage = lazy(() => import('../pages/homeowner/HomeownerPortalPage'))
+  const MenuTestPage = lazy(() => import('../pages/MenuTestPage'))
+  const AutomationDemoPage = lazy(() => import('../pages/test/AutomationDemoPage'))
+  const DatabaseTestPage = lazy(() => import('../pages/test/DatabaseTestPage'))
+  const SignalWireTestPage = lazy(() => import('../pages/test/SignalWireTestPage'))
+  const SignalWireSyncTestPage = lazy(() => import('../pages/test/SignalWireSyncTestPage'))
+  const TrackingMigrationPage = lazy(() => import('../pages/test/TrackingMigrationPage'))
+  const UITestPage = lazy(() => import('../pages/test/UITestPage'))
+  const VideoTestPage = lazy(() => import('../pages/test/VideoTestPage'))
+  const TrackingPage = lazy(() => import('../pages/tracking/TrackingPage'))
+  const TrackingOverviewPage = lazy(() => import('../pages/tracking/TrackingOverviewPage'))
+  const LandingPage = lazy(() => import('../pages/marketing/LandingPage'))
+  const HomeownerSignupPage = lazy(() => import('../pages/marketing/HomeownerSignupPage'))
+  const CustomerPortalLandingPage = lazy(() => import('../pages/marketing/CustomerPortalLandingPage'))
+  const SignupPage = lazy(() => import('../pages/marketing/SignupPage'))
+
   // Note: Onboarding is now handled via modal in MasterLayout
 
   return (
@@ -76,7 +100,7 @@ const PrivateRoutes = () => {
         <Route element={<ProtectedLayout />}>
         {/* Redirect to Dashboard after success login/registartion */}
         <Route path='auth/*' element={<Navigate to='/dashboard' />} />
-        
+        <Route index element={<Navigate to='/dashboard' />} />
         
           {/* Main Dashboard */}
           <Route path='dashboard' element={<DashboardWrapper />} />
@@ -433,10 +457,26 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path='settings/branding'
+          element={
+            <SuspensedView>
+              <BrandingSettingsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='settings/supplier-branding'
+          element={
+            <SuspensedView>
+              <SupplierBrandingPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path='settings/billing'
           element={
             <SuspensedView>
-              <ServiceLibraryPage />
+              <BillingPage />
             </SuspensedView>
           }
         />
@@ -511,6 +551,102 @@ const PrivateRoutes = () => {
           }
         />
         
+        {/* MOBILE & FIELD OPERATIONS ROUTES */}
+        <Route
+          path='mobile/tracking'
+          element={
+            <SuspensedView>
+              <MobileTrackingPage />
+            </SuspensedView>
+          }
+        />
+        
+        {/* TRACKING & FLEET MANAGEMENT ROUTES */}
+        <Route
+          path='tracking/*'
+          element={
+            <SuspensedView>
+              <TrackingOverviewPage />
+            </SuspensedView>
+          }
+        />
+        
+        {/* HOMEOWNER & CUSTOMER PORTAL ROUTES */}
+        <Route
+          path='homeowner-portal'
+          element={
+            <SuspensedView>
+              <HomeownerPortalPage />
+            </SuspensedView>
+          }
+        />
+        
+        {/* ADVANCED TEST PAGES */}
+        <Route
+          path='test/menu'
+          element={
+            <SuspensedView>
+              <MenuTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/automation'
+          element={
+            <SuspensedView>
+              <AutomationDemoPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/database'
+          element={
+            <SuspensedView>
+              <DatabaseTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/signalwire'
+          element={
+            <SuspensedView>
+              <SignalWireTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/signalwire-sync'
+          element={
+            <SuspensedView>
+              <SignalWireSyncTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/tracking-migration'
+          element={
+            <SuspensedView>
+              <TrackingMigrationPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/ui'
+          element={
+            <SuspensedView>
+              <UITestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/video'
+          element={
+            <SuspensedView>
+              <VideoTestPage />
+            </SuspensedView>
+          }
+        />
+        
         {/* MISSING NAVIGATION ROUTES - Redirect to existing pages */}
         <Route path='jobs/analytics' element={<Navigate to='/jobs' />} />
         <Route path='jobs/templates' element={<Navigate to='/jobs' />} />
@@ -520,9 +656,9 @@ const PrivateRoutes = () => {
         <Route path='customers/communications' element={<Navigate to='/customers' />} />
         <Route path='customers/feedback' element={<Navigate to='/customers' />} />
         
-        <Route path='schedule/tracking' element={<Navigate to='/schedule' />} />
+        <Route path='schedule/tracking' element={<Navigate to='/mobile/tracking' />} />
         <Route path='schedule/routes' element={<Navigate to='/schedule' />} />
-        <Route path='schedule/mobile' element={<Navigate to='/schedule' />} />
+        <Route path='schedule/mobile' element={<Navigate to='/mobile/tracking' />} />
         <Route path='schedule/automation' element={<Navigate to='/schedule' />} />
         
         <Route path='services/equipment' element={<Navigate to='/services/inventory' />} />
@@ -530,7 +666,7 @@ const PrivateRoutes = () => {
         <Route path='services/analytics' element={<Navigate to='/services/inventory' />} />
         
         <Route path='billing/payments' element={<Navigate to='/billing' />} />
-        <Route path='billing/reports' element={<Navigate to='/billing' />} />
+        <Route path='billing/reports' element={<Navigate to='/reports/financial' />} />
         <Route path='billing/automation' element={<Navigate to='/billing' />} />
         <Route path='billing/signatures' element={<Navigate to='/billing' />} />
         
@@ -539,9 +675,30 @@ const PrivateRoutes = () => {
         <Route path='communications/analytics' element={<Navigate to='/communications' />} />
         
         <Route path='team/users' element={<Navigate to='/team' />} />
-        <Route path='team/performance' element={<Navigate to='/team' />} />
-        <Route path='team/training' element={<Navigate to='/team' />} />
-        <Route path='team/analytics' element={<Navigate to='/team' />} />
+        <Route
+          path='team/performance'
+          element={
+            <SuspensedView>
+              <PerformancePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='team/training'
+          element={
+            <SuspensedView>
+              <TrainingPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='team/analytics'
+          element={
+            <SuspensedView>
+              <TeamAnalyticsPage />
+            </SuspensedView>
+          }
+        />
         
         <Route path='reports/executive' element={<Navigate to='/reports' />} />
         <Route path='reports/operations' element={<Navigate to='/reports' />} />
@@ -549,11 +706,8 @@ const PrivateRoutes = () => {
         <Route path='reports/communications' element={<Navigate to='/reports' />} />
         <Route path='reports/custom' element={<Navigate to='/reports' />} />
         
-        <Route path='settings/users' element={<Navigate to='/settings' />} />
-        <Route path='settings/notifications' element={<Navigate to='/settings' />} />
-        <Route path='settings/security' element={<Navigate to='/settings' />} />
-        <Route path='settings/integrations' element={<Navigate to='/settings' />} />
-        <Route path='settings/system' element={<Navigate to='/settings' />} />
+        <Route path='settings/users' element={<Navigate to='/team/profiles' />} />
+        <Route path='settings/system' element={<Navigate to='/test/database' />} />
         
         {/* Profile sub-routes are handled by ProfilePage internally */}
         

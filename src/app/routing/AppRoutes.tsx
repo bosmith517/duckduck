@@ -76,11 +76,13 @@ const AppRoutes: FC = () => {
       <Routes>
         {/* Public routes - accessible without authentication */}
         <Route path='track/:trackingToken' element={<TrackingPage />} />
+        <Route path='customer-tracking/:trackingToken' element={<TrackingPage />} />
         <Route path='customer/:customerId' element={<CustomerPortalPage />} />
         <Route path='customer/:customerId/track/:trackingToken' element={<CustomerPortalPage />} />
         
-        {/* Marketing routes */}
+        {/* Marketing routes - always accessible */}
         <Route path='/' element={<LandingPage />} />
+        <Route path='home' element={<LandingPage />} />
         <Route path='signup' element={<SignupPage />} />
         <Route path='homeowner-signup' element={<HomeownerSignupPage />} />
         <Route path='customer-portal' element={<CustomerPortalLandingPage />} />
@@ -101,12 +103,15 @@ const AppRoutes: FC = () => {
           <Route path='automation-demo' element={<AutomationDemoPage />} />
           {currentUser ? (
             <>
-              <Route path='/*' element={<PrivateRoutes />} />
-              <Route index element={<Navigate to='/dashboard' />} />
+              <Route path='dashboard/*' element={<PrivateRoutes />} />
+              <Route path='app/*' element={<PrivateRoutes />} />
+              <Route path='*' element={<PrivateRoutes />} />
+              <Route path='auth/*' element={<Navigate to='/dashboard' />} />
             </>
           ) : (
             <>
               <Route path='auth/*' element={<AuthPage />} />
+              <Route path='dashboard' element={<Navigate to='/auth/login' />} />
               <Route path='app/*' element={<Navigate to='/auth/login' />} />
             </>
           )}

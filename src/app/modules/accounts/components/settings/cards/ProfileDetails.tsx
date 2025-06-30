@@ -1,6 +1,7 @@
-import React, {useState} from 'react'
+import React, {useState, useEffect} from 'react'
 import {toAbsoluteUrl} from '../../../../../../_metronic/helpers'
 import {IProfileDetails, profileDetailsInitValues as initialValues} from '../SettingsModel'
+import {useSupabaseAuth} from '../../../../auth/core/SupabaseAuth'
 import * as Yup from 'yup'
 import {useFormik} from 'formik'
 
@@ -17,7 +18,34 @@ const profileDetailsSchema = Yup.object().shape({
 })
 
 const ProfileDetails: React.FC = () => {
+  const { userProfile, tenant } = useSupabaseAuth()
   const [data, setData] = useState<IProfileDetails>(initialValues)
+  const [actualInitialValues, setActualInitialValues] = useState<IProfileDetails>(initialValues)
+
+  // Prepopulate with real user data when available
+  useEffect(() => {
+    if (userProfile && tenant) {
+      const populatedValues: IProfileDetails = {
+        ...initialValues,
+        fName: userProfile.first_name || '',
+        lName: userProfile.last_name || '',
+        company: tenant.company_name || tenant.name || '',
+        contactPhone: '', // Business phone would be in tenant.business_info if available
+        companySite: tenant.business_info?.website || '',
+        // Keep default values for country, language, timezone, currency until user sets them
+        country: initialValues.country,
+        language: initialValues.language,
+        timeZone: initialValues.timeZone,
+        currency: initialValues.currency,
+        communications: initialValues.communications,
+        allowMarketing: initialValues.allowMarketing
+      }
+      
+      setActualInitialValues(populatedValues)
+      setData(populatedValues)
+    }
+  }, [userProfile, tenant])
+
   const updateData = (fieldsToUpdate: Partial<IProfileDetails>): void => {
     const updatedData = Object.assign(data, fieldsToUpdate)
     setData(updatedData)
@@ -25,7 +53,8 @@ const ProfileDetails: React.FC = () => {
 
   const [loading, setLoading] = useState(false)
   const formik = useFormik<IProfileDetails>({
-    initialValues,
+    initialValues: actualInitialValues,
+    enableReinitialize: true, // Allow form to reinitialize when actualInitialValues changes
     validationSchema: profileDetailsSchema,
     onSubmit: (values) => {
       setLoading(true)

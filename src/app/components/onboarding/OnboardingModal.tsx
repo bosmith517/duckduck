@@ -45,7 +45,7 @@ const SERVICE_TYPES = [
 ]
 
 export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClose, onComplete }) => {
-  const { tenant } = useSupabaseAuth()
+  const { tenant, userProfile } = useSupabaseAuth()
   const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [availableNumbers, setAvailableNumbers] = useState<any[]>([])
@@ -67,6 +67,37 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
       photoDocumentation: true
     }
   })
+
+  // Prepopulate form data when modal opens and tenant/userProfile are available
+  useEffect(() => {
+    if (isOpen && tenant && userProfile) {
+      console.log('OnboardingModal: Prepopulating form data', { tenant, userProfile })
+      
+      // Map business type from signup to service type
+      const mapBusinessTypeToServiceType = (businessType: string): string => {
+        const mapping: { [key: string]: string } = {
+          'HVAC': 'hvac',
+          'Plumbing': 'plumbing',
+          'Electrical': 'electrical',
+          'General Contractor': 'general',
+          'Landscaping': 'landscaping',
+          'Roofing': 'roofing',
+          'Handyman Services': 'general',
+          'Appliance Repair': 'hvac',
+          'Cleaning Services': 'general',
+          'Other': 'general'
+        }
+        return mapping[businessType] || ''
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        businessName: tenant.company_name || tenant.name || prev.businessName,
+        businessEmail: userProfile.email || prev.businessEmail,
+        serviceType: tenant.service_type ? mapBusinessTypeToServiceType(tenant.service_type) : prev.serviceType
+      }))
+    }
+  }, [isOpen, tenant, userProfile])
 
   const searchPhoneNumbers = async () => {
     if (!formData.desiredAreaCode || formData.desiredAreaCode.length !== 3) {

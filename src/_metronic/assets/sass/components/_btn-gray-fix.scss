@@ -1,0 +1,53 @@
+// Fix for gray/secondary button text colors
+// Ensures proper text contrast on gray buttons
+
+// Light gray buttons should have dark text
+.btn.btn-light-secondary,
+.btn.btn-secondary,
+.btn.btn-gray {
+  color: var(--#{$prefix}gray-900) !important;
+  
+  &:hover,
+  &:focus,
+  &:active,
+  &.active {
+    color: var(--#{$prefix}gray-900) !important;
+  }
+  
+  // Icon colors
+  i,
+  .svg-icon,
+  .ki-duotone {
+    color: var(--#{$prefix}gray-700) !important;
+  }
+}
+
+// Specifically for buttons with gray background
+.btn-bg-secondary,
+.btn-bg-gray,
+.bg-secondary .btn,
+.bg-gray .btn {
+  color: var(--#{$prefix}gray-900) !important;
+}
+
+// Dark mode adjustments
+@include color-mode(dark) {
+  .btn.btn-light-secondary,
+  .btn.btn-secondary,
+  .btn.btn-gray {
+    color: var(--#{$prefix}gray-100) !important;
+    
+    &:hover,
+    &:focus,
+    &:active,
+    &.active {
+      color: var(--#{$prefix}gray-100) !important;
+    }
+    
+    i,
+    .svg-icon,
+    .ki-duotone {
+      color: var(--#{$prefix}gray-300) !important;
+    }
+  }
+}

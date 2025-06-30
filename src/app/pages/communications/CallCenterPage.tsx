@@ -565,6 +565,23 @@ const CallCenterPage: React.FC = () => {
                     Voicemail
                   </a>
                 </li>
+                <li className='nav-item'>
+                  <a
+                    className='nav-link'
+                    href='/app/communications'
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <i className='ki-duotone ki-robot fs-2 me-2'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    AI Features
+                    <i className='ki-duotone ki-exit-right-corner fs-3 ms-1'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                  </a>
+                </li>
               </ul>
             </KTCardBody>
           </KTCard>

@@ -67,8 +67,10 @@ const AsideDefault: FC = () => {
   
 
   const handleCompleteOnboarding = () => {
+    console.log('AsideDefault: Continue Setup button clicked')
     // Signal OnboardingGuard to open its local modal
     window.dispatchEvent(new CustomEvent('openOnboardingModal'))
+    console.log('AsideDefault: openOnboardingModal event dispatched')
   }
 
   return (

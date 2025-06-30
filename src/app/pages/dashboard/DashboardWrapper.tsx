@@ -18,16 +18,21 @@ import {
   TilesWidget5,
 } from '../../../_metronic/partials/widgets'
 import NewFeaturesWidget from '../../components/dashboard/NewFeaturesWidget'
-import { useOnboardingModal } from '../../hooks/useOnboardingModal'
 import { useSupabaseAuth } from '../../../app/modules/auth/core/SupabaseAuth'
 import { KTIcon } from '../../../_metronic/helpers'
 
 const DashboardPage = () => {
-  const { openOnboarding } = useOnboardingModal()
   const { tenant } = useSupabaseAuth()
   
   // Show quick setup if onboarding not completed
   const showQuickSetup = !tenant?.onboarding_completed
+
+  const handleQuickSetup = () => {
+    console.log('DashboardWrapper: Quick Setup button clicked')
+    // Signal OnboardingGuard to open its local modal (same as sidebar)
+    window.dispatchEvent(new CustomEvent('openOnboardingModal'))
+    console.log('DashboardWrapper: openOnboardingModal event dispatched')
+  }
 
   return (
   <>
@@ -49,7 +54,7 @@ const DashboardPage = () => {
             </div>
             <button 
               className='btn btn-light-primary btn-sm'
-              onClick={openOnboarding}
+              onClick={handleQuickSetup}
             >
               <KTIcon iconName='setting-3' className='fs-6 me-2' />
               Quick Setup

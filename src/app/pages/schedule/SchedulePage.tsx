@@ -18,7 +18,8 @@ interface ScheduleEvent {
 }
 
 const SchedulePage: React.FC = () => {
-  const [events] = useState<ScheduleEvent[]>([
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [events, setEvents] = useState<ScheduleEvent[]>([
     {
       id: '1',
       title: 'Kitchen Installation',
@@ -115,9 +116,190 @@ const SchedulePage: React.FC = () => {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
+  const [showEventForm, setShowEventForm] = useState(false)
+  const [selectedDate, setSelectedDate] = useState('')
+
+  const handleNewEvent = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0])
+    setShowEventForm(true)
+  }
+
+  const handleSaveEvent = (eventData: any) => {
+    const newEvent: ScheduleEvent = {
+      id: (events.length + 1).toString(),
+      title: eventData.title,
+      client: eventData.client,
+      jobId: `JOB-${String(events.length + 1).padStart(3, '0')}`,
+      type: eventData.type,
+      startTime: eventData.startTime,
+      endTime: eventData.endTime,
+      date: eventData.date,
+      location: eventData.location,
+      assignedTo: [eventData.assignedTo],
+      status: 'scheduled',
+      notes: eventData.notes
+    }
+    setEvents(prev => [...prev, newEvent])
+    setShowEventForm(false)
+  }
+
+  const handleEditEvent = (eventId: string) => {
+    alert(`Edit event ${eventId}`)
+  }
+
+  const handleMarkComplete = (eventId: string) => {
+    setEvents(prev => prev.map(event => 
+      event.id === eventId 
+        ? { ...event, status: 'completed' as const }
+        : event
+    ))
+  }
+
+  const handleDeleteEvent = (eventId: string) => {
+    if (confirm('Are you sure you want to delete this event?')) {
+      setEvents(prev => prev.filter(event => event.id !== eventId))
+    }
+  }
+
+  const renderCalendarView = () => {
+    const today = new Date()
+    const currentMonth = today.getMonth()
+    const currentYear = today.getFullYear()
+    const firstDay = new Date(currentYear, currentMonth, 1)
+    const lastDay = new Date(currentYear, currentMonth + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDayOfWeek = firstDay.getDay()
+
+    const days = []
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"]
+
+    // Add empty cells for days before month starts
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>)
+    }
+
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentYear, currentMonth, day)
+      const dateString = date.toISOString().split('T')[0]
+      const dayEvents = events.filter(event => event.date === dateString)
+      
+      days.push(
+        <div key={day} className="calendar-day">
+          <div className="day-number">{day}</div>
+          <div className="day-events">
+            {dayEvents.slice(0, 2).map(event => (
+              <div key={event.id} className={`event-item ${event.type}`}>
+                <small>{event.title}</small>
+              </div>
+            ))}
+            {dayEvents.length > 2 && (
+              <small className="text-muted">+{dayEvents.length - 2} more</small>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="calendar-container">
+        <div className="calendar-header mb-4">
+          <h4>{monthNames[currentMonth]} {currentYear}</h4>
+        </div>
+        <div className="calendar-grid">
+          <div className="calendar-weekdays">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="weekday-header">{day}</div>
+            ))}
+          </div>
+          <div className="calendar-days">
+            {days}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <PageTitle breadcrumbs={[]}>Schedule Management</PageTitle>
+      
+      <style>{`
+        .calendar-container {
+          min-height: 600px;
+        }
+        .calendar-grid {
+          display: grid;
+          grid-template-rows: auto 1fr;
+          height: 100%;
+        }
+        .calendar-weekdays {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 1px;
+          background-color: #f5f8fa;
+          padding: 10px 0;
+        }
+        .weekday-header {
+          text-align: center;
+          font-weight: 600;
+          color: #5e6278;
+          font-size: 14px;
+          padding: 10px;
+        }
+        .calendar-days {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 1px;
+          background-color: #e1e3ea;
+        }
+        .calendar-day {
+          background-color: white;
+          min-height: 120px;
+          padding: 8px;
+          border: 1px solid #e1e3ea;
+          position: relative;
+        }
+        .calendar-day.empty {
+          background-color: #f5f8fa;
+        }
+        .day-number {
+          font-weight: 600;
+          color: #181c32;
+          font-size: 14px;
+          margin-bottom: 4px;
+        }
+        .day-events {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .event-item {
+          background-color: #f1f3ff;
+          border-left: 3px solid #3f4254;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-size: 11px;
+          line-height: 1.2;
+        }
+        .event-item.work {
+          background-color: #e8f4fd;
+          border-left-color: #009ef7;
+        }
+        .event-item.meeting {
+          background-color: #fff8dd;
+          border-left-color: #ffc700;
+        }
+        .event-item.inspection {
+          background-color: #fff0e6;
+          border-left-color: #f1416c;
+        }
+        .event-item.delivery {
+          background-color: #e8f5e8;
+          border-left-color: #50cd89;
+        }
+      `}</style>
       
       <div className='row g-5 g-xl-8'>
         <div className='col-xl-12'>
@@ -128,17 +310,28 @@ const SchedulePage: React.FC = () => {
                 <span className='text-muted mt-1 fw-semibold fs-7'>Manage appointments and work schedules</span>
               </h3>
               <div className='card-toolbar'>
-                <button className='btn btn-sm btn-light me-3'>
+                <button 
+                  className={`btn btn-sm me-3 ${viewMode === 'calendar' ? 'btn-primary' : 'btn-light'}`}
+                  onClick={() => setViewMode('calendar')}
+                >
                   <i className='ki-duotone ki-calendar fs-2'></i>
                   Calendar View
                 </button>
-                <button className='btn btn-sm btn-primary'>
+                <button 
+                  className={`btn btn-sm me-3 ${viewMode === 'list' ? 'btn-primary' : 'btn-light'}`}
+                  onClick={() => setViewMode('list')}
+                >
+                  <i className='ki-duotone ki-row-horizontal fs-2'></i>
+                  List View
+                </button>
+                <button className='btn btn-sm btn-primary' onClick={handleNewEvent}>
                   <i className='ki-duotone ki-plus fs-2'></i>
                   New Event
                 </button>
               </div>
             </div>
             <KTCardBody className='py-3'>
+              {viewMode === 'calendar' ? renderCalendarView() : (
               <div className='table-responsive'>
                 <table className='table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4'>
                   <thead>
@@ -217,8 +410,8 @@ const SchedulePage: React.FC = () => {
                         </td>
                         <td>
                           <div className='d-flex justify-content-end flex-shrink-0'>
-                            <a
-                              href='#'
+                            <button
+                              onClick={(e) => { e.preventDefault(); handleEditEvent(event.id) }}
                               className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
                               title='Edit Event'
                             >
@@ -226,19 +419,20 @@ const SchedulePage: React.FC = () => {
                                 <span className='path1'></span>
                                 <span className='path2'></span>
                               </i>
-                            </a>
-                            <a
-                              href='#'
+                            </button>
+                            <button
+                              onClick={(e) => { e.preventDefault(); handleMarkComplete(event.id) }}
                               className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
                               title='Mark Complete'
+                              disabled={event.status === 'completed'}
                             >
                               <i className='ki-duotone ki-check fs-3'>
                                 <span className='path1'></span>
                                 <span className='path2'></span>
                               </i>
-                            </a>
-                            <a
-                              href='#'
+                            </button>
+                            <button
+                              onClick={(e) => { e.preventDefault(); handleDeleteEvent(event.id) }}
                               className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm'
                               title='Delete'
                             >
@@ -249,7 +443,7 @@ const SchedulePage: React.FC = () => {
                                 <span className='path4'></span>
                                 <span className='path5'></span>
                               </i>
-                            </a>
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -257,10 +451,100 @@ const SchedulePage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              )}
             </KTCardBody>
           </KTCard>
         </div>
       </div>
+
+      {/* New Event Modal */}
+      {showEventForm && (
+        <div className='modal fade show d-block' style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
+          <div className='modal-dialog modal-lg'>
+            <div className='modal-content'>
+              <div className='modal-header'>
+                <h5 className='modal-title'>Create New Event</h5>
+                <button 
+                  type='button' 
+                  className='btn-close' 
+                  onClick={() => setShowEventForm(false)}
+                ></button>
+              </div>
+              <div className='modal-body'>
+                <form onSubmit={(e) => {
+                  e.preventDefault()
+                  const formData = new FormData(e.target as HTMLFormElement)
+                  const eventData = {
+                    title: formData.get('title'),
+                    client: formData.get('client'),
+                    type: formData.get('type'),
+                    startTime: formData.get('startTime'),
+                    endTime: formData.get('endTime'),
+                    date: formData.get('date'),
+                    location: formData.get('location'),
+                    assignedTo: formData.get('assignedTo'),
+                    notes: formData.get('notes')
+                  }
+                  handleSaveEvent(eventData)
+                }}>
+                  <div className='row g-3'>
+                    <div className='col-md-6'>
+                      <label className='form-label required'>Event Title</label>
+                      <input type='text' name='title' className='form-control' required />
+                    </div>
+                    <div className='col-md-6'>
+                      <label className='form-label required'>Client Name</label>
+                      <input type='text' name='client' className='form-control' required />
+                    </div>
+                    <div className='col-md-6'>
+                      <label className='form-label required'>Event Type</label>
+                      <select name='type' className='form-select' required>
+                        <option value=''>Select Type</option>
+                        <option value='meeting'>Meeting</option>
+                        <option value='work'>Work</option>
+                        <option value='inspection'>Inspection</option>
+                        <option value='delivery'>Delivery</option>
+                      </select>
+                    </div>
+                    <div className='col-md-6'>
+                      <label className='form-label required'>Date</label>
+                      <input type='date' name='date' className='form-control' defaultValue={selectedDate} required />
+                    </div>
+                    <div className='col-md-6'>
+                      <label className='form-label required'>Start Time</label>
+                      <input type='time' name='startTime' className='form-control' required />
+                    </div>
+                    <div className='col-md-6'>
+                      <label className='form-label required'>End Time</label>
+                      <input type='time' name='endTime' className='form-control' required />
+                    </div>
+                    <div className='col-12'>
+                      <label className='form-label required'>Location</label>
+                      <input type='text' name='location' className='form-control' placeholder='123 Main St, City, State' required />
+                    </div>
+                    <div className='col-12'>
+                      <label className='form-label required'>Assigned To</label>
+                      <input type='text' name='assignedTo' className='form-control' placeholder='Technician name' required />
+                    </div>
+                    <div className='col-12'>
+                      <label className='form-label'>Notes</label>
+                      <textarea name='notes' className='form-control' rows={3} placeholder='Additional notes...'></textarea>
+                    </div>
+                  </div>
+                  <div className='modal-footer'>
+                    <button type='button' className='btn btn-light' onClick={() => setShowEventForm(false)}>
+                      Cancel
+                    </button>
+                    <button type='submit' className='btn btn-primary'>
+                      Create Event
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

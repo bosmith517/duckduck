@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 
 const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { currentUser, signOut } = useSupabaseAuth()
 
   return (
     <div className="d-flex flex-column min-vh-100 bg-white">
@@ -55,28 +57,44 @@ const LandingPage: React.FC = () => {
               <li className="nav-item">
                 <Link className="nav-link fw-semibold" to="/demo">Free Demo</Link>
               </li>
-              <li className="nav-item ms-3">
-                <Link className="btn btn-primary px-4" to="/signup">Try Free - 14 Days</Link>
-              </li>
+              {currentUser ? (
+                <>
+                  <li className="nav-item ms-3">
+                    <Link className="btn btn-outline-primary px-4" to="/dashboard">Go to Dashboard</Link>
+                  </li>
+                  <li className="nav-item ms-2">
+                    <button className="btn btn-outline-secondary px-4" onClick={signOut}>Logout</button>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="nav-item ms-3">
+                    <Link className="btn btn-outline-primary px-4" to="/auth/login">Login</Link>
+                  </li>
+                  <li className="nav-item ms-2">
+                    <Link className="btn btn-primary px-4" to="/signup">Try Free - 14 Days</Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-primary py-20" style={{marginTop: '76px'}}>
+      <section className="bg-light py-20" style={{marginTop: '76px'}}>
         <div className="container">
           <div className="row align-items-center">
             <div className="col-lg-6">
-              <div className="badge bg-light text-primary mb-4 px-3 py-2 fs-7 fw-bold">
+              <div className="badge bg-primary text-white mb-4 px-3 py-2 fs-7 fw-bold">
                 🚀 SAVE TIME, EARN MORE, BUILD REPUTATION
               </div>
               <h1 className="display-3 fw-bolder text-dark mb-4 lh-1">
                 Grow Your Service Business 
-                <span className="text-warning">50% Faster</span> 
+                <span className="text-primary">50% Faster </span> 
                 Than Any Competitor
               </h1>
-              <p className="fs-4 text-dark mb-6 lh-base">
+              <p className="fs-4 text-gray-700 mb-6 lh-base">
                 Join 50,000+ service professionals using our all-in-one platform with built-in 
                 customer portals, AI-powered recommendations, and advanced communication tools 
                 that other platforms don't offer.
@@ -139,14 +157,14 @@ const LandingPage: React.FC = () => {
               </div>
 
               <div className="d-flex gap-3 flex-wrap mb-6">
-                <Link className="btn btn-lg btn-light text-primary fw-bold px-6" to="/signup">
+                <Link className="btn btn-lg btn-primary text-white fw-bold px-6" to="/signup">
                   <i className="ki-duotone ki-rocket fs-3 me-2">
                     <span className="path1"></span>
                     <span className="path2"></span>
                   </i>
                   Start Free 14-Day Trial
                 </Link>
-                <button className="btn btn-lg btn-outline-light fw-semibold" data-bs-toggle="modal" data-bs-target="#demoModal">
+                <button className="btn btn-lg btn-outline-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#demoModal">
                   <i className="ki-duotone ki-play fs-3 me-2">
                     <span className="path1"></span>
                     <span className="path2"></span>
@@ -185,8 +203,8 @@ const LandingPage: React.FC = () => {
                 <div className="card shadow-lg border-0">
                   <div className="card-body p-0">
                     <img 
-                      src="https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600&h=400&fit=crop" 
-                      alt="TradeWorks Pro Dashboard" 
+                      src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&h=400&fit=crop" 
+                      alt="Team of contractors with tools and equipment" 
                       className="img-fluid rounded-3"
                     />
                     <div className="position-absolute top-50 start-50 translate-middle">
@@ -741,7 +759,35 @@ const LandingPage: React.FC = () => {
                         <span className="path1"></span>
                         <span className="path2"></span>
                       </i>
-                      <span className="fs-6">Everything HouseCall Pro has</span>
+                      <span className="fs-6">Job scheduling & dispatch</span>
+                    </li>
+                    <li className="d-flex align-items-center mb-3">
+                      <i className="ki-duotone ki-check fs-5 text-success me-3">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <span className="fs-6">Invoicing & estimates</span>
+                    </li>
+                    <li className="d-flex align-items-center mb-3">
+                      <i className="ki-duotone ki-check fs-5 text-success me-3">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <span className="fs-6">Customer management (CRM)</span>
+                    </li>
+                    <li className="d-flex align-items-center mb-3">
+                      <i className="ki-duotone ki-check fs-5 text-success me-3">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <span className="fs-6">Mobile field app</span>
+                    </li>
+                    <li className="d-flex align-items-center mb-3">
+                      <i className="ki-duotone ki-check fs-5 text-success me-3">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <span className="fs-6">Payment processing</span>
                     </li>
                     <li className="d-flex align-items-center mb-3">
                       <i className="ki-duotone ki-check fs-5 text-success me-3">
@@ -929,29 +975,29 @@ const LandingPage: React.FC = () => {
       {/* Final CTA Section */}
       <section className="py-15 bg-primary">
         <div className="container text-center">
-          <h2 className="display-5 fw-bold text-dark mb-4">
+          <h2 className="display-5 fw-bold text-white mb-4">
             Ready to Beat Your Competition?
           </h2>
-          <p className="fs-4 text-dark mb-8">
+          <p className="fs-4 text-white opacity-75 mb-8">
             Join 50,000+ service professionals who chose TradeWorks Pro over the competition
           </p>
           
           <div className="row justify-content-center mb-8">
             <div className="col-md-8">
               <div className="d-flex justify-content-center gap-8 flex-wrap">
-                <div className="text-center text-dark">
+                <div className="text-center text-white">
                   <h4 className="fw-bold">14 Days</h4>
                   <small>Free Trial</small>
                 </div>
-                <div className="text-center text-dark">
+                <div className="text-center text-white">
                   <h4 className="fw-bold">15 Min</h4>
                   <small>Setup Time</small>
                 </div>
-                <div className="text-center text-dark">
+                <div className="text-center text-white">
                   <h4 className="fw-bold">24/7</h4>
                   <small>Support</small>
                 </div>
-                <div className="text-center text-dark">
+                <div className="text-center text-white">
                   <h4 className="fw-bold">$0</h4>
                   <small>Migration Cost</small>
                 </div>
@@ -967,7 +1013,7 @@ const LandingPage: React.FC = () => {
               </i>
               Start Free Trial - No Credit Card
             </Link>
-            <button className="btn btn-lg btn-outline-light fw-semibold" data-bs-toggle="modal" data-bs-target="#demoModal">
+            <button className="btn btn-lg btn-outline-light text-white fw-semibold" data-bs-toggle="modal" data-bs-target="#demoModal">
               <i className="ki-duotone ki-play fs-3 me-2">
                 <span className="path1"></span>
                 <span className="path2"></span>

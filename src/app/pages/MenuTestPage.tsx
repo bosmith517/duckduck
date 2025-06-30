@@ -1050,3 +1050,4 @@ const MenuTestPage: FC = () => {
 }
 
 export {MenuTestPage}
+export default MenuTestPage

@@ -7,16 +7,22 @@ import MobileReceiptScanner from './MobileReceiptScanner'
 interface JobCost {
   id: string
   job_id: string
-  category: 'labor' | 'materials' | 'equipment' | 'permits' | 'travel' | 'overhead' | 'other'
+  cost_type: 'labor' | 'material' | 'equipment' | 'subcontractor' | 'overhead'
+  category?: string
   subcategory?: string
   description: string
   amount: number
-  date: string
+  cost_date: string
+  date?: string
+  quantity?: number
+  unit_cost?: number
+  total_cost?: number
   receipt_url?: string
   vendor_name?: string
-  is_reimbursable: boolean
+  is_reimbursable?: boolean
   technician_id?: string
-  approval_status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected'
+  approval_status?: string
   created_at: string
 }
 
@@ -59,7 +65,7 @@ const RealTimeJobCosting: React.FC = () => {
   // New cost form
   const [newCost, setNewCost] = useState({
     job_id: '',
-    category: 'materials' as const,
+    cost_type: 'material' as const,
     subcategory: '',
     description: '',
     amount: 0,
@@ -70,12 +76,10 @@ const RealTimeJobCosting: React.FC = () => {
 
   const costCategories = [
     { value: 'labor', label: 'Labor', icon: 'user', color: 'primary' },
-    { value: 'materials', label: 'Materials', icon: 'package', color: 'success' },
+    { value: 'material', label: 'Materials', icon: 'package', color: 'success' },
     { value: 'equipment', label: 'Equipment', icon: 'wrench', color: 'warning' },
-    { value: 'permits', label: 'Permits', icon: 'document', color: 'info' },
-    { value: 'travel', label: 'Travel', icon: 'location', color: 'secondary' },
-    { value: 'overhead', label: 'Overhead', icon: 'setting-2', color: 'dark' },
-    { value: 'other', label: 'Other', icon: 'more-horizontal', color: 'muted' }
+    { value: 'subcontractor', label: 'Subcontractor', icon: 'users', color: 'info' },
+    { value: 'overhead', label: 'Overhead', icon: 'setting-2', color: 'dark' }
   ]
 
   useEffect(() => {
@@ -83,7 +87,11 @@ const RealTimeJobCosting: React.FC = () => {
   }, [userProfile?.tenant_id])
 
   const fetchData = async () => {
-    if (!userProfile?.tenant_id) return
+    console.log('UserProfile:', userProfile)
+    if (!userProfile?.tenant_id) {
+      console.log('No tenant_id found in userProfile')
+      return
+    }
 
     setLoading(true)
     try {
@@ -91,16 +99,17 @@ const RealTimeJobCosting: React.FC = () => {
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select(`
-          id, title, status, estimated_value, total_amount,
-          contact_id, account_id, created_at, updated_at,
+          id, title, status, estimated_cost, actual_cost, total_budget, total_invoiced,
+          contact_id, account_id, created_at, 
           contacts(first_name, last_name),
           accounts(name)
         `)
         .eq('tenant_id', userProfile.tenant_id)
-        .in('status', ['scheduled', 'in_progress', 'completed'])
+        .in('status', ['Scheduled', 'In Progress', 'Completed', 'scheduled', 'in_progress', 'completed'])
         .order('created_at', { ascending: false })
 
       if (jobsError) throw jobsError
+      console.log('Jobs fetched:', jobsData)
       setJobs(jobsData || [])
 
       // Fetch job costs
@@ -111,6 +120,7 @@ const RealTimeJobCosting: React.FC = () => {
         .order('created_at', { ascending: false })
 
       if (costsError) throw costsError
+      console.log('Job costs fetched:', costsData)
       setJobCosts(costsData || [])
 
       // Calculate profitability
@@ -126,24 +136,25 @@ const RealTimeJobCosting: React.FC = () => {
   const calculateJobProfitability = (jobsData: any[], costsData: JobCost[]) => {
     const profitability = jobsData.map(job => {
       const jobCosts = costsData.filter(cost => cost.job_id === job.id)
-      const totalCosts = jobCosts.reduce((sum, cost) => sum + cost.amount, 0)
+      const totalCosts = jobCosts.reduce((sum, cost) => sum + (cost.total_cost || cost.amount || 0), 0)
       
       const laborCosts = jobCosts
-        .filter(cost => cost.category === 'labor')
-        .reduce((sum, cost) => sum + cost.amount, 0)
+        .filter(cost => cost.cost_type === 'labor')
+        .reduce((sum, cost) => sum + (cost.total_cost || cost.amount || 0), 0)
       
       const materialCosts = jobCosts
-        .filter(cost => cost.category === 'materials')
-        .reduce((sum, cost) => sum + cost.amount, 0)
+        .filter(cost => cost.cost_type === 'material')
+        .reduce((sum, cost) => sum + (cost.total_cost || cost.amount || 0), 0)
       
       const equipmentCosts = jobCosts
-        .filter(cost => cost.category === 'equipment')
-        .reduce((sum, cost) => sum + cost.amount, 0)
+        .filter(cost => cost.cost_type === 'equipment')
+        .reduce((sum, cost) => sum + (cost.total_cost || cost.amount || 0), 0)
       
       const otherCosts = totalCosts - laborCosts - materialCosts - equipmentCosts
 
-      const estimatedRevenue = job.estimated_value || 0
-      const actualRevenue = job.total_amount || estimatedRevenue
+      // For HVAC jobs, total_budget is the job price/revenue, costs come from job_costs table
+      const estimatedRevenue = job.total_budget || 0
+      const actualRevenue = job.total_invoiced || job.total_budget || 0
       const profitMargin = actualRevenue - totalCosts
       const profitPercentage = actualRevenue > 0 ? (profitMargin / actualRevenue) * 100 : 0
       
@@ -189,8 +200,11 @@ const RealTimeJobCosting: React.FC = () => {
           ...newCost,
           tenant_id: userProfile?.tenant_id,
           technician_id: userProfile?.id,
-          date: new Date().toISOString().split('T')[0],
-          approval_status: 'approved'
+          cost_date: new Date().toISOString().split('T')[0],
+          total_cost: newCost.amount,
+          quantity: 1,
+          unit_cost: newCost.amount,
+          status: 'approved'
         })
 
       if (error) throw error
@@ -198,7 +212,7 @@ const RealTimeJobCosting: React.FC = () => {
       // Reset form
       setNewCost({
         job_id: '',
-        category: 'materials',
+        cost_type: 'material',
         subcategory: '',
         description: '',
         amount: 0,
@@ -485,8 +499,8 @@ const RealTimeJobCosting: React.FC = () => {
                   <label className="form-label required">Category</label>
                   <select 
                     className="form-select"
-                    value={newCost.category}
-                    onChange={(e) => setNewCost(prev => ({ ...prev, category: e.target.value as any }))}
+                    value={newCost.cost_type}
+                    onChange={(e) => setNewCost(prev => ({ ...prev, cost_type: e.target.value as any }))}
                   >
                     {costCategories.map((cat) => (
                       <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -597,12 +611,12 @@ const RealTimeJobCosting: React.FC = () => {
                         .slice(0, 20)
                         .map((cost) => {
                           const job = jobs.find(j => j.id === cost.job_id)
-                          const category = costCategories.find(c => c.value === cost.category)
+                          const category = costCategories.find(c => c.value === cost.cost_type)
                           return (
                             <tr key={cost.id}>
                               <td>
                                 <div className="text-muted fs-7">
-                                  {new Date(cost.date).toLocaleDateString()}
+                                  {new Date(cost.cost_date || cost.date || cost.created_at).toLocaleDateString()}
                                 </div>
                               </td>
                               <td>
@@ -611,7 +625,7 @@ const RealTimeJobCosting: React.FC = () => {
                               <td>
                                 <span className={`badge badge-light-${category?.color || 'secondary'}`}>
                                   <KTIcon iconName={category?.icon || 'question'} className="fs-7 me-1" />
-                                  {category?.label || cost.category}
+                                  {category?.label || cost.cost_type}
                                 </span>
                               </td>
                               <td>
@@ -621,7 +635,7 @@ const RealTimeJobCosting: React.FC = () => {
                                 )}
                               </td>
                               <td>
-                                <div className="fw-bold">${cost.amount.toLocaleString()}</div>
+                                <div className="fw-bold">${(cost.total_cost || cost.amount || 0).toLocaleString()}</div>
                                 {cost.is_reimbursable && (
                                   <div className="badge badge-light-info fs-8">Reimbursable</div>
                                 )}

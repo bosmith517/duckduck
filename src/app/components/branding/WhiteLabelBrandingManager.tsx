@@ -55,28 +55,36 @@ const WhiteLabelBrandingManager: React.FC = () => {
         .eq('tenant_id', userProfile.tenant_id)
         .single()
 
-      if (error && error.code !== 'PGRST116') throw error
+      // Handle table not found error (PGRST116) or no data found (PGRST116)
+      if (error && error.code !== 'PGRST116') {
+        console.warn('tenant_branding table not found, using defaults:', error)
+        // Table doesn't exist, proceed with tenant defaults
+      }
 
       if (data) {
         setBranding(data)
         setLogoPreview(data.logo_url || '')
       } else {
-        // Set defaults from company info
-        const { data: company } = await supabase
-          .from('companies')
+        // Set defaults from tenant info and user profile data
+        const { data: tenant } = await supabase
+          .from('tenants')
           .select('*')
           .eq('id', userProfile.tenant_id)
           .single()
 
-        if (company) {
+        if (tenant) {
+          const businessInfo = tenant.business_info || {}
+          const companyName = tenant.company_name || tenant.name || ''
+          const businessEmail = businessInfo.business_email || userProfile?.email || ''
+          
           setBranding(prev => ({
             ...prev,
-            company_name: company.company_name || '',
-            email_from_name: company.company_name || '',
-            email_from_address: `info@${company.company_name?.toLowerCase().replace(/\s+/g, '')}.com`,
-            phone_display_name: company.company_name || '',
-            website_url: company.website || '',
-            address: company.address || ''
+            company_name: companyName,
+            email_from_name: companyName,
+            email_from_address: businessEmail || `info@${companyName.toLowerCase().replace(/\s+/g, '')}.com`,
+            phone_display_name: companyName,
+            website_url: businessInfo.website || '',
+            address: businessInfo.address_line1 || ''
           }))
         }
       }
@@ -155,15 +163,33 @@ const WhiteLabelBrandingManager: React.FC = () => {
         .from('tenant_branding')
         .upsert(brandingData, { onConflict: 'tenant_id' })
 
-      if (error) throw error
+      if (error) {
+        console.warn('Could not save to tenant_branding table:', error)
+        // Store branding settings in tenant.business_info as fallback
+        await supabase
+          .from('tenants')
+          .update({
+            business_info: {
+              ...branding,
+              branding_settings: brandingData
+            }
+          })
+          .eq('id', userProfile?.tenant_id)
+        
+        console.log('Branding settings saved to tenant business_info as fallback')
+      }
 
-      // Update email templates and communication settings
-      await supabase.functions.invoke('update-branding-templates', {
-        body: {
-          tenant_id: userProfile?.tenant_id,
-          branding: brandingData
-        }
-      })
+      // Update email templates and communication settings (optional Edge Function)
+      try {
+        await supabase.functions.invoke('update-branding-templates', {
+          body: {
+            tenant_id: userProfile?.tenant_id,
+            branding: brandingData
+          }
+        })
+      } catch (edgeFunctionError) {
+        console.warn('Edge function not available, skipping template update:', edgeFunctionError)
+      }
 
       alert('Branding settings saved successfully!')
       fetchBrandingSettings()

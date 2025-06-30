@@ -3,6 +3,7 @@ import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import ModernTeamChat from '../../components/communications/ModernTeamChat'
 import InstantChatPopup from '../../components/communications/InstantChatPopup'
+import RoleAssignmentModal from '../../components/team/RoleAssignmentModal'
 
 interface TeamMember {
   id: string
@@ -17,6 +18,7 @@ interface TeamMember {
   currentJobs: number
   completedJobs: number
   avatar?: string
+  permissions?: string[]
 }
 
 const TeamPage: React.FC = () => {
@@ -26,6 +28,7 @@ const TeamPage: React.FC = () => {
   const [showEditMemberModal, setShowEditMemberModal] = useState(false)
   const [showAssignJobModal, setShowAssignJobModal] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showRoleAssignmentModal, setShowRoleAssignmentModal] = useState(false)
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
   const [teamMembers] = useState<TeamMember[]>([
     {
@@ -161,6 +164,19 @@ const TeamPage: React.FC = () => {
   const handleAssignJob = (member: TeamMember) => {
     setSelectedMember(member)
     setShowAssignJobModal(true)
+  }
+
+  const handleAssignRole = (member: TeamMember) => {
+    setSelectedMember(member)
+    setShowRoleAssignmentModal(true)
+  }
+
+  const handleRoleSave = (userId: string, role: string, permissions: string[]) => {
+    // Here you would typically make an API call to update the user's role and permissions
+    console.log('Saving role assignment:', { userId, role, permissions })
+    // For demo purposes, we'll just log it
+    // In production, this would call your backend API
+    setShowRoleAssignmentModal(false)
   }
 
   return (
@@ -344,11 +360,21 @@ const TeamPage: React.FC = () => {
                               </i>
                             </button>
                             <button
-                              className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm'
+                              className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
                               title='Assign Job'
                               onClick={() => handleAssignJob(member)}
                             >
                               <i className='ki-duotone ki-briefcase fs-3'>
+                                <span className='path1'></span>
+                                <span className='path2'></span>
+                              </i>
+                            </button>
+                            <button
+                              className='btn btn-icon btn-bg-light btn-active-color-warning btn-sm'
+                              title='Assign Role & Permissions'
+                              onClick={() => handleAssignRole(member)}
+                            >
+                              <i className='ki-duotone ki-security-user fs-3'>
                                 <span className='path1'></span>
                                 <span className='path2'></span>
                               </i>
@@ -714,6 +740,20 @@ const TeamPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Role Assignment Modal */}
+      <RoleAssignmentModal
+        show={showRoleAssignmentModal}
+        onHide={() => setShowRoleAssignmentModal(false)}
+        user={selectedMember ? {
+          id: selectedMember.id,
+          name: selectedMember.name,
+          email: selectedMember.email,
+          role: selectedMember.role,
+          permissions: selectedMember.permissions || []
+        } : null}
+        onSave={handleRoleSave}
+      />
     </>
   )
 }

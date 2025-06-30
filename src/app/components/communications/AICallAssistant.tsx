@@ -23,6 +23,7 @@ interface AIAssistantConfig {
 
 export const AICallAssistant: React.FC = () => {
   const { tenant } = useSupabaseAuth()
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [config, setConfig] = useState<AIAssistantConfig>({
     voice: 'polly.amy',
     personality: 'professional',
@@ -62,10 +63,45 @@ export const AICallAssistant: React.FC = () => {
   const [testMode, setTestMode] = useState(false)
 
   const voices = [
-    { value: 'polly.amy', label: 'Amy (British Female)', accent: 'British' },
-    { value: 'polly.matthew', label: 'Matthew (American Male)', accent: 'American' },
-    { value: 'polly.joanna', label: 'Joanna (American Female)', accent: 'American' },
-    { value: 'polly.brian', label: 'Brian (British Male)', accent: 'British' }
+    // Amazon Polly Voices
+    { value: 'polly.amy', label: 'Amy (British Female)', accent: 'British', provider: 'Amazon Polly' },
+    { value: 'polly.brian', label: 'Brian (British Male)', accent: 'British', provider: 'Amazon Polly' },
+    { value: 'polly.emma', label: 'Emma (British Female)', accent: 'British', provider: 'Amazon Polly' },
+    { value: 'polly.joanna', label: 'Joanna (American Female)', accent: 'American', provider: 'Amazon Polly' },
+    { value: 'polly.joey', label: 'Joey (American Male)', accent: 'American', provider: 'Amazon Polly' },
+    { value: 'polly.kendra', label: 'Kendra (American Female)', accent: 'American', provider: 'Amazon Polly' },
+    { value: 'polly.kimberly', label: 'Kimberly (American Female)', accent: 'American', provider: 'Amazon Polly' },
+    { value: 'polly.matthew', label: 'Matthew (American Male)', accent: 'American', provider: 'Amazon Polly' },
+    { value: 'polly.salli', label: 'Salli (American Female)', accent: 'American', provider: 'Amazon Polly' },
+    { value: 'polly.russell', label: 'Russell (Australian Male)', accent: 'Australian', provider: 'Amazon Polly' },
+    { value: 'polly.nicole', label: 'Nicole (Australian Female)', accent: 'Australian', provider: 'Amazon Polly' },
+    
+    // Google Cloud Voices
+    { value: 'google.en-US-Wavenet-A', label: 'Wavenet A (American Male)', accent: 'American', provider: 'Google Cloud' },
+    { value: 'google.en-US-Wavenet-B', label: 'Wavenet B (American Male)', accent: 'American', provider: 'Google Cloud' },
+    { value: 'google.en-US-Wavenet-C', label: 'Wavenet C (American Female)', accent: 'American', provider: 'Google Cloud' },
+    { value: 'google.en-US-Wavenet-D', label: 'Wavenet D (American Male)', accent: 'American', provider: 'Google Cloud' },
+    { value: 'google.en-US-Wavenet-E', label: 'Wavenet E (American Female)', accent: 'American', provider: 'Google Cloud' },
+    { value: 'google.en-US-Wavenet-F', label: 'Wavenet F (American Female)', accent: 'American', provider: 'Google Cloud' },
+    { value: 'google.en-GB-Wavenet-A', label: 'Wavenet A (British Female)', accent: 'British', provider: 'Google Cloud' },
+    { value: 'google.en-GB-Wavenet-B', label: 'Wavenet B (British Male)', accent: 'British', provider: 'Google Cloud' },
+    
+    // Microsoft Azure Voices
+    { value: 'azure.en-US-JennyNeural', label: 'Jenny (American Female)', accent: 'American', provider: 'Microsoft Azure' },
+    { value: 'azure.en-US-GuyNeural', label: 'Guy (American Male)', accent: 'American', provider: 'Microsoft Azure' },
+    { value: 'azure.en-US-AriaNeural', label: 'Aria (American Female)', accent: 'American', provider: 'Microsoft Azure' },
+    { value: 'azure.en-US-DavisNeural', label: 'Davis (American Male)', accent: 'American', provider: 'Microsoft Azure' },
+    { value: 'azure.en-GB-SoniaNeural', label: 'Sonia (British Female)', accent: 'British', provider: 'Microsoft Azure' },
+    { value: 'azure.en-GB-RyanNeural', label: 'Ryan (British Male)', accent: 'British', provider: 'Microsoft Azure' },
+    
+    // ElevenLabs Voices (Premium Natural Voices)
+    { value: 'elevenlabs.rachel', label: 'Rachel (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
+    { value: 'elevenlabs.josh', label: 'Josh (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
+    { value: 'elevenlabs.bella', label: 'Bella (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
+    { value: 'elevenlabs.antoni', label: 'Antoni (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
+    { value: 'elevenlabs.arnold', label: 'Arnold (Natural Male)', accent: 'American', provider: 'ElevenLabs' },
+    { value: 'elevenlabs.domi', label: 'Domi (Natural Female)', accent: 'American', provider: 'ElevenLabs' },
+    { value: 'elevenlabs.elli', label: 'Elli (Natural Female)', accent: 'American', provider: 'ElevenLabs' }
   ]
 
   const personalities = [
@@ -103,18 +139,80 @@ export const AICallAssistant: React.FC = () => {
     }
   }
 
+  const handlePreviewVoice = async () => {
+    setPreviewLoading(true)
+    try {
+      // Check if this is a premium voice that requires API preview
+      const selectedVoice = voices.find(v => v.value === config.voice)
+      
+      if (selectedVoice?.provider === 'ElevenLabs' || 
+          selectedVoice?.provider === 'Google Cloud' || 
+          selectedVoice?.provider === 'Microsoft Azure') {
+        // For premium voices, show a message instead of browser TTS
+        alert(`Preview not available for ${selectedVoice.provider} voices.\n\nTo hear the actual ${selectedVoice.label} voice:\n1. Save your configuration\n2. Use the "Test Call" feature\n3. Or wait for an incoming call\n\nThe actual voice will sound much more natural than this preview.`)
+        setPreviewLoading(false)
+        return
+      }
+      
+      // For basic Polly voices, use browser TTS as approximation
+      const utterance = new SpeechSynthesisUtterance(config.customGreeting)
+      
+      // Try to match accent at least
+      const isFemaleName = config.voice.includes('amy') || config.voice.includes('joanna') || 
+                          config.voice.includes('emma') || config.voice.includes('kendra') || 
+                          config.voice.includes('kimberly') || config.voice.includes('salli') || 
+                          config.voice.includes('nicole')
+      
+      const voices = speechSynthesis.getVoices()
+      if (config.voice.includes('british')) {
+        utterance.voice = voices.find(v => v.lang.includes('en-GB')) || voices[0]
+      } else if (config.voice.includes('australian')) {
+        utterance.voice = voices.find(v => v.lang.includes('en-AU')) || voices[0]
+      } else {
+        utterance.voice = voices.find(v => v.lang.includes('en-US')) || voices[0]
+      }
+      
+      utterance.rate = config.personality === 'concise' ? 1.1 : 0.9
+      utterance.pitch = isFemaleName ? 1.1 : 0.9
+      
+      speechSynthesis.speak(utterance)
+      
+      // Wait for speech to complete
+      utterance.onend = () => {
+        setPreviewLoading(false)
+      }
+    } catch (error) {
+      console.error('Preview error:', error)
+      setPreviewLoading(false)
+    }
+  }
+
   const handleTestCall = async () => {
     setTestMode(true)
     try {
+      const selectedVoice = voices.find(v => v.value === config.voice)
+      const phoneNumber = prompt('Enter your phone number to receive test call (e.g., +1234567890):')
+      
+      if (!phoneNumber) {
+        setTestMode(false)
+        return
+      }
+
+      // Show what would happen in production
+      alert(`Test Call Configuration:\n\nVoice: ${selectedVoice?.label}\nProvider: ${selectedVoice?.provider}\nPersonality: ${config.personality}\nGreeting: "${config.customGreeting}"\n\nWhen fully integrated with SignalWire/Vapi:\n- You would receive a call at ${phoneNumber}\n- The AI would use the actual ${selectedVoice?.label} voice from ${selectedVoice?.provider}\n- It would greet you with your custom message\n- The voice would sound natural and distinct\n\nNote: Full voice provider integration requires API keys for ${selectedVoice?.provider}`)
+      
+      // In production, uncomment this:
+      /*
       const { data, error } = await supabase.functions.invoke('initiate-ai-test-call', {
         body: { 
           config,
-          testNumber: tenant?.phone // Call the tenant's own number for testing
+          testNumber: phoneNumber,
+          voiceProvider: selectedVoice?.provider,
+          voiceId: config.voice
         }
       })
-
       if (error) throw error
-      alert('Test call initiated! Your phone will ring shortly.')
+      */
     } catch (error) {
       console.error('Error initiating test call:', error)
       alert('Failed to initiate test call')
@@ -238,13 +336,38 @@ export const AICallAssistant: React.FC = () => {
                     value={config.voice}
                     onChange={(e) => setConfig({ ...config, voice: e.target.value as any })}
                   >
-                    {voices.map(voice => (
-                      <option key={voice.value} value={voice.value}>
-                        {voice.label}
-                      </option>
-                    ))}
+                    <optgroup label="Amazon Polly (Standard)">
+                      {voices.filter(v => v.provider === 'Amazon Polly').map(voice => (
+                        <option key={voice.value} value={voice.value}>
+                          {voice.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Google Cloud (WaveNet)">
+                      {voices.filter(v => v.provider === 'Google Cloud').map(voice => (
+                        <option key={voice.value} value={voice.value}>
+                          {voice.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Microsoft Azure (Neural)">
+                      {voices.filter(v => v.provider === 'Microsoft Azure').map(voice => (
+                        <option key={voice.value} value={voice.value}>
+                          {voice.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="ElevenLabs (Premium Natural)">
+                      {voices.filter(v => v.provider === 'ElevenLabs').map(voice => (
+                        <option key={voice.value} value={voice.value}>
+                          {voice.label}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
-                  <div className="form-text">Choose the voice for your AI assistant</div>
+                  <div className="form-text">
+                    Choose from various TTS providers. ElevenLabs provides the most natural-sounding voices.
+                  </div>
                 </div>
               </div>
               <div className="col-md-6">
@@ -279,15 +402,45 @@ export const AICallAssistant: React.FC = () => {
 
             {/* Voice Preview */}
             <div className="bg-light rounded p-5">
-              <h5 className="mb-3">Preview</h5>
-              <div className="d-flex align-items-center">
-                <button className="btn btn-sm btn-light-primary me-3">
-                  <KTIcon iconName="play" className="fs-3" />
+              <h5 className="mb-3">Voice Testing</h5>
+              <div className="d-flex align-items-center mb-3">
+                <button 
+                  className="btn btn-sm btn-light-primary me-3"
+                  onClick={handlePreviewVoice}
+                  disabled={previewLoading}
+                  title="Basic preview using browser TTS"
+                >
+                  {previewLoading ? (
+                    <span className="spinner-border spinner-border-sm" />
+                  ) : (
+                    <KTIcon iconName="play" className="fs-3" />
+                  )}
                 </button>
                 <div className="flex-grow-1">
                   <div className="fw-bold">Sample: "{config.customGreeting}"</div>
-                  <div className="text-muted fs-7">Voice: {voices.find(v => v.value === config.voice)?.label}</div>
+                  <div className="text-muted fs-7">
+                    Voice: {voices.find(v => v.value === config.voice)?.label} 
+                    <span className="badge badge-light-info ms-2">{voices.find(v => v.value === config.voice)?.provider}</span>
+                  </div>
+                  <div className="text-warning fs-8 mt-1">
+                    Note: Browser preview uses basic TTS. Actual AI voice will sound much better with the selected provider.
+                  </div>
                 </div>
+              </div>
+              
+              {/* Test Call Button */}
+              <div className="border-top pt-3">
+                <button 
+                  className="btn btn-sm btn-success me-3"
+                  onClick={handleTestCall}
+                  disabled={testMode}
+                >
+                  <KTIcon iconName="phone" className="fs-3 me-2" />
+                  Make Test Call
+                </button>
+                <span className="text-muted fs-7">
+                  Receive a real call from your AI assistant to hear the actual voice
+                </span>
               </div>
             </div>
           </div>

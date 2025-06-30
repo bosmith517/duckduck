@@ -36,17 +36,6 @@ export function HeaderWrapper() {
         )}
         {/* end::Aside mobile toggle */}
 
-        <div
-          className='d-flex topbar align-items-center d-lg-none ms-n2 me-3'
-          title='Show aside menu'
-        >
-          <div
-            className='btn btn-icon btn-active-light-primary btn-custom w-30px h-30px w-md-40px h-md-40px'
-            id='kt_header_menu_mobile_toggle'
-          >
-            <KTIcon iconName='abstract-14' className='fs-2x' />
-          </div>
-        </div>
 
         <div className='header-logo me-5 me-md-10 flex-grow-1 flex-lg-grow-0'>
           <Link to='/' className='d-flex align-items-center text-decoration-none'>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { KTCard, KTCardBody, KTIcon } from '../../../_metronic/helpers'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
-import EstimateTemplateBuilder from './EstimateTemplateBuilder'
+// import EstimateTemplateBuilder from './EstimateTemplateBuilder'
 
 interface EstimateTemplate {
   id: string
@@ -113,8 +113,211 @@ const TemplateDrivenEstimates: React.FC = () => {
         .eq('tenant_id', userProfile.tenant_id)
         .order('usage_count', { ascending: false })
 
-      if (templatesError) throw templatesError
-      setTemplates(templatesData || [])
+      if (templatesError && templatesError.code !== 'PGRST116') throw templatesError
+      
+      // If no templates exist, create sample templates for demo
+      if (!templatesData || templatesData.length === 0) {
+        const sampleTemplates: EstimateTemplate[] = [
+          {
+            id: 'sample-hvac-repair',
+            name: 'HVAC System Repair',
+            description: 'Complete HVAC system diagnostic and repair service',
+            service_type: 'HVAC',
+            category: 'Repair',
+            base_price: 299,
+            pricing_tiers: {
+              basic: {
+                name: 'Basic Repair',
+                description: 'Standard diagnostic and basic component repair',
+                price: 299,
+                includes: ['System diagnostic', 'Basic component repair', 'Filter replacement', '30-day warranty']
+              },
+              standard: {
+                name: 'Standard Repair',
+                description: 'Comprehensive repair with premium parts',
+                price: 499,
+                includes: ['Full system diagnostic', 'Premium parts', 'Filter replacement', 'System tune-up', '90-day warranty']
+              },
+              premium: {
+                name: 'Premium Repair',
+                description: 'Complete system overhaul with 1-year warranty',
+                price: 799,
+                includes: ['Complete system analysis', 'Premium parts', 'Full system cleaning', 'Performance optimization', '1-year warranty', 'Priority support']
+              }
+            },
+            line_items: [
+              {
+                id: '1',
+                name: 'Diagnostic Fee',
+                description: 'Complete system diagnostic and issue identification',
+                category: 'labor',
+                unit_type: 'hour',
+                unit_price: 120,
+                quantity: 1,
+                is_variable: false
+              },
+              {
+                id: '2',
+                name: 'Repair Labor',
+                description: 'Skilled technician labor for repairs',
+                category: 'labor',
+                unit_type: 'hour',
+                unit_price: 85,
+                quantity: 2,
+                is_variable: true,
+                variable_name: 'repair_hours'
+              }
+            ],
+            variables: [
+              {
+                name: 'repair_hours',
+                display_name: 'Estimated Repair Hours',
+                type: 'number',
+                default_value: 2,
+                required: true,
+                affects_pricing: true,
+                multiplier: 85,
+                description: 'Number of hours required for repair work'
+              },
+              {
+                name: 'system_size',
+                display_name: 'System Size (Sq Ft)',
+                type: 'area_measurement',
+                default_value: 1500,
+                required: true,
+                affects_pricing: true,
+                multiplier: 0.05,
+                description: 'Square footage of area served by HVAC system'
+              }
+            ],
+            markup_percentage: 15,
+            tax_rate: 8.25,
+            is_default: true,
+            usage_count: 25,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 'sample-plumbing-emergency',
+            name: 'Emergency Plumbing Service',
+            description: 'Emergency plumbing repair for urgent issues',
+            service_type: 'Plumbing',
+            category: 'Emergency',
+            base_price: 199,
+            pricing_tiers: {
+              basic: {
+                name: 'Emergency Call',
+                description: 'Emergency diagnostic and basic repair',
+                price: 199,
+                includes: ['Emergency response', 'Basic repair', 'Temporary fix if needed']
+              },
+              standard: {
+                name: 'Emergency Repair',
+                description: 'Complete emergency repair service',
+                price: 349,
+                includes: ['Emergency response', 'Complete repair', 'Quality parts', '60-day warranty']
+              },
+              premium: {
+                name: 'Emergency + Prevention',
+                description: 'Emergency repair plus preventive maintenance',
+                price: 549,
+                includes: ['Emergency response', 'Complete repair', 'System inspection', 'Preventive maintenance', '6-month warranty']
+              }
+            },
+            line_items: [
+              {
+                id: '1',
+                name: 'Emergency Service Call',
+                description: 'Emergency response and initial assessment',
+                category: 'labor',
+                unit_type: 'item',
+                unit_price: 150,
+                quantity: 1,
+                is_variable: false
+              }
+            ],
+            variables: [
+              {
+                name: 'after_hours',
+                display_name: 'After Hours Service',
+                type: 'checkbox',
+                default_value: false,
+                required: false,
+                affects_pricing: true,
+                multiplier: 50,
+                description: 'Additional fee for after-hours emergency service'
+              }
+            ],
+            markup_percentage: 20,
+            tax_rate: 8.25,
+            is_default: false,
+            usage_count: 12,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 'sample-electrical-inspection',
+            name: 'Electrical Safety Inspection',
+            description: 'Comprehensive electrical system safety inspection',
+            service_type: 'Electrical',
+            category: 'Inspection',
+            base_price: 175,
+            pricing_tiers: {
+              basic: {
+                name: 'Basic Inspection',
+                description: 'Standard electrical safety inspection',
+                price: 175,
+                includes: ['Panel inspection', 'Outlet testing', 'Basic safety report']
+              },
+              standard: {
+                name: 'Comprehensive Inspection',
+                description: 'Detailed inspection with recommendations',
+                price: 299,
+                includes: ['Full system inspection', 'Load testing', 'Detailed report', 'Upgrade recommendations']
+              },
+              premium: {
+                name: 'Complete Assessment',
+                description: 'Full assessment with thermal imaging',
+                price: 449,
+                includes: ['Complete system analysis', 'Thermal imaging', 'Load calculations', 'Detailed report', 'Priority support']
+              }
+            },
+            line_items: [
+              {
+                id: '1',
+                name: 'Inspection Service',
+                description: 'Professional electrical system inspection',
+                category: 'labor',
+                unit_type: 'hour',
+                unit_price: 95,
+                quantity: 2,
+                is_variable: false
+              }
+            ],
+            variables: [
+              {
+                name: 'panel_count',
+                display_name: 'Number of Electrical Panels',
+                type: 'number',
+                default_value: 1,
+                required: true,
+                affects_pricing: true,
+                multiplier: 25,
+                description: 'Additional panels require extra inspection time'
+              }
+            ],
+            markup_percentage: 10,
+            tax_rate: 8.25,
+            is_default: false,
+            usage_count: 8,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ]
+        setTemplates(sampleTemplates)
+      } else {
+        setTemplates(templatesData)
+      }
 
       // Fetch customers for quick estimate creation
       const { data: contactsData } = await supabase

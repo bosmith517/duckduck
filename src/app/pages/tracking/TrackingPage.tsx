@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { trackingService, TrackingLocation } from '../../services/trackingService'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 
-// Simple map component using basic HTML5 geolocation and a placeholder map
+// Access token will be loaded from environment variables
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || ''
+
+interface BusinessLocation {
+  lat: number
+  lng: number
+  name: string
+  address: string
+}
 const TrackingPage: React.FC = () => {
   const { trackingToken } = useParams<{ trackingToken: string }>()
   const [location, setLocation] = useState<TrackingLocation | null>(null)
@@ -10,6 +20,18 @@ const TrackingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [isExpired, setIsExpired] = useState(false)
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const mapContainer = useRef<HTMLDivElement>(null)
+  const map = useRef<mapboxgl.Map | null>(null)
+  const technicianMarker = useRef<mapboxgl.Marker | null>(null)
+  const officeMarker = useRef<mapboxgl.Marker | null>(null)
+
+  // Business office location (this should come from your company settings)
+  const businessLocation: BusinessLocation = {
+    lat: 39.7817, // Springfield, IL coordinates - replace with actual business location
+    lng: -89.6501,
+    name: 'TaurusTech Office',
+    address: 'Springfield, IL'
+  }
 
   useEffect(() => {
     if (trackingToken) {
@@ -21,8 +43,165 @@ const TrackingPage: React.FC = () => {
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current)
       }
+      if (map.current) {
+        map.current.remove()
+      }
     }
   }, [trackingToken])
+
+  useEffect(() => {
+    initializeMap()
+  }, [])
+
+  useEffect(() => {
+    if (location && map.current) {
+      updateTechnicianLocation()
+    }
+  }, [location])
+
+  const initializeMap = () => {
+    if (!mapContainer.current || map.current) return
+
+    // Check if Mapbox token is available
+    if (!mapboxgl.accessToken) {
+      // Show placeholder if no token available
+      if (mapContainer.current) {
+        mapContainer.current.innerHTML = `
+          <div class="h-100 bg-light rounded d-flex align-items-center justify-content-center">
+            <div class="text-center">
+              <i class="ki-duotone ki-geolocation fs-5x text-primary mb-3">
+                <span class="path1"></span>
+                <span class="path2"></span>
+              </i>
+              <h4 class="text-gray-800 mb-3">Live Tracking Unavailable</h4>
+              <p class="text-muted mb-4">
+                Map services are temporarily unavailable. Please check back later.
+              </p>
+            </div>
+          </div>
+        `
+      }
+      return
+    }
+
+    try {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v12', // 3D street style
+        center: [businessLocation.lng, businessLocation.lat],
+        zoom: 12,
+        pitch: 60, // 3D tilt
+        bearing: 0,
+        collectResourceTiming: false // Disable analytics to reduce console noise
+      })
+
+      map.current.on('load', () => {
+        // Add 3D buildings layer
+        if (map.current) {
+          map.current.addLayer({
+            id: 'add-3d-buildings',
+            source: 'composite',
+            'source-layer': 'building',
+            filter: ['==', 'extrude', 'true'],
+            type: 'fill-extrusion',
+            minzoom: 15,
+            paint: {
+              'fill-extrusion-color': '#aaa',
+              'fill-extrusion-height': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                15,
+                0,
+                15.05,
+                ['get', 'height']
+              ],
+              'fill-extrusion-base': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                15,
+                0,
+                15.05,
+                ['get', 'min_height']
+              ],
+              'fill-extrusion-opacity': 0.6
+            }
+          })
+
+          // Add office marker
+          addOfficeMarker()
+        }
+      })
+
+      // Add navigation controls
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
+      map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right')
+    } catch (error) {
+      console.error('Error initializing map:', error)
+      setError('Failed to initialize map. Please check your internet connection.')
+    }
+  }
+
+  const addOfficeMarker = () => {
+    if (!map.current) return
+
+    // Create office marker
+    const officeEl = document.createElement('div')
+    officeEl.className = 'office-marker'
+    officeEl.innerHTML = '<i class="ki-duotone ki-home-2 fs-2x text-primary"></i>'
+
+    officeMarker.current = new mapboxgl.Marker(officeEl)
+      .setLngLat([businessLocation.lng, businessLocation.lat])
+      .setPopup(
+        new mapboxgl.Popup({ offset: 25 })
+          .setHTML(`
+            <div class="p-3">
+              <h6 class="mb-1">${businessLocation.name}</h6>
+              <p class="mb-0 text-muted">${businessLocation.address}</p>
+            </div>
+          `)
+      )
+      .addTo(map.current)
+  }
+
+  const updateTechnicianLocation = () => {
+    if (!map.current || !location) return
+
+    // Remove existing technician marker
+    if (technicianMarker.current) {
+      technicianMarker.current.remove()
+    }
+
+    // Create technician marker
+    const techEl = document.createElement('div')
+    techEl.className = 'technician-marker'
+    techEl.innerHTML = '<i class="ki-duotone ki-geolocation fs-2x text-success"></i>'
+
+    technicianMarker.current = new mapboxgl.Marker(techEl)
+      .setLngLat([location.longitude, location.latitude])
+      .setPopup(
+        new mapboxgl.Popup({ offset: 25 })
+          .setHTML(`
+            <div class="p-3">
+              <h6 class="mb-1">Technician Location</h6>
+              <p class="mb-1"><strong>Coordinates:</strong> ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}</p>
+              <p class="mb-0 text-muted"><strong>Last Update:</strong> ${formatTime(location.timestamp)}</p>
+            </div>
+          `)
+      )
+      .addTo(map.current)
+
+    // Fit map to show both office and technician
+    const bounds = new mapboxgl.LngLatBounds()
+    bounds.extend([businessLocation.lng, businessLocation.lat])
+    bounds.extend([location.longitude, location.latitude])
+    
+    map.current.fitBounds(bounds, {
+      padding: 100,
+      maxZoom: 15
+    })
+  }
 
   const fetchInitialLocation = async () => {
     if (!trackingToken) return
@@ -148,42 +327,15 @@ const TrackingPage: React.FC = () => {
       {/* Map Container */}
       <div className='container-fluid p-0'>
         <div className='position-relative' style={{ height: 'calc(100vh - 120px)' }}>
-          {location ? (
-            <div className='h-100 d-flex align-items-center justify-content-center bg-secondary'>
-              {/* Placeholder for map - In a real implementation, you would integrate with Google Maps, Mapbox, or Leaflet */}
-              <div className='text-center text-white'>
-                <div className='mb-4'>
-                  <i className='ki-duotone ki-geolocation fs-5x text-white mb-3'>
-                    <span className='path1'></span>
-                    <span className='path2'></span>
-                  </i>
-                </div>
-                <h3 className='text-white mb-3'>Technician Location</h3>
-                <div className='bg-white bg-opacity-10 rounded p-4 d-inline-block'>
-                  <div className='text-white fs-5 mb-2'>
-                    <strong>Latitude:</strong> {location.latitude.toFixed(6)}
-                  </div>
-                  <div className='text-white fs-5 mb-2'>
-                    <strong>Longitude:</strong> {location.longitude.toFixed(6)}
-                  </div>
-                  <div className='text-white fs-6'>
-                    <strong>Last Updated:</strong> {formatTime(location.timestamp)}
-                  </div>
-                </div>
-                <div className='mt-4'>
-                  <div className='badge badge-success fs-6 px-3 py-2'>
-                    <i className='ki-duotone ki-check fs-3 me-2'>
-                      <span className='path1'></span>
-                      <span className='path2'></span>
-                    </i>
-                    Technician is on the way
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className='h-100 d-flex align-items-center justify-content-center bg-light'>
-              <div className='text-center'>
+          <div 
+            ref={mapContainer} 
+            className='h-100'
+            style={{ width: '100%' }}
+          />
+          
+          {!location && !loading && (
+            <div className='position-absolute top-50 start-50 translate-middle text-center'>
+              <div className='bg-white rounded shadow p-4'>
                 <div className='spinner-border text-primary mb-3' role='status'>
                   <span className='visually-hidden'>Loading location...</span>
                 </div>
@@ -240,8 +392,64 @@ const TrackingPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Map Styles */}
+      <style>{`
+        .mapboxgl-popup {
+          max-width: 300px;
+        }
+        
+        .office-marker {
+          cursor: pointer;
+          padding: 8px;
+          background: white;
+          border-radius: 50%;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          border: 3px solid #007bff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .technician-marker {
+          cursor: pointer;
+          padding: 8px;
+          background: white;
+          border-radius: 50%;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          border: 3px solid #28a745;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          }
+          50% {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(40, 167, 69, 0.4);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          }
+        }
+        
+        .mapboxgl-ctrl-group {
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        .mapboxgl-popup-content {
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+      `}</style>
     </div>
   )
 }
 
-export default TrackingPage
+export { TrackingPage as default }

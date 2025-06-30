@@ -281,6 +281,14 @@ const JobsPage: React.FC = () => {
                 <option value='urgent'>Urgent</option>
               </select>
 
+              <a
+                href='/jobs/costing'
+                className='btn btn-light-success me-3'
+              >
+                <i className='ki-duotone ki-dollar fs-2'></i>
+                Real-Time Job Costing
+              </a>
+              
               <button
                 type='button'
                 className='btn btn-primary'

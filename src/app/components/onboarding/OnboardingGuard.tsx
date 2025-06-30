@@ -27,9 +27,6 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
     
     console.log('OnboardingGuard: tenant loaded', { tenant, isOnboardingCompleted })
     
-    // For testing: clear any existing skip data
-    localStorage.removeItem('onboarding_skip')
-    
     if (!isOnboardingCompleted) {
       // Check if user has temporarily skipped onboarding
       const skipData = localStorage.getItem('onboarding_skip')
@@ -70,15 +67,26 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
     }
   }, [skipExpiry])
 
-  // Listen for sidebar button clicks
+  // Listen for Quick Setup and Continue Setup button clicks
   useEffect(() => {
     const handleOpenModal = () => {
+      console.log('OnboardingGuard: Received openOnboardingModal event')
+      console.log('OnboardingGuard: Opening modal, current state:', { showLocalOnboardingModal, showOnboardingPrompt, skipExpiry })
+      // Always open the modal when explicitly requested via buttons
       setShowLocalOnboardingModal(true)
+      // Also clear any skip period and prompt state
+      setShowOnboardingPrompt(false)
+      setSkipExpiry(null)
+      localStorage.removeItem('onboarding_skip')
     }
 
     window.addEventListener('openOnboardingModal', handleOpenModal)
-    return () => window.removeEventListener('openOnboardingModal', handleOpenModal)
-  }, [])
+    console.log('OnboardingGuard: Event listener added for openOnboardingModal')
+    return () => {
+      window.removeEventListener('openOnboardingModal', handleOpenModal)
+      console.log('OnboardingGuard: Event listener removed for openOnboardingModal')
+    }
+  }, [showLocalOnboardingModal, showOnboardingPrompt, skipExpiry])
 
   const handleCompleteOnboarding = () => {
     setShowOnboardingPrompt(false)
@@ -258,6 +266,7 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
       {children}
       
       {/* Local OnboardingModal controlled by welcome popup */}
+      {console.log('OnboardingGuard: Rendering OnboardingModal with isOpen:', showLocalOnboardingModal)}
       <OnboardingModal 
         isOpen={showLocalOnboardingModal}
         onClose={handleCloseOnboardingModal}

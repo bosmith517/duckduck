@@ -438,7 +438,7 @@ const EstimateTemplateBuilder: React.FC<TemplateBuilderProps> = ({ template, onS
                       >
                         <div className="d-flex justify-content-between w-100 me-3">
                           <span>{item.name || `Line Item ${index + 1}`}</span>
-                          <span className="text-muted">{item.category} - ${item.unit_price}/{{item.unit_type}}</span>
+                          <span className="text-muted">{item.category} - ${item.unit_price}/{item.unit_type}</span>
                         </div>
                       </button>
                     </h2>

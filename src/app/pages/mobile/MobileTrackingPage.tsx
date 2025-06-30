@@ -429,3 +429,5 @@ function getStatusColor(status: string): string {
     default: return 'secondary';
   }
 }
+
+export default MobileTrackingPage

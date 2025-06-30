@@ -121,13 +121,22 @@ const EstimatesPage: React.FC = () => {
                 <span className='text-muted mt-1 fw-semibold fs-7'>Manage project estimates and proposals</span>
               </h3>
               <div className='card-toolbar'>
-                <button 
-                  className='btn btn-sm btn-primary'
-                  onClick={() => setShowEstimateForm(true)}
-                >
-                  <i className='ki-duotone ki-plus fs-2'></i>
-                  New Estimate
-                </button>
+                <div className='d-flex gap-2'>
+                  <a 
+                    href='/estimates/templates'
+                    className='btn btn-sm btn-light-success'
+                  >
+                    <i className='ki-duotone ki-flash fs-2'></i>
+                    Template Estimates (80% Faster)
+                  </a>
+                  <button 
+                    className='btn btn-sm btn-primary'
+                    onClick={() => setShowEstimateForm(true)}
+                  >
+                    <i className='ki-duotone ki-plus fs-2'></i>
+                    New Custom Estimate
+                  </button>
+                </div>
               </div>
             </div>
             <KTCardBody className='py-3'>

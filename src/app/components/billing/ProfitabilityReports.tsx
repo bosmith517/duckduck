@@ -92,7 +92,7 @@ const ProfitabilityReports: React.FC<ProfitabilityReportsProps> = ({
           title,
           status,
           start_date,
-          completion_date,
+          end_date,
           estimated_cost,
           actual_cost,
           total_invoiced,

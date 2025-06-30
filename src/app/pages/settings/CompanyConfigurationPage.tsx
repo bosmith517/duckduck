@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../supabaseClient'
+import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 
 interface CompanyInfo {
   id: string
@@ -46,6 +47,7 @@ interface DocumentTemplate {
 }
 
 const CompanyConfigurationPage: React.FC = () => {
+  const { userProfile } = useSupabaseAuth()
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null)
   const [documents, setDocuments] = useState<DocumentTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,56 +56,51 @@ const CompanyConfigurationPage: React.FC = () => {
   const [uploadingDocument, setUploadingDocument] = useState(false)
 
   useEffect(() => {
-    loadCompanyConfiguration()
-  }, [])
+    if (userProfile?.tenant_id) {
+      loadCompanyConfiguration()
+    }
+  }, [userProfile?.tenant_id])
 
   const loadCompanyConfiguration = async () => {
+    if (!userProfile?.tenant_id) return
+    
     try {
       setLoading(true)
       
-      // Load company information from enhanced tenants table
+      // Load company information from tenants table
       const { data: tenantData, error: tenantError } = await supabase
         .from('tenants')
-        .select(`
-          *,
-          business_phone,
-          business_email,
-          website,
-          address_line1,
-          address_line2,
-          city,
-          state,
-          zip_code,
-          license_number,
-          insurance_info,
-          logo_url,
-          emergency_phone,
-          business_hours,
-          service_areas,
-          specialties,
-          customer_portal_settings
-        `)
+        .select('*')
+        .eq('id', userProfile.tenant_id)
         .single()
 
       if (tenantError) throw tenantError
 
-      // Build company info from database
+      // Extract business info from JSONB field
+      const businessInfo = tenantData.business_info || {}
+      
+      // Use signup data as intelligent defaults instead of generic placeholders
+      const companyName = tenantData.company_name || tenantData.name || businessInfo.company_name || ''
+      const businessEmail = businessInfo.business_email || userProfile?.email || ''
+      const businessPhone = businessInfo.business_phone || ''
+      
+      // Build company info from database with signup data fallbacks
       setCompanyInfo({
         id: tenantData.id,
-        company_name: tenantData.company_name || 'Your Service Company',
-        business_phone: tenantData.business_phone || '(555) 123-4567',
-        business_email: tenantData.business_email || 'info@yourcompany.com',
-        website: tenantData.website || 'www.yourcompany.com',
-        address_line1: tenantData.address_line1 || '123 Business Ave',
-        address_line2: tenantData.address_line2 || '',
-        city: tenantData.city || 'Austin',
-        state: tenantData.state || 'TX',
-        zip_code: tenantData.zip_code || '78701',
-        license_number: tenantData.license_number || '',
-        insurance_info: tenantData.insurance_info || '',
-        logo_url: tenantData.logo_url || '/assets/media/logos/company-logo.png',
-        emergency_phone: tenantData.emergency_phone || '',
-        business_hours: tenantData.business_hours || {
+        company_name: companyName,
+        business_phone: businessPhone,
+        business_email: businessEmail,
+        website: businessInfo.website || (companyName ? `www.${companyName.toLowerCase().replace(/\s+/g, '')}.com` : ''),
+        address_line1: businessInfo.address_line1 || '',
+        address_line2: businessInfo.address_line2 || '',
+        city: businessInfo.city || '',
+        state: businessInfo.state || '',
+        zip_code: businessInfo.zip_code || '',
+        license_number: businessInfo.license_number || '',
+        insurance_info: businessInfo.insurance_info || '',
+        logo_url: businessInfo.logo_url || '/assets/media/logos/company-logo.png',
+        emergency_phone: businessInfo.emergency_phone || '',
+        business_hours: businessInfo.business_hours || {
           monday: { open: '08:00', close: '17:00', closed: false },
           tuesday: { open: '08:00', close: '17:00', closed: false },
           wednesday: { open: '08:00', close: '17:00', closed: false },
@@ -112,9 +109,9 @@ const CompanyConfigurationPage: React.FC = () => {
           saturday: { open: '09:00', close: '15:00', closed: false },
           sunday: { open: '10:00', close: '14:00', closed: true }
         },
-        service_areas: tenantData.service_areas || ['Austin', 'Round Rock', 'Cedar Park'],
-        specialties: tenantData.specialties || ['HVAC Repair', 'AC Installation'],
-        customer_portal_settings: tenantData.customer_portal_settings || {
+        service_areas: businessInfo.service_areas || tenantData.service_areas || ['Austin', 'Round Rock', 'Cedar Park'],
+        specialties: businessInfo.specialties || tenantData.service_subtypes || ['HVAC Repair', 'AC Installation'],
+        customer_portal_settings: businessInfo.customer_portal_settings || {
           show_pricing: true,
           allow_online_booking: true,
           show_technician_photos: true,
@@ -135,6 +132,7 @@ const CompanyConfigurationPage: React.FC = () => {
           created_at,
           is_active
         `)
+        .eq('tenant_id', userProfile.tenant_id)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
 
@@ -166,26 +164,31 @@ const CompanyConfigurationPage: React.FC = () => {
     try {
       setSaving(true)
       
-      // Update tenant information with all fields
+      // Update tenant information - store business details in business_info JSONB
       const { error } = await supabase
         .from('tenants')
         .update({
           company_name: companyInfo.company_name,
-          business_phone: companyInfo.business_phone,
-          business_email: companyInfo.business_email,
-          website: companyInfo.website,
-          address_line1: companyInfo.address_line1,
-          address_line2: companyInfo.address_line2,
-          city: companyInfo.city,
-          state: companyInfo.state,
-          zip_code: companyInfo.zip_code,
-          license_number: companyInfo.license_number,
-          insurance_info: companyInfo.insurance_info,
-          emergency_phone: companyInfo.emergency_phone,
-          business_hours: companyInfo.business_hours,
-          service_areas: companyInfo.service_areas,
-          specialties: companyInfo.specialties,
-          customer_portal_settings: companyInfo.customer_portal_settings,
+          business_info: {
+            business_phone: companyInfo.business_phone,
+            business_email: companyInfo.business_email,
+            website: companyInfo.website,
+            address_line1: companyInfo.address_line1,
+            address_line2: companyInfo.address_line2,
+            city: companyInfo.city,
+            state: companyInfo.state,
+            zip_code: companyInfo.zip_code,
+            license_number: companyInfo.license_number,
+            insurance_info: companyInfo.insurance_info,
+            logo_url: companyInfo.logo_url,
+            emergency_phone: companyInfo.emergency_phone,
+            business_hours: companyInfo.business_hours,
+            service_areas: companyInfo.service_areas,
+            specialties: companyInfo.specialties,
+            customer_portal_settings: companyInfo.customer_portal_settings
+          },
+          service_type: companyInfo.specialties?.[0] || null,
+          service_subtypes: companyInfo.specialties || [],
           updated_at: new Date().toISOString()
         })
         .eq('id', companyInfo.id)
@@ -222,6 +225,7 @@ const CompanyConfigurationPage: React.FC = () => {
       const { data: docData, error: docError } = await supabase
         .from('document_templates')
         .insert({
+          tenant_id: userProfile?.tenant_id,
           template_name: file.name,
           template_type: documentType,
           file_url: publicUrl,

@@ -158,13 +158,13 @@ const SignupPage: React.FC = () => {
   const getPlanDetails = (planName: string) => {
     switch (planName) {
       case 'starter':
-        return { price: '$99', features: ['Up to 5 technicians', 'Customer portals', 'Basic AI', 'VoIP & SMS'] }
+        return { price: '$49', features: ['Up to 5 technicians', 'Customer portals', 'Basic AI', 'VoIP & SMS'] }
       case 'professional':
-        return { price: '$249', features: ['Up to 25 technicians', 'Advanced AI', 'Video calls', 'Analytics'] }
+        return { price: '$199', features: ['Up to 25 technicians', 'Advanced AI', 'Video calls', 'Analytics'] }
       case 'enterprise':
         return { price: 'Custom', features: ['Unlimited technicians', 'Custom integrations', 'White-label', '24/7 support'] }
       default:
-        return { price: '$249', features: ['Professional features'] }
+        return { price: '$49', features: ['Professional features'] }
     }
   }
 

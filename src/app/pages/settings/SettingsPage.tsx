@@ -14,6 +14,7 @@ const SettingsMainPage: React.FC = () => {
     if (path.includes('/billing')) return 'billing'
     if (path.includes('/notifications')) return 'notifications'
     if (path.includes('/security')) return 'security'
+    if (path.includes('/integrations')) return 'integrations'
     return 'general'
   }
 
@@ -209,6 +210,89 @@ const SettingsMainPage: React.FC = () => {
     </div>
   )
 
+  const renderIntegrationsSettings = () => (
+    <div className='row'>
+      <div className='col-md-6'>
+        <h5 className='mb-5'>Communication Integrations</h5>
+        <div className='card mb-5'>
+          <div className='card-body d-flex align-items-center justify-content-between'>
+            <div className='d-flex align-items-center'>
+              <div className='symbol symbol-50px me-3'>
+                <span className='symbol-label bg-primary'>
+                  <i className='ki-duotone ki-phone fs-2 text-white'></i>
+                </span>
+              </div>
+              <div>
+                <h6 className='mb-1'>SignalWire VoIP</h6>
+                <span className='text-muted fs-7'>Voice and SMS services</span>
+              </div>
+            </div>
+            <div className='form-check form-switch'>
+              <input className='form-check-input' type='checkbox' defaultChecked />
+            </div>
+          </div>
+        </div>
+        <div className='card mb-5'>
+          <div className='card-body d-flex align-items-center justify-content-between'>
+            <div className='d-flex align-items-center'>
+              <div className='symbol symbol-50px me-3'>
+                <span className='symbol-label bg-success'>
+                  <i className='ki-duotone ki-message-text fs-2 text-white'></i>
+                </span>
+              </div>
+              <div>
+                <h6 className='mb-1'>SMS Gateway</h6>
+                <span className='text-muted fs-7'>Text messaging service</span>
+              </div>
+            </div>
+            <div className='form-check form-switch'>
+              <input className='form-check-input' type='checkbox' defaultChecked />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className='col-md-6'>
+        <h5 className='mb-5'>Business Integrations</h5>
+        <div className='card mb-5'>
+          <div className='card-body d-flex align-items-center justify-content-between'>
+            <div className='d-flex align-items-center'>
+              <div className='symbol symbol-50px me-3'>
+                <span className='symbol-label bg-warning'>
+                  <i className='ki-duotone ki-profile-user fs-2 text-white'></i>
+                </span>
+              </div>
+              <div>
+                <h6 className='mb-1'>Supabase Database</h6>
+                <span className='text-muted fs-7'>Real-time database</span>
+              </div>
+            </div>
+            <div className='form-check form-switch'>
+              <input className='form-check-input' type='checkbox' defaultChecked />
+            </div>
+          </div>
+        </div>
+        <div className='card mb-5'>
+          <div className='card-body d-flex align-items-center justify-content-between'>
+            <div className='d-flex align-items-center'>
+              <div className='symbol symbol-50px me-3'>
+                <span className='symbol-label bg-info'>
+                  <i className='ki-duotone ki-chart-simple fs-2 text-white'></i>
+                </span>
+              </div>
+              <div>
+                <h6 className='mb-1'>Analytics Platform</h6>
+                <span className='text-muted fs-7'>Business intelligence</span>
+              </div>
+            </div>
+            <div className='form-check form-switch'>
+              <input className='form-check-input' type='checkbox' />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   const activeTab = getActiveTab()
 
   return (
@@ -265,6 +349,15 @@ const SettingsMainPage: React.FC = () => {
                 </li>
                 <li className='nav-item'>
                   <a
+                    className={`nav-link ${activeTab === 'integrations' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('integrations')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Integrations
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
                     className={`nav-link ${activeTab === 'phone-numbers' ? 'active' : ''}`}
                     onClick={() => handleTabClick('phone-numbers')}
                     style={{ cursor: 'pointer' }}
@@ -281,6 +374,7 @@ const SettingsMainPage: React.FC = () => {
                 {activeTab === 'billing' && renderBillingSettings()}
                 {activeTab === 'notifications' && renderNotificationSettings()}
                 {activeTab === 'security' && renderSecuritySettings()}
+                {activeTab === 'integrations' && renderIntegrationsSettings()}
               </div>
 
               {/* Save Button - Only show for non-phone-numbers tabs */}
@@ -305,6 +399,10 @@ const SettingsPage: React.FC = () => {
   return (
     <Routes>
       <Route path='phone-numbers' element={<PhoneNumbersPage />} />
+      <Route path='billing' element={<SettingsMainPage />} />
+      <Route path='notifications' element={<SettingsMainPage />} />
+      <Route path='security' element={<SettingsMainPage />} />
+      <Route path='integrations' element={<SettingsMainPage />} />
       <Route path='*' element={<SettingsMainPage />} />
     </Routes>
   )
