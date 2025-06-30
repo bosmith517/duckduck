@@ -107,14 +107,51 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClos
 
     setSearchingNumbers(true)
     try {
-      const { data, error } = await supabase.functions.invoke('search-available-numbers', {
-        body: { areaCode: formData.desiredAreaCode }
+      console.log('🚀 About to call search-available-numbers...')
+      
+      const response = await supabase.functions.invoke('search-available-numbers', {
+        body: { areacode: formData.desiredAreaCode }
       })
 
-      if (error) throw error
-      setAvailableNumbers(data.numbers || [])
+      console.log('📡 Raw response received:', response)
+      
+      const { data, error } = response
+
+      if (error) {
+        console.error('❌ Function returned error:', error)
+        throw error
+      }
+      
+      console.log('✅ Search response data:', data)
+      console.log('📋 Available numbers array:', data?.available_numbers)
+      console.log('📊 Array length:', data?.available_numbers?.length)
+      
+      // Map the response format to what the UI expects
+      try {
+        console.log('🔄 Starting number mapping...')
+        console.log('🔍 First number structure:', data?.available_numbers?.[0])
+        
+        const mappedNumbers = (data?.available_numbers || []).map((number: any, index: number) => {
+          console.log(`📱 Mapping number ${index}:`, number)
+          return {
+            phone_number: number.e164,
+            friendly_name: number.national_number_formatted,
+            locality: number.rate_center,
+            region: number.region
+          }
+        })
+        
+        console.log('🗺️ Mapped numbers:', mappedNumbers)
+        console.log('🎯 Setting available numbers...')
+        setAvailableNumbers(mappedNumbers)
+        console.log('✅ Numbers set successfully')
+      } catch (mappingError) {
+        console.error('💥 Error during mapping:', mappingError)
+        setAvailableNumbers([])
+      }
     } catch (error) {
-      console.error('Error searching numbers:', error)
+      console.error('💥 Error searching numbers:', error)
+      console.error('🔍 Error details:', JSON.stringify(error, null, 2))
       // Mock data for demo
       const mockNumbers = [
         { phone_number: `+1${formData.desiredAreaCode}5551234`, friendly_name: `(${formData.desiredAreaCode}) 555-1234`, locality: 'Demo City', region: 'Demo State' },

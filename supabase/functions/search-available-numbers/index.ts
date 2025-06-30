@@ -76,7 +76,8 @@ serve(async (req) => {
 
     // Step 5: Get search criteria from the frontend request
     const { 
-      areacode, 
+      areaCode, 
+      areacode,
       number_type = 'local', 
       starts_with, 
       contains, 
@@ -86,9 +87,12 @@ serve(async (req) => {
       city 
     } = await req.json()
 
+    // Support both areaCode (from frontend) and areacode for backwards compatibility
+    const searchAreaCode = areaCode || areacode
+
     // Step 3: Construct the SignalWire API URL with search parameters
     const searchParams = new URLSearchParams()
-    if (areacode) searchParams.append('areacode', areacode)
+    if (searchAreaCode) searchParams.append('areacode', searchAreaCode)
     if (starts_with) searchParams.append('starts_with', starts_with)
     if (contains) searchParams.append('contains', contains)
     if (ends_with) searchParams.append('ends_with', ends_with)
@@ -128,7 +132,7 @@ serve(async (req) => {
       tenant_name: tenant.name,
       available_numbers: availableNumbers,
       search_criteria: {
-        areacode,
+        areacode: searchAreaCode,
         number_type,
         starts_with,
         contains,

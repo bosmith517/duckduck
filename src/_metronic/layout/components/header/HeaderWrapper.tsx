@@ -11,7 +11,7 @@ import {useSupabaseAuth} from '../../../../app/modules/auth/core/SupabaseAuth'
 export function HeaderWrapper() {
   const {config, classes, attributes} = useLayout()
   const {header, aside} = config
-  const {signOut} = useSupabaseAuth()
+  const {signOut, currentUser} = useSupabaseAuth()
 
   return (
     <div
@@ -38,7 +38,7 @@ export function HeaderWrapper() {
 
 
         <div className='header-logo me-5 me-md-10 flex-grow-1 flex-lg-grow-0'>
-          <Link to='/' className='d-flex align-items-center text-decoration-none'>
+          <Link to={currentUser ? '/dashboard' : '/'} className='d-flex align-items-center text-decoration-none'>
             <div className='d-flex align-items-center'>
               <div className='bg-primary rounded-circle d-flex align-items-center justify-content-center me-3' style={{width: '32px', height: '32px'}}>
                 <i className='bi bi-tools text-white fs-5'></i>
