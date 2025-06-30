@@ -3,6 +3,7 @@ import { KTIcon } from '../../../_metronic/helpers'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { locationTriggerService } from '../../services/locationTriggerService'
+import PhotoCapture from '../shared/PhotoCapture'
 
 interface TodayJob {
   id: string
@@ -32,11 +33,35 @@ export const MyDayDashboard: React.FC = () => {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedJob, setSelectedJob] = useState<TodayJob | null>(null)
   const [showJobDetails, setShowJobDetails] = useState(false)
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false)
+  const [photoJobId, setPhotoJobId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchTodayJobs()
-    getCurrentLocation()
-  }, [userProfile?.id])
+    if (userProfile?.id) {
+      fetchTodayJobs()
+      getCurrentLocation()
+      
+      // Set up periodic location updates if any job is on route or in progress
+      const hasActiveJobs = todayJobs.some(job => 
+        job.status === 'on_route' || job.status === 'in_progress'
+      )
+      
+      if (hasActiveJobs && navigator.geolocation) {
+        const watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            setCurrentLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            })
+          },
+          (error) => console.warn('Location watch error:', error),
+          { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
+        )
+        
+        return () => navigator.geolocation.clearWatch(watchId)
+      }
+    }
+  }, [userProfile?.id, todayJobs.length])
 
   const fetchTodayJobs = async () => {
     if (!userProfile?.tenant_id) return
@@ -49,46 +74,121 @@ export const MyDayDashboard: React.FC = () => {
         .from('jobs')
         .select(`
           *,
-          accounts:account_id(name),
-          contacts:contact_id(first_name, last_name, phone, address)
+          account:accounts(name, phone, email),
+          contact:contacts(first_name, last_name, phone)
         `)
         .eq('tenant_id', userProfile.tenant_id)
-        .eq('assigned_technician_id', userProfile.id)
-        .gte('scheduled_start', `${today}T00:00:00.000Z`)
-        .lt('scheduled_start', `${today}T23:59:59.999Z`)
-        .order('scheduled_start', { ascending: true })
+        .gte('start_date', `${today}T00:00:00.000Z`)
+        .lt('start_date', `${today}T23:59:59.999Z`)
+        .order('start_date', { ascending: true })
 
       if (error) throw error
 
       // Transform data to match interface
-      const transformedJobs = data?.map(job => ({
-        id: job.id,
-        title: job.title,
-        description: job.description || '',
-        status: job.status,
-        priority: job.priority || 'normal',
-        scheduled_start: job.scheduled_start,
-        estimated_duration: job.estimated_duration || 120,
-        customer: {
-          name: job.accounts?.name || `${job.contacts?.first_name || ''} ${job.contacts?.last_name || ''}`.trim(),
-          phone: job.contacts?.phone || '',
-          address: job.contacts?.address || job.service_address || '',
-          special_instructions: job.special_instructions
-        },
-        service_type: job.service_type || 'General Service',
-        job_number: job.job_number || job.id.slice(0, 8),
-        equipment: job.equipment_needed ? job.equipment_needed.split(',') : [],
-        photos_required: job.photos_required || false,
-        customer_signature_required: job.signature_required || false
-      })) || []
+      const transformedJobs = data?.map(job => {
+        const customerName = job.account?.name || `${job.contact?.first_name || ''} ${job.contact?.last_name || ''}`.trim() || 'Unknown Customer'
+        const customerPhone = job.contact?.phone || job.account?.phone || ''
+        const customerAddress = [job.location_address, job.location_city, job.location_state].filter(Boolean).join(', ') || 'Address TBD'
+        
+        return {
+          id: job.id,
+          title: job.title || 'Untitled Job',
+          description: job.description || '',
+          status: mapJobStatusToDisplayStatus(job.status),
+          priority: mapJobPriorityToDisplayPriority(job.priority),
+          scheduled_start: job.start_date || new Date().toISOString(),
+          estimated_duration: job.estimated_hours ? job.estimated_hours * 60 : 120,
+          customer: {
+            name: customerName,
+            phone: customerPhone,
+            address: customerAddress,
+            special_instructions: job.notes
+          },
+          service_type: 'Service',
+          job_number: job.job_number || `JOB-${job.id.slice(0, 8)}`,
+          equipment: [],
+          photos_required: true,
+          customer_signature_required: true
+        }
+      }) || []
 
       setTodayJobs(transformedJobs)
+      
+      // Set up real-time subscription for job updates
+      const subscription = supabase
+        .channel('technician_jobs')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'jobs',
+            filter: `tenant_id=eq.${userProfile.tenant_id}`
+          },
+          (payload) => {
+            console.log('Job updated:', payload)
+            // Refresh jobs when changes occur
+            fetchTodayJobs()
+          }
+        )
+        .subscribe()
+      
+      // Cleanup subscription when component unmounts
+      return () => {
+        subscription.unsubscribe()
+      }
     } catch (error) {
       console.error('Error fetching today jobs:', error)
       // Use sample data for demo
       setTodayJobs(generateSampleJobs())
     } finally {
       setLoading(false)
+    }
+  }
+  
+  // Helper function to map job status to display status
+  const mapJobStatusToDisplayStatus = (status: string): TodayJob['status'] => {
+    switch (status?.toLowerCase()) {
+      case 'scheduled':
+      case 'pending':
+      case 'confirmed':
+        return 'scheduled'
+      case 'on_route':
+      case 'on_the_way':
+      case 'en_route':
+        return 'on_route'
+      case 'in progress':
+      case 'in_progress':
+      case 'active':
+      case 'work_in_progress':
+        return 'in_progress'
+      case 'completed':
+      case 'finished':
+      case 'done':
+        return 'completed'
+      case 'paused':
+      case 'on_hold':
+        return 'paused'
+      default:
+        return 'scheduled'
+    }
+  }
+  
+  // Helper function to map job priority to display priority
+  const mapJobPriorityToDisplayPriority = (priority: string): TodayJob['priority'] => {
+    switch (priority?.toLowerCase()) {
+      case 'high':
+      case 'urgent':
+        return 'high'
+      case 'emergency':
+      case 'critical':
+        return 'emergency'
+      case 'low':
+        return 'low'
+      case 'medium':
+      case 'normal':
+      default:
+        return 'normal'
     }
   }
 
@@ -174,48 +274,99 @@ export const MyDayDashboard: React.FC = () => {
   }
 
   const updateJobStatus = async (jobId: string, newStatus: TodayJob['status']) => {
+    if (!userProfile?.id) {
+      alert('User not authenticated')
+      return
+    }
+    
     try {
+      // Map display status back to database status
+      const dbStatus = mapDisplayStatusToDbStatus(newStatus)
+      
+      const updateData: any = {
+        status: dbStatus,
+        updated_at: new Date().toISOString()
+      }
+      
+      // Add timestamp fields based on status
+      if (newStatus === 'on_route') {
+        updateData.started_travel_at = new Date().toISOString()
+      } else if (newStatus === 'in_progress') {
+        updateData.started_work_at = new Date().toISOString()
+      } else if (newStatus === 'completed') {
+        updateData.completed_at = new Date().toISOString()
+      }
+      
       const { error } = await supabase
         .from('jobs')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', jobId)
+        .eq('tenant_id', userProfile.tenant_id)
 
       if (error) throw error
 
-      // Update local state
+      // Update local state immediately for better UX
       setTodayJobs(prev => prev.map(job => 
         job.id === jobId ? { ...job, status: newStatus } : job
       ))
 
       // Create status update log
+      const statusLogData = {
+        job_id: jobId,
+        technician_id: userProfile.id,
+        old_status: 'previous', // Could get this from current state
+        new_status: dbStatus,
+        updated_at: new Date().toISOString()
+      }
+      
+      if (currentLocation) {
+        (statusLogData as any).location_latitude = +currentLocation.lat;
+        (statusLogData as any).location_longitude = +currentLocation.lng;
+      }
+      
       await supabase
         .from('job_status_updates')
-        .insert({
-          job_id: jobId,
-          technician_id: userProfile?.id,
-          status: newStatus,
-          timestamp: new Date().toISOString(),
-          location: currentLocation
-        })
+        .insert(statusLogData)
 
-      // Handle location tracking based on status
+      // Handle location tracking and notifications based on status
       if (newStatus === 'on_route') {
         // Start location tracking when technician is en route
-        locationTriggerService.startLocationTracking(jobId)
-        alert('🚨 Location tracking started! Customers will be notified when you\'re nearby.')
+        try {
+          locationTriggerService.startLocationTracking(jobId)
+          alert('🚨 Location tracking started! Customer will be notified of your progress.')
+        } catch (trackingError) {
+          console.warn('Location tracking failed:', trackingError)
+          alert('Job status updated, but location tracking could not be started.')
+        }
       } else if (newStatus === 'completed') {
         // Stop location tracking when job is done
         locationTriggerService.stopLocationTracking()
+        alert('✅ Job completed! Great work!')
+      } else if (newStatus === 'in_progress') {
+        alert('🔧 Job started! Remember to take photos as you work.')
       }
-
-      // The database trigger will automatically send customer notifications
 
     } catch (error) {
       console.error('Error updating job status:', error)
-      alert('Failed to update job status')
+      alert('Failed to update job status. Please try again.')
+    }
+  }
+  
+  // Helper function to map display status back to database status
+  const mapDisplayStatusToDbStatus = (displayStatus: TodayJob['status']): string => {
+    switch (displayStatus) {
+      case 'scheduled':
+        return 'Scheduled'
+      case 'on_route':
+        return 'On Route'
+      case 'in_progress':
+        return 'In Progress'
+      case 'completed':
+        return 'Completed'
+      case 'paused':
+        return 'Paused'
+      default:
+        return 'Scheduled'
     }
   }
 
@@ -399,7 +550,13 @@ export const MyDayDashboard: React.FC = () => {
                     </button>
                   </div>
                   <div className="col-4">
-                    <button className="btn btn-light-success btn-sm w-100">
+                    <button 
+                      className="btn btn-light-success btn-sm w-100"
+                      onClick={() => {
+                        setPhotoJobId(job.id)
+                        setShowPhotoCapture(true)
+                      }}
+                    >
                       <KTIcon iconName="camera" className="fs-6 me-1" />
                       Photo
                     </button>
@@ -526,6 +683,24 @@ export const MyDayDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Photo Capture Modal */}
+      {showPhotoCapture && photoJobId && (
+        <PhotoCapture
+          isOpen={showPhotoCapture}
+          onClose={() => {
+            setShowPhotoCapture(false)
+            setPhotoJobId(null)
+          }}
+          onPhotoSaved={(photoUrl, photoId) => {
+            console.log('Photo saved:', { photoUrl, photoId, jobId: photoJobId })
+            // Could add logic here to update job status or show success message
+          }}
+          jobId={photoJobId}
+          photoType="job_progress"
+          title="Add Job Photo"
+        />
       )}
     </div>
   )

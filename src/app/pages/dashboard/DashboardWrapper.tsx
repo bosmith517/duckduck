@@ -20,9 +20,13 @@ import {
 import NewFeaturesWidget from '../../components/dashboard/NewFeaturesWidget'
 import { useSupabaseAuth } from '../../../app/modules/auth/core/SupabaseAuth'
 import { KTIcon } from '../../../_metronic/helpers'
+import { supabase } from '../../../supabaseClient'
+import { NewInquiryButton } from '../../components/workflows/WorkflowLauncher'
+import { useUserPermissions } from '../../hooks/useUserPermissions'
 
 const DashboardPage = () => {
   const { tenant } = useSupabaseAuth()
+  const { canManageInfrastructure } = useUserPermissions()
   
   // Show quick setup if onboarding not completed
   const showQuickSetup = !tenant?.onboarding_completed
@@ -34,10 +38,112 @@ const DashboardPage = () => {
     console.log('DashboardWrapper: openOnboardingModal event dispatched')
   }
 
+  // TEMPORARY: Function to create subproject
+  const handleCreateSubproject = async () => {
+    if (!tenant) return
+    
+    console.log('Creating subproject for tenant:', tenant.id)
+    try {
+      const { data, error } = await supabase.functions.invoke('create-signalwire-subproject', {
+        body: {
+          tenantId: tenant.id,
+          companyName: tenant.company_name
+        }
+      })
+      
+      if (error) {
+        console.error('Error creating subproject:', error)
+        alert('Error creating subproject: ' + error.message)
+      } else {
+        console.log('Subproject created successfully:', data)
+        alert('Subproject created successfully! Check console for details.')
+      }
+    } catch (err) {
+      console.error('Exception creating subproject:', err)
+      alert('Exception: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  // TEMPORARY: Function to repair incomplete setup
+  const handleRepairSetup = async () => {
+    if (!tenant) return
+    
+    console.log('Repairing setup for tenant:', tenant.id)
+    try {
+      const { data, error } = await supabase.functions.invoke('repair-tenant-setup', {
+        body: {
+          tenantId: tenant.id
+        }
+      })
+      
+      if (error) {
+        console.error('Error repairing setup:', error)
+        alert('Error repairing setup: ' + error.message)
+      } else {
+        console.log('Repair completed:', data)
+        alert('Setup repair completed! Check console for details.')
+      }
+    } catch (err) {
+      console.error('Exception repairing setup:', err)
+      alert('Exception: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
   return (
   <>
-    {/* Quick Setup Banner */}
-    {showQuickSetup && (
+    {/* Platform Admin Controls - Only visible to platform users */}
+    {canManageInfrastructure() && (
+      <div className='row g-5 g-xl-8 mb-4'>
+        <div className='col-12'>
+          <div className='alert alert-warning d-flex align-items-center justify-content-between p-5'>
+            <div>
+              <h4 className='mb-1'>PLATFORM ADMIN: SignalWire Management</h4>
+              <p className='mb-0'>Platform controls for tenant: {tenant?.company_name}</p>
+            </div>
+            <div className='d-flex gap-2'>
+              <button 
+                className='btn btn-warning'
+                onClick={handleCreateSubproject}
+              >
+                Create Subproject
+              </button>
+              <button 
+                className='btn btn-info'
+                onClick={handleRepairSetup}
+              >
+                Repair Setup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Customer Journey Controls - Visible to all contractor users */}
+    <div className='row g-5 g-xl-8 mb-4'>
+      <div className='col-12'>
+        <div className='alert alert-success d-flex align-items-center justify-content-between p-5'>
+          <div>
+            <h4 className='mb-1'>Customer Journey</h4>
+            <p className='mb-0'>Start your automated customer workflow - from call to completion</p>
+          </div>
+          <div className='d-flex gap-2'>
+            <NewInquiryButton 
+              onSuccess={() => window.location.href = '/leads'}
+              variant='success'
+              size='lg'
+            />
+            <a href='/leads' className='btn btn-primary'>
+              <KTIcon iconName='notepad-edit' className='fs-4 me-2' />
+              Manage Leads
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Quick Setup Banner - For contractor users */}
+    {showQuickSetup && !canManageInfrastructure() && (
       <div className='row g-5 g-xl-8 mb-8'>
         <div className='col-12'>
           <div className='alert alert-primary d-flex align-items-center p-5'>

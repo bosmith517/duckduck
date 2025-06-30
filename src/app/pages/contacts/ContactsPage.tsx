@@ -5,6 +5,8 @@ import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { ContactForm } from './components/ContactForm'
 import { ContactsList } from './components/ContactsList'
 import { QuickAddClient } from '../../components/clients/QuickAddClient'
+import { CustomerWorkflowModal } from '../../components/workflows/CustomerWorkflowModal'
+import { Job } from '../../../supabaseClient'
 
 const ContactsPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
@@ -15,6 +17,8 @@ const ContactsPage: React.FC = () => {
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [showWorkflow, setShowWorkflow] = useState(false)
+  const [workflowContact, setWorkflowContact] = useState<Contact | null>(null)
 
   useEffect(() => {
     if (userProfile?.tenant_id) {
@@ -301,6 +305,23 @@ const ContactsPage: React.FC = () => {
     }
   }
 
+  const handleStartWorkflow = (contact: Contact) => {
+    setWorkflowContact(contact)
+    setShowWorkflow(true)
+  }
+
+  const handleWorkflowComplete = (job: Job) => {
+    setShowWorkflow(false)
+    setWorkflowContact(null)
+    // Navigate to the created job
+    window.location.href = `/schedule?job=${job.id}`
+  }
+
+  const handleCloseWorkflow = () => {
+    setShowWorkflow(false)
+    setWorkflowContact(null)
+  }
+
   const filteredContacts = contacts.filter(contact =>
     contact.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -364,6 +385,7 @@ const ContactsPage: React.FC = () => {
               contacts={filteredContacts}
               onEdit={handleEdit}
               onDelete={handleDeleteContact}
+              onStartWorkflow={handleStartWorkflow}
             />
           )}
         </div>
@@ -385,6 +407,14 @@ const ContactsPage: React.FC = () => {
         <QuickAddClient
           onClose={() => setShowQuickAdd(false)}
           onSuccess={handleQuickAddSuccess}
+        />
+      )}
+
+      {showWorkflow && workflowContact && (
+        <CustomerWorkflowModal
+          contact={workflowContact}
+          onClose={handleCloseWorkflow}
+          onWorkflowComplete={handleWorkflowComplete}
         />
       )}
     </>

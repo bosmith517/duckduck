@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import HomeownerOnboardingModal from '../../components/onboarding/HomeownerOnboardingModal'
 
 const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [showHomeownerModal, setShowHomeownerModal] = useState(false)
   const { currentUser, signOut } = useSupabaseAuth()
 
   return (
@@ -90,8 +92,8 @@ const LandingPage: React.FC = () => {
                 🚀 SAVE TIME, EARN MORE, BUILD REPUTATION
               </div>
               <h1 className="display-3 fw-bolder text-dark mb-4 lh-1">
-                Grow Your Service Business 
-                <span className="text-primary">50% Faster </span> 
+                Grow Your Service Business  
+                <span className="text-primary">50% Faster </span>  
                 Than Any Competitor
               </h1>
               <p className="fs-4 text-gray-700 mb-6 lh-base">
@@ -236,6 +238,56 @@ const LandingPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Homeowner Section */}
+      <section className="py-10 bg-success">
+        <div className="container">
+          <div className="row align-items-center">
+            <div className="col-lg-8">
+              <h2 className="text-white fw-bold mb-3">Need Service for Your Home?</h2>
+              <p className="text-white fs-5 mb-4">
+                Connect with trusted professionals in your area. Get quotes, schedule service, 
+                and track your home maintenance - all in one place.
+              </p>
+              <div className="d-flex gap-4 mb-4">
+                <div className="d-flex align-items-center">
+                  <i className="ki-duotone ki-check-circle fs-3 text-white me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  <span className="text-white">Free for homeowners</span>
+                </div>
+                <div className="d-flex align-items-center">
+                  <i className="ki-duotone ki-check-circle fs-3 text-white me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  <span className="text-white">Instant quotes</span>
+                </div>
+                <div className="d-flex align-items-center">
+                  <i className="ki-duotone ki-check-circle fs-3 text-white me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  <span className="text-white">Trusted professionals</span>
+                </div>
+              </div>
+            </div>
+            <div className="col-lg-4 text-center text-lg-end">
+              <button 
+                className="btn btn-white btn-lg fw-bold px-8 py-3"
+                onClick={() => setShowHomeownerModal(true)}
+              >
+                <i className="ki-duotone ki-home-2 fs-2 me-2">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                Get Service Now
+              </button>
             </div>
           </div>
         </div>
@@ -1121,6 +1173,17 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Homeowner Onboarding Modal */}
+      <HomeownerOnboardingModal
+        isOpen={showHomeownerModal}
+        onClose={() => setShowHomeownerModal(false)}
+        onComplete={(data) => {
+          console.log('Homeowner service request submitted:', data)
+          // Could redirect to a success page or show confirmation
+        }}
+        contractorName="TradeWorks Pro"
+      />
     </div>
   )
 }

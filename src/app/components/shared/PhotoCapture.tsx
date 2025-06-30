@@ -354,38 +354,53 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
 
             {/* Photo Capture Options */}
             {!showCamera && (
-              <div className="row g-3 mb-6">
-                <div className="col-md-6">
-                  <button
-                    className="btn btn-primary w-100 py-3"
-                    onClick={startCamera}
-                  >
-                    <i className="ki-duotone ki-camera fs-2x mb-2">
-                      <span className="path1"></span>
-                      <span className="path2"></span>
-                    </i>
-                    <div>Take Photo</div>
-                  </button>
+              <div>
+                <div className="alert alert-info d-flex align-items-center mb-4">
+                  <i className="ki-duotone ki-information fs-2x text-info me-3">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                    <span className="path3"></span>
+                  </i>
+                  <div>
+                    <strong>Two ways to add photos:</strong> Take new photos with your camera or upload existing photos from your device.
+                  </div>
                 </div>
-                <div className="col-md-6">
-                  <button
-                    className="btn btn-light-primary w-100 py-3"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <i className="ki-duotone ki-folder-up fs-2x mb-2">
-                      <span className="path1"></span>
-                      <span className="path2"></span>
-                    </i>
-                    <div>Choose from Gallery</div>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    style={{ display: 'none' }}
-                    onChange={handleFileSelect}
-                  />
+                
+                <div className="row g-3 mb-6">
+                  <div className="col-md-6">
+                    <button
+                      className="btn btn-primary w-100 py-4"
+                      onClick={startCamera}
+                    >
+                      <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <div className="fw-bold">Take New Photo</div>
+                      <small className="text-white-75">Use your camera</small>
+                    </button>
+                  </div>
+                  <div className="col-md-6">
+                    <button
+                      className="btn btn-light-primary w-100 py-4"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <i className="ki-duotone ki-folder-up fs-2x mb-2 text-primary">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <div className="fw-bold">Upload Photos</div>
+                      <small className="text-primary">From gallery or files</small>
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={handleFileSelect}
+                    />
+                  </div>
                 </div>
               </div>
             )}

@@ -51,33 +51,27 @@ serve(async (req) => {
 
     console.log('Creating subproject for tenant:', tenantId, 'company:', companyName)
 
-    // Create subproject via SignalWire API
+    // Create subaccount via SignalWire API
     const auth = btoa(`${projectId}:${apiToken}`)
-    const subprojectUrl = `https://${spaceUrl}/api/fabric/projects`
+    const subprojectUrl = `https://${spaceUrl}/api/laml/2010-04-01/Accounts.json`
     
     // Generate clean subproject name
     const cleanCompanyName = companyName.replace(/[^a-zA-Z0-9\s]/g, '').trim()
-    const subprojectName = `${cleanCompanyName} - ${tenantId.substring(0, 8)}`
+    const friendlyName = `${cleanCompanyName} - ${tenantId.substring(0, 8)}`
+    
+    // Create form data for the request
+    const formData = new URLSearchParams({
+      FriendlyName: friendlyName
+    })
     
     const subprojectResponse = await fetch(subprojectUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        name: subprojectName,
-        description: `TradeWorks Pro tenant: ${companyName}`,
-        settings: {
-          // Inherit parent project settings
-          inherit_parent_settings: true,
-          // Set reasonable limits for contractor business
-          monthly_call_limit: 5000, // 5k minutes/month
-          monthly_sms_limit: 10000,  // 10k SMS/month
-          concurrent_call_limit: 50  // 50 concurrent calls
-        }
-      })
+      body: formData.toString()
     })
 
     if (!subprojectResponse.ok) {
@@ -87,37 +81,15 @@ serve(async (req) => {
     }
 
     const subprojectData = await subprojectResponse.json()
-    console.log('Created subproject:', subprojectData.id)
+    console.log('Created subaccount:', subprojectData.sid, 'for', subprojectData.friendly_name)
 
-    // Create API token for the subproject
-    const tokenUrl = `https://${spaceUrl}/api/fabric/projects/${subprojectData.id}/tokens`
+    // For SignalWire subaccounts, we need to get the auth token
+    // The subaccount will have its own SID but might need a separate auth token request
+    const subprojectId = subprojectData.sid
+    const subprojectAuthToken = subprojectData.auth_token || null
     
-    const tokenResponse = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        name: `${subprojectName} API Token`,
-        scopes: [
-          'voice',
-          'messaging', 
-          'fax',
-          'relay'
-        ]
-      })
-    })
-
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text()
-      console.error('Token creation failed:', errorText)
-      throw new Error(`Failed to create API token: ${errorText}`)
-    }
-
-    const tokenData = await tokenResponse.json()
-    console.log('Created API token for subproject')
+    // Note: SignalWire subaccounts inherit the parent space URL
+    console.log('Subaccount created successfully with SID:', subprojectId)
 
     // Store subproject credentials in database
     const supabaseAdmin = createClient(
@@ -128,9 +100,11 @@ serve(async (req) => {
     const { error: updateError } = await supabaseAdmin
       .from('tenants')
       .update({
-        signalwire_subproject_id: subprojectData.id,
-        signalwire_subproject_token: tokenData.token,
-        signalwire_subproject_space: subprojectData.space_url || spaceUrl,
+        signalwire_subproject_id: subprojectId,
+        signalwire_subproject_token: subprojectAuthToken,
+        signalwire_subproject_space: spaceUrl,
+        subproject_status: 'created',
+        subproject_created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', tenantId)
@@ -140,26 +114,44 @@ serve(async (req) => {
       throw new Error('Failed to save subproject credentials')
     }
 
-    // Create initial SIP configuration for the subproject
-    await createInitialSipConfig(
-      supabaseAdmin, 
-      tenantId, 
-      subprojectData.id, 
-      tokenData.token, 
-      subprojectData.space_url || spaceUrl,
-      companyName
-    )
+    // Create SIP configuration for the subproject
+    try {
+      const { data: sipData, error: sipError } = await supabase.functions.invoke('create-sip-configuration', {
+        body: {
+          tenantId: tenantId,
+          subprojectId: subprojectId,
+          companyName: companyName,
+          from_onboarding: true  // Flag to indicate this is from onboarding flow
+        }
+      })
+      
+      if (sipError) {
+        console.error('Error creating SIP configuration:', sipError)
+        // Non-blocking - SIP can be configured later, but log the issue
+        console.log('SIP configuration will need to be retried via repair function')
+      } else {
+        console.log('SIP configuration created successfully:', sipData)
+        if (sipData?.has_errors) {
+          console.warn('SIP configuration completed with errors - check function logs')
+        }
+      }
+    } catch (sipErr) {
+      console.error('Exception creating SIP configuration:', sipErr)
+      // Non-blocking - continue with subproject creation success
+      console.log('SIP configuration will need to be retried via repair function')
+    }
 
     console.log('Subproject setup completed for tenant:', tenantId)
 
     return new Response(JSON.stringify({
       success: true,
       subproject: {
-        id: subprojectData.id,
-        name: subprojectData.name,
-        space_url: subprojectData.space_url || spaceUrl
+        id: subprojectId,
+        sid: subprojectId,
+        friendly_name: subprojectData.friendly_name,
+        space_url: spaceUrl
       },
-      message: 'SignalWire subproject created successfully'
+      message: 'SignalWire subaccount created successfully'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

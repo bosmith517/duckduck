@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
+import { supabase, Job, Account, Contact } from '../../../supabaseClient'
+import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 
 interface ScheduleEvent {
   id: string
@@ -15,11 +17,18 @@ interface ScheduleEvent {
   assignedTo: string[]
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
   notes: string
+  job?: Job
+  account?: Account
+  contact?: Contact
 }
 
 const SchedulePage: React.FC = () => {
+  const { currentUser, userProfile } = useSupabaseAuth()
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
-  const [events, setEvents] = useState<ScheduleEvent[]>([
+  const [events, setEvents] = useState<ScheduleEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [initialMockEvents] = useState<ScheduleEvent[]>([
     {
       id: '1',
       title: 'Kitchen Installation',
@@ -78,6 +87,141 @@ const SchedulePage: React.FC = () => {
     }
   ])
 
+  // Fetch real jobs from database
+  const fetchJobsAsEvents = async () => {
+    if (!userProfile?.tenant_id) return
+
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const { data: jobs, error: jobsError } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          account:accounts(*),
+          contact:contacts(*)
+        `)
+        .eq('tenant_id', userProfile.tenant_id)
+        .not('start_date', 'is', null)
+        .order('start_date', { ascending: true })
+
+      if (jobsError) {
+        console.error('Error fetching jobs:', jobsError)
+        setError('Failed to fetch jobs')
+        // Fall back to mock data if database fails
+        setEvents(initialMockEvents)
+        return
+      }
+
+      if (jobs && jobs.length > 0) {
+        // Convert jobs to schedule events
+        const scheduleEvents: ScheduleEvent[] = jobs.map(job => {
+          const startDate = job.start_date ? new Date(job.start_date) : new Date()
+          const dueDate = job.due_date ? new Date(job.due_date) : new Date(startDate.getTime() + 8 * 60 * 60 * 1000) // +8 hours default
+          
+          return {
+            id: job.id,
+            title: job.title || 'Untitled Job',
+            client: job.account?.name || job.contact?.first_name + ' ' + job.contact?.last_name || 'Unknown Client',
+            jobId: job.job_number || `JOB-${job.id.slice(0, 8)}`,
+            type: determineJobType(job.title || '', job.description || ''),
+            startTime: startDate.toTimeString().slice(0, 5),
+            endTime: dueDate.toTimeString().slice(0, 5),
+            date: startDate.toISOString().split('T')[0],
+            location: [job.location_address, job.location_city, job.location_state]
+              .filter(Boolean).join(', ') || 'Location TBD',
+            assignedTo: ['Technician'], // TODO: Add technician assignment
+            status: mapJobStatusToEventStatus(job.status),
+            notes: job.notes || '',
+            job,
+            account: job.account,
+            contact: job.contact
+          }
+        })
+        
+        setEvents(scheduleEvents)
+      } else {
+        // No jobs found, use mock data for demo
+        setEvents(initialMockEvents)
+      }
+    } catch (err) {
+      console.error('Error in fetchJobsAsEvents:', err)
+      setError('Failed to load schedule data')
+      setEvents(initialMockEvents)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Helper function to determine job type from title/description
+  const determineJobType = (title: string, description: string): 'meeting' | 'work' | 'inspection' | 'delivery' => {
+    const text = (title + ' ' + description).toLowerCase()
+    if (text.includes('meeting') || text.includes('consultation') || text.includes('estimate')) return 'meeting'
+    if (text.includes('inspection') || text.includes('review') || text.includes('check')) return 'inspection'
+    if (text.includes('delivery') || text.includes('pickup') || text.includes('material')) return 'delivery'
+    return 'work'
+  }
+
+  // Helper function to map job status to event status
+  const mapJobStatusToEventStatus = (jobStatus: string): 'scheduled' | 'in-progress' | 'completed' | 'cancelled' => {
+    switch (jobStatus?.toLowerCase()) {
+      case 'scheduled':
+      case 'pending':
+      case 'confirmed':
+        return 'scheduled'
+      case 'in progress':
+      case 'in-progress':
+      case 'active':
+      case 'started':
+        return 'in-progress'
+      case 'completed':
+      case 'finished':
+      case 'done':
+        return 'completed'
+      case 'cancelled':
+      case 'canceled':
+      case 'rejected':
+        return 'cancelled'
+      default:
+        return 'scheduled'
+    }
+  }
+
+  // Load jobs on component mount and when user changes
+  useEffect(() => {
+    if (currentUser) {
+      fetchJobsAsEvents()
+    }
+  }, [userProfile?.tenant_id])
+
+  // Set up real-time subscription for job updates
+  useEffect(() => {
+    if (!userProfile?.tenant_id) return
+
+    const subscription = supabase
+      .channel('jobs_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'jobs',
+          filter: `tenant_id=eq.${userProfile.tenant_id}`
+        },
+        (payload) => {
+          console.log('Job updated:', payload)
+          // Refetch jobs when changes occur
+          fetchJobsAsEvents()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [userProfile?.tenant_id])
+
   const getTypeIcon = (type: string) => {
     const icons = {
       'meeting': 'ki-people',
@@ -124,40 +268,134 @@ const SchedulePage: React.FC = () => {
     setShowEventForm(true)
   }
 
-  const handleSaveEvent = (eventData: any) => {
-    const newEvent: ScheduleEvent = {
-      id: (events.length + 1).toString(),
-      title: eventData.title,
-      client: eventData.client,
-      jobId: `JOB-${String(events.length + 1).padStart(3, '0')}`,
-      type: eventData.type,
-      startTime: eventData.startTime,
-      endTime: eventData.endTime,
-      date: eventData.date,
-      location: eventData.location,
-      assignedTo: [eventData.assignedTo],
-      status: 'scheduled',
-      notes: eventData.notes
+  const handleSaveEvent = async (eventData: any) => {
+    if (!userProfile?.tenant_id) {
+      alert('You must be logged in to create events')
+      return
     }
-    setEvents(prev => [...prev, newEvent])
-    setShowEventForm(false)
+
+    try {
+      // Create a new job in the database
+      const startDateTime = new Date(`${eventData.date}T${eventData.startTime}:00`)
+      const endDateTime = new Date(`${eventData.date}T${eventData.endTime}:00`)
+      
+      const newJob = {
+        tenant_id: userProfile.tenant_id,
+        title: eventData.title,
+        description: eventData.notes || '',
+        status: 'Scheduled',
+        priority: 'medium',
+        start_date: startDateTime.toISOString(),
+        due_date: endDateTime.toISOString(),
+        location_address: eventData.location,
+        notes: eventData.notes || '',
+        job_number: `JOB-${Date.now().toString().slice(-6)}` // Generate unique job number
+      }
+
+      const { data: job, error: jobError } = await supabase
+        .from('jobs')
+        .insert([newJob])
+        .select()
+        .single()
+
+      if (jobError) {
+        console.error('Error creating job:', jobError)
+        alert('Failed to create job: ' + jobError.message)
+        return
+      }
+
+      // If we need to create/link an account for the client
+      if (eventData.client && eventData.client.trim()) {
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .insert([{
+            tenant_id: userProfile.tenant_id,
+            name: eventData.client,
+            type: 'Customer'
+          }])
+          .select()
+          .single()
+
+        if (!accountError && account) {
+          // Update job with account_id
+          await supabase
+            .from('jobs')
+            .update({ account_id: account.id })
+            .eq('id', job.id)
+        }
+      }
+
+      console.log('Job created successfully:', job)
+      
+      // Refresh the events list
+      await fetchJobsAsEvents()
+      setShowEventForm(false)
+      
+    } catch (err) {
+      console.error('Error saving event:', err)
+      alert('Failed to save event. Please try again.')
+    }
   }
 
   const handleEditEvent = (eventId: string) => {
     alert(`Edit event ${eventId}`)
   }
 
-  const handleMarkComplete = (eventId: string) => {
-    setEvents(prev => prev.map(event => 
-      event.id === eventId 
-        ? { ...event, status: 'completed' as const }
-        : event
-    ))
+  const handleMarkComplete = async (eventId: string) => {
+    if (!userProfile?.tenant_id) return
+
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: 'Completed' })
+        .eq('id', eventId)
+        .eq('tenant_id', userProfile.tenant_id)
+
+      if (error) {
+        console.error('Error updating job status:', error)
+        alert('Failed to update job status')
+        return
+      }
+
+      // Update local state immediately for better UX
+      setEvents(prev => prev.map(event => 
+        event.id === eventId 
+          ? { ...event, status: 'completed' as const }
+          : event
+      ))
+      
+    } catch (err) {
+      console.error('Error marking job complete:', err)
+      alert('Failed to mark job as complete')
+    }
   }
 
-  const handleDeleteEvent = (eventId: string) => {
-    if (confirm('Are you sure you want to delete this event?')) {
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!userProfile?.tenant_id) return
+    
+    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', eventId)
+        .eq('tenant_id', userProfile.tenant_id)
+
+      if (error) {
+        console.error('Error deleting job:', error)
+        alert('Failed to delete job')
+        return
+      }
+
+      // Update local state immediately
       setEvents(prev => prev.filter(event => event.id !== eventId))
+      
+    } catch (err) {
+      console.error('Error deleting job:', err)
+      alert('Failed to delete job')
     }
   }
 
@@ -331,7 +569,27 @@ const SchedulePage: React.FC = () => {
               </div>
             </div>
             <KTCardBody className='py-3'>
-              {viewMode === 'calendar' ? renderCalendarView() : (
+              {loading && (
+                <div className='text-center py-5'>
+                  <div className='spinner-border text-primary' role='status'>
+                    <span className='visually-hidden'>Loading...</span>
+                  </div>
+                  <p className='mt-3 text-muted'>Loading schedule data...</p>
+                </div>
+              )}
+              
+              {error && (
+                <div className='alert alert-warning' role='alert'>
+                  <i className='ki-duotone ki-information fs-2'>
+                    <span className='path1'></span>
+                    <span className='path2'></span>
+                    <span className='path3'></span>
+                  </i>
+                  {error}. Showing demo data.
+                </div>
+              )}
+              
+              {!loading && (viewMode === 'calendar' ? renderCalendarView() : (
               <div className='table-responsive'>
                 <table className='table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4'>
                   <thead>
@@ -451,7 +709,7 @@ const SchedulePage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              )}
+              ))}
             </KTCardBody>
           </KTCard>
         </div>

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import TrackingPage from './TrackingPage'
+import DispatchPage from './DispatchPage'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
@@ -14,6 +15,8 @@ const FleetTrackingPage: React.FC = () => {
   const [activeTechnicians, setActiveTechnicians] = useState(0)
   const [totalJobs, setTotalJobs] = useState(0)
   const [completedToday, setCompletedToday] = useState(0)
+  const [realTimeUpdates, setRealTimeUpdates] = useState(true)
+  const [lastUpdateTime, setLastUpdateTime] = useState(new Date())
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
 
@@ -54,11 +57,47 @@ const FleetTrackingPage: React.FC = () => {
   ]
 
   useEffect(() => {
-    // Mock data - replace with actual API calls
-    setActiveTechnicians(8)
-    setTotalJobs(24)
-    setCompletedToday(12)
-  }, [])
+    // Initial data load
+    loadFleetData()
+    
+    // Set up auto-refresh every 30 seconds if real-time updates are enabled
+    let refreshInterval: NodeJS.Timeout
+    if (realTimeUpdates) {
+      refreshInterval = setInterval(() => {
+        loadFleetData()
+        setLastUpdateTime(new Date())
+      }, 30000)
+    }
+    
+    return () => {
+      if (refreshInterval) clearInterval(refreshInterval)
+    }
+  }, [realTimeUpdates])
+  
+  const loadFleetData = async () => {
+    try {
+      // In a real implementation, these would be actual API calls to supabase
+      // For now, using mock data with some variation to simulate real-time changes
+      const randomVariation = () => Math.floor(Math.random() * 3) - 1 // -1, 0, or 1
+      
+      setActiveTechnicians(8 + randomVariation())
+      setTotalJobs(24 + randomVariation())
+      setCompletedToday(12 + Math.max(0, randomVariation()))
+      
+      // Update technician locations on map
+      if (map.current) {
+        updateTechnicianMarkers()
+      }
+    } catch (error) {
+      console.error('Error loading fleet data:', error)
+    }
+  }
+  
+  const updateTechnicianMarkers = () => {
+    // In a real implementation, this would fetch live technician locations
+    // and update markers with new positions
+    console.log('Updating technician positions...')
+  }
 
   useEffect(() => {
     initializeFleetMap()
@@ -322,26 +361,44 @@ const FleetTrackingPage: React.FC = () => {
                 <span className='text-muted mt-1 fw-semibold fs-7'>Real-time technician locations and job progress</span>
               </h3>
               <div className='card-toolbar'>
-                <button 
-                  className='btn btn-sm btn-light me-3'
-                  onClick={() => alert('Filter functionality coming soon!')}
-                >
-                  <i className='ki-duotone ki-filter fs-2'>
-                    <span className='path1'></span>
-                    <span className='path2'></span>
-                  </i>
-                  Filter
-                </button>
-                <button 
-                  className='btn btn-sm btn-primary'
-                  onClick={() => alert('Add Technician functionality coming soon!')}
-                >
-                  <i className='ki-duotone ki-plus fs-2'>
-                    <span className='path1'></span>
-                    <span className='path2'></span>
-                  </i>
-                  Add Technician
-                </button>
+                <div className='d-flex align-items-center gap-2'>
+                  <span className='text-muted fs-8 me-3'>Last updated: {lastUpdateTime.toLocaleTimeString()}</span>
+                  
+                  <button 
+                    className={`btn btn-sm ${realTimeUpdates ? 'btn-success' : 'btn-light'} me-2`}
+                    onClick={() => setRealTimeUpdates(!realTimeUpdates)}
+                    title={realTimeUpdates ? 'Real-time updates ON' : 'Real-time updates OFF'}
+                  >
+                    <i className={`ki-duotone ${realTimeUpdates ? 'ki-pulse' : 'ki-pause'} fs-2`}>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    {realTimeUpdates ? 'Live' : 'Paused'}
+                  </button>
+                  
+                  <button 
+                    className='btn btn-sm btn-light me-3'
+                    onClick={loadFleetData}
+                    title='Refresh now'
+                  >
+                    <i className='ki-duotone ki-refresh fs-2'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    Refresh
+                  </button>
+                  
+                  <button 
+                    className='btn btn-sm btn-primary'
+                    onClick={() => alert('Add Technician functionality coming soon!')}
+                  >
+                    <i className='ki-duotone ki-plus fs-2'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    Add Technician
+                  </button>
+                </div>
               </div>
             </div>
             <KTCardBody className='py-3'>
@@ -581,41 +638,216 @@ const FleetTrackingPage: React.FC = () => {
 
 // Route Optimization Page
 const RouteOptimizationPage: React.FC = () => {
+  const [optimizedRoutes, setOptimizedRoutes] = useState([
+    {
+      id: 'route-1',
+      technician: 'John Doe',
+      jobs: ['Kitchen Installation', 'Bathroom Repair', 'HVAC Maintenance'],
+      totalDistance: '32.4 miles',
+      estimatedTime: '6.5 hours',
+      efficiency: 92
+    },
+    {
+      id: 'route-2',
+      technician: 'Sarah Johnson',
+      jobs: ['Plumbing Repair', 'General Inspection'],
+      totalDistance: '18.7 miles',
+      estimatedTime: '4.2 hours',
+      efficiency: 88
+    }
+  ])
+
+  const handleOptimizeRoutes = () => {
+    alert('Route optimization algorithm would run here. This feature integrates with mapping services to calculate optimal routes.')
+  }
+
   return (
     <>
       <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isActive: false, isSeparator: false}, {title: 'Route Optimization', path: '/tracking/routes', isActive: true, isSeparator: true}]}>Route Optimization</PageTitle>
       
       <div className='row g-5 g-xl-8'>
+        {/* Route Statistics */}
+        <div className='col-xl-4'>
+          <div className='card card-xl-stretch mb-xl-8'>
+            <div className='card-body'>
+              <div className='d-flex align-items-center'>
+                <div className='symbol symbol-50px me-5'>
+                  <span className='symbol-label bg-light-primary'>
+                    <i className='ki-duotone ki-route fs-2x text-primary'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                  </span>
+                </div>
+                <div className='flex-grow-1'>
+                  <div className='d-flex justify-content-between align-items-start flex-wrap mb-2'>
+                    <div className='d-flex flex-column'>
+                      <div className='d-flex align-items-center mb-2'>
+                        <span className='text-gray-900 fs-3 fw-bold me-2'>51.1</span>
+                        <span className='badge badge-light-success fs-base'>miles</span>
+                      </div>
+                      <span className='text-gray-500 fs-6 fw-semibold'>Total Distance Today</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className='col-xl-4'>
+          <div className='card card-xl-stretch mb-xl-8'>
+            <div className='card-body'>
+              <div className='d-flex align-items-center'>
+                <div className='symbol symbol-50px me-5'>
+                  <span className='symbol-label bg-light-success'>
+                    <i className='ki-duotone ki-time fs-2x text-success'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                  </span>
+                </div>
+                <div className='flex-grow-1'>
+                  <div className='d-flex justify-content-between align-items-start flex-wrap mb-2'>
+                    <div className='d-flex flex-column'>
+                      <div className='d-flex align-items-center mb-2'>
+                        <span className='text-gray-900 fs-3 fw-bold me-2'>2.3</span>
+                        <span className='badge badge-light-success fs-base'>hours saved</span>
+                      </div>
+                      <span className='text-gray-500 fs-6 fw-semibold'>Time Optimization</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className='col-xl-4'>
+          <div className='card card-xl-stretch mb-xl-8'>
+            <div className='card-body'>
+              <div className='d-flex align-items-center'>
+                <div className='symbol symbol-50px me-5'>
+                  <span className='symbol-label bg-light-warning'>
+                    <i className='ki-duotone ki-chart-line-up fs-2x text-warning'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                  </span>
+                </div>
+                <div className='flex-grow-1'>
+                  <div className='d-flex justify-content-between align-items-start flex-wrap mb-2'>
+                    <div className='d-flex flex-column'>
+                      <div className='d-flex align-items-center mb-2'>
+                        <span className='text-gray-900 fs-3 fw-bold me-2'>90%</span>
+                        <span className='badge badge-light-warning fs-base'>efficiency</span>
+                      </div>
+                      <span className='text-gray-500 fs-6 fw-semibold'>Route Efficiency</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className='row g-5 g-xl-8'>
         <div className='col-xl-12'>
           <KTCard>
             <div className='card-header border-0 pt-5'>
               <h3 className='card-title align-items-start flex-column'>
-                <span className='card-label fw-bold fs-3 mb-1'>Route Optimization</span>
-                <span className='text-muted mt-1 fw-semibold fs-7'>Optimize technician routes for maximum efficiency</span>
+                <span className='card-label fw-bold fs-3 mb-1'>Optimized Routes</span>
+                <span className='text-muted mt-1 fw-semibold fs-7'>AI-generated optimal routes for today's technicians</span>
               </h3>
+              <div className='card-toolbar'>
+                <button className='btn btn-sm btn-light me-3'>
+                  <i className='ki-duotone ki-setting-3 fs-2'></i>
+                  Settings
+                </button>
+                <button className='btn btn-sm btn-primary' onClick={handleOptimizeRoutes}>
+                  <i className='ki-duotone ki-abstract-14 fs-2'></i>
+                  Optimize Routes
+                </button>
+              </div>
             </div>
             <KTCardBody className='py-3'>
-              <div className='d-flex flex-column h-400px'>
-                <div className='h-100 bg-light rounded d-flex align-items-center justify-content-center'>
-                  <div className='text-center'>
-                    <i className='ki-duotone ki-route fs-5x text-primary mb-3'>
-                      <span className='path1'></span>
-                      <span className='path2'></span>
-                    </i>
-                    <h4 className='text-gray-800 mb-3'>Route Optimization Tools</h4>
-                    <p className='text-muted mb-4'>
-                      AI-powered route optimization and scheduling tools to maximize technician efficiency and reduce travel time.
-                    </p>
-                    <button className='btn btn-primary me-3'>
-                      <i className='ki-duotone ki-plus fs-2'></i>
-                      Create Route
-                    </button>
-                    <button className='btn btn-light'>
-                      <i className='ki-duotone ki-setting-3 fs-2'></i>
-                      Settings
-                    </button>
-                  </div>
-                </div>
+              <div className='table-responsive'>
+                <table className='table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4'>
+                  <thead>
+                    <tr className='fw-bold text-muted'>
+                      <th>Technician</th>
+                      <th>Jobs</th>
+                      <th>Distance</th>
+                      <th>Estimated Time</th>
+                      <th>Efficiency</th>
+                      <th className='text-end'>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optimizedRoutes.map((route) => (
+                      <tr key={route.id}>
+                        <td>
+                          <div className='d-flex align-items-center'>
+                            <div className='symbol symbol-45px me-5'>
+                              <span className='symbol-label bg-light-primary text-primary fw-bold'>
+                                {route.technician.split(' ').map(n => n[0]).join('')}
+                              </span>
+                            </div>
+                            <div className='d-flex justify-content-start flex-column'>
+                              <span className='text-dark fw-bold text-hover-primary fs-6'>
+                                {route.technician}
+                              </span>
+                              <span className='text-muted fw-semibold text-muted d-block fs-7'>
+                                Route #{route.id.split('-')[1]}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className='d-flex flex-column'>
+                            {route.jobs.map((job, index) => (
+                              <span key={index} className='text-dark fw-bold fs-6'>
+                                {job}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td>
+                          <span className='text-dark fw-bold d-block fs-6'>
+                            {route.totalDistance}
+                          </span>
+                        </td>
+                        <td>
+                          <span className='text-dark fw-bold d-block fs-6'>
+                            {route.estimatedTime}
+                          </span>
+                        </td>
+                        <td>
+                          <div className='d-flex align-items-center'>
+                            <span className='text-dark fw-bold fs-6 me-2'>{route.efficiency}%</span>
+                            <div className='progress h-6px w-100px bg-light-success'>
+                              <div 
+                                className='progress-bar bg-success' 
+                                style={{width: `${route.efficiency}%`}}
+                              ></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div className='d-flex justify-content-end flex-shrink-0'>
+                            <button className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'>
+                              <i className='ki-duotone ki-eye fs-3'></i>
+                            </button>
+                            <button className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm'>
+                              <i className='ki-duotone ki-pencil fs-3'></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </KTCardBody>
           </KTCard>
@@ -627,41 +859,218 @@ const RouteOptimizationPage: React.FC = () => {
 
 // Live Monitoring Page
 const LiveMonitoringPage: React.FC = () => {
+  const [isMonitoring, setIsMonitoring] = useState(false)
+  const [liveActivities] = useState([
+    {
+      id: '1',
+      technician: 'John Doe',
+      activity: 'Arrived at job site',
+      location: '123 Main St, Springfield',
+      timestamp: new Date(Date.now() - 5 * 60000), // 5 minutes ago
+      status: 'on_site'
+    },
+    {
+      id: '2',
+      technician: 'Sarah Johnson',
+      activity: 'Completed job - Kitchen Installation',
+      location: '456 Oak Ave, Springfield',
+      timestamp: new Date(Date.now() - 15 * 60000), // 15 minutes ago
+      status: 'completed'
+    },
+    {
+      id: '3',
+      technician: 'Mike Wilson',
+      activity: 'En route to next job',
+      location: 'Highway 55 North',
+      timestamp: new Date(Date.now() - 3 * 60000), // 3 minutes ago
+      status: 'traveling'
+    }
+  ])
+
+  const getTimeAgo = (timestamp: Date) => {
+    const minutes = Math.floor((Date.now() - timestamp.getTime()) / 60000)
+    if (minutes < 1) return 'Just now'
+    if (minutes === 1) return '1 minute ago'
+    return `${minutes} minutes ago`
+  }
+
+  const getActivityIcon = (status: string) => {
+    switch (status) {
+      case 'on_site':
+        return 'ki-geolocation text-success'
+      case 'completed':
+        return 'ki-check-circle text-primary'
+      case 'traveling':
+        return 'ki-truck text-warning'
+      default:
+        return 'ki-information text-info'
+    }
+  }
+
   return (
     <>
       <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isActive: false, isSeparator: false}, {title: 'Live Monitoring', path: '/tracking/live', isActive: true, isSeparator: true}]}>Live Monitoring</PageTitle>
       
+      {/* Live Stats */}
+      <div className='row g-5 g-xl-8 mb-5'>
+        <div className='col-xl-3'>
+          <div className='card card-xl-stretch'>
+            <div className='card-body'>
+              <div className='d-flex align-items-center'>
+                <div className='symbol symbol-50px me-5'>
+                  <span className='symbol-label bg-light-success'>
+                    <i className='ki-duotone ki-profile-user fs-2x text-success'></i>
+                  </span>
+                </div>
+                <div>
+                  <div className='fs-3 fw-bold text-dark'>8</div>
+                  <div className='fs-7 fw-semibold text-muted'>Active Technicians</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className='col-xl-3'>
+          <div className='card card-xl-stretch'>
+            <div className='card-body'>
+              <div className='d-flex align-items-center'>
+                <div className='symbol symbol-50px me-5'>
+                  <span className='symbol-label bg-light-primary'>
+                    <i className='ki-duotone ki-abstract-26 fs-2x text-primary'></i>
+                  </span>
+                </div>
+                <div>
+                  <div className='fs-3 fw-bold text-dark'>24</div>
+                  <div className='fs-7 fw-semibold text-muted'>Jobs in Progress</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className='col-xl-3'>
+          <div className='card card-xl-stretch'>
+            <div className='card-body'>
+              <div className='d-flex align-items-center'>
+                <div className='symbol symbol-50px me-5'>
+                  <span className='symbol-label bg-light-warning'>
+                    <i className='ki-duotone ki-timer fs-2x text-warning'></i>
+                  </span>
+                </div>
+                <div>
+                  <div className='fs-3 fw-bold text-dark'>3</div>
+                  <div className='fs-7 fw-semibold text-muted'>Urgent Jobs</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className='col-xl-3'>
+          <div className='card card-xl-stretch'>
+            <div className='card-body'>
+              <div className='d-flex align-items-center'>
+                <div className='symbol symbol-50px me-5'>
+                  <span className='symbol-label bg-light-info'>
+                    <i className='ki-duotone ki-pulse fs-2x text-info'></i>
+                  </span>
+                </div>
+                <div>
+                  <div className='fs-3 fw-bold text-dark'>98%</div>
+                  <div className='fs-7 fw-semibold text-muted'>System Uptime</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className='row g-5 g-xl-8'>
         <div className='col-xl-12'>
           <KTCard>
             <div className='card-header border-0 pt-5'>
               <h3 className='card-title align-items-start flex-column'>
-                <span className='card-label fw-bold fs-3 mb-1'>Live Fleet Monitoring</span>
-                <span className='text-muted mt-1 fw-semibold fs-7'>Real-time monitoring of all technician activities</span>
+                <span className='card-label fw-bold fs-3 mb-1'>Live Activity Feed</span>
+                <span className='text-muted mt-1 fw-semibold fs-7'>Real-time technician activities and job updates</span>
               </h3>
+              <div className='card-toolbar'>
+                <button 
+                  className={`btn btn-sm ${isMonitoring ? 'btn-danger' : 'btn-success'}`}
+                  onClick={() => setIsMonitoring(!isMonitoring)}
+                >
+                  <i className={`ki-duotone ${isMonitoring ? 'ki-cross-square' : 'ki-play'} fs-2`}></i>
+                  {isMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
+                </button>
+              </div>
             </div>
             <KTCardBody className='py-3'>
-              <div className='d-flex flex-column h-400px'>
-                <div className='h-100 bg-light rounded d-flex align-items-center justify-content-center'>
-                  <div className='text-center'>
-                    <i className='ki-duotone ki-monitor-mobbile fs-5x text-success mb-3'>
-                      <span className='path1'></span>
-                      <span className='path2'></span>
-                      <span className='path3'></span>
-                      <span className='path4'></span>
-                      <span className='path5'></span>
-                    </i>
-                    <h4 className='text-gray-800 mb-3'>Live Monitoring Dashboard</h4>
-                    <p className='text-muted mb-4'>
-                      Monitor technician locations, job status, and real-time updates from the field.
-                    </p>
-                    <button className='btn btn-success'>
-                      <i className='ki-duotone ki-play fs-2'></i>
-                      Start Monitoring
-                    </button>
+              {isMonitoring && (
+                <div className='alert alert-success d-flex align-items-center p-5 mb-5'>
+                  <div className='d-flex flex-column'>
+                    <h5 className='mb-1'>Live Monitoring Active</h5>
+                    <span>Real-time updates are being received from field technicians</span>
+                  </div>
+                  <div className='ms-auto'>
+                    <div className='spinner-border spinner-border-sm text-success' role='status'>
+                      <span className='visually-hidden'>Loading...</span>
+                    </div>
                   </div>
                 </div>
+              )}
+              
+              <div className='timeline timeline-border-dashed'>
+                {liveActivities.map((activity, index) => (
+                  <div key={activity.id} className='timeline-item'>
+                    <div className='timeline-line w-40px'></div>
+                    
+                    <div className='timeline-icon symbol symbol-circle symbol-40px'>
+                      <div className='symbol-label bg-light'>
+                        <i className={`ki-duotone ${getActivityIcon(activity.status)} fs-2`}></i>
+                      </div>
+                    </div>
+                    
+                    <div className='timeline-content mb-10 mt-n1'>
+                      <div className='pe-3 mb-5'>
+                        <div className='fs-5 fw-semibold mb-2'>{activity.activity}</div>
+                        
+                        <div className='d-flex align-items-center mt-1 fs-6'>
+                          <div className='text-muted me-2'>
+                            <i className='ki-duotone ki-profile-circle fs-7 me-1'></i>
+                            {activity.technician}
+                          </div>
+                          
+                          <div className='text-muted me-2'>
+                            <i className='ki-duotone ki-geolocation fs-7 me-1'></i>
+                            {activity.location}
+                          </div>
+                          
+                          <div className='text-muted'>
+                            <i className='ki-duotone ki-time fs-7 me-1'></i>
+                            {getTimeAgo(activity.timestamp)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+              
+              {!isMonitoring && (
+                <div className='text-center py-5'>
+                  <i className='ki-duotone ki-monitor-mobbile fs-5x text-muted mb-3'>
+                    <span className='path1'></span>
+                    <span className='path2'></span>
+                    <span className='path3'></span>
+                    <span className='path4'></span>
+                    <span className='path5'></span>
+                  </i>
+                  <h4 className='text-gray-800 mb-3'>Start Live Monitoring</h4>
+                  <p className='text-muted mb-4'>
+                    Click "Start Monitoring" to begin receiving real-time updates from technicians in the field.
+                  </p>
+                </div>
+              )}
             </KTCardBody>
           </KTCard>
         </div>
@@ -670,131 +1079,9 @@ const LiveMonitoringPage: React.FC = () => {
   )
 }
 
-// Technician Dispatch Page
+// Legacy Technician Dispatch Page - Redirected to new DispatchPage
 const TechnicianDispatchPage: React.FC = () => {
-  return (
-    <>
-      <PageTitle breadcrumbs={[{title: 'Scheduling & Dispatch', path: '/schedule', isActive: false, isSeparator: false}, {title: 'Technician Dispatch', path: '/tracking/dispatch', isActive: true, isSeparator: true}]}>Technician Dispatch</PageTitle>
-      
-      <div className='row g-5 g-xl-8'>
-        <div className='col-xl-12'>
-          <KTCard>
-            <div className='card-header border-0 pt-5'>
-              <h3 className='card-title align-items-start flex-column'>
-                <span className='card-label fw-bold fs-3 mb-1'>Dispatch Center</span>
-                <span className='text-muted mt-1 fw-semibold fs-7'>Assign jobs and manage technician availability</span>
-              </h3>
-              <div className='card-toolbar'>
-                <button className='btn btn-sm btn-light me-3'>
-                  <i className='ki-duotone ki-filter fs-2'></i>
-                  Filter
-                </button>
-                <button className='btn btn-sm btn-primary'>
-                  <i className='ki-duotone ki-plus fs-2'></i>
-                  New Assignment
-                </button>
-              </div>
-            </div>
-            <KTCardBody className='py-3'>
-              <div className='row g-5'>
-                {/* Available Technicians */}
-                <div className='col-lg-6'>
-                  <h5 className='mb-4'>Available Technicians</h5>
-                  <div className='d-flex flex-column gap-3'>
-                    <div className='card border border-primary'>
-                      <div className='card-body p-4'>
-                        <div className='d-flex align-items-center justify-content-between'>
-                          <div className='d-flex align-items-center'>
-                            <div className='symbol symbol-45px me-3'>
-                              <span className='symbol-label bg-light-primary text-primary fw-bold'>JD</span>
-                            </div>
-                            <div>
-                              <div className='fw-bold text-dark'>John Doe</div>
-                              <div className='text-muted fs-7'>Senior Technician</div>
-                              <div className='badge badge-light-success fs-8'>Available</div>
-                            </div>
-                          </div>
-                          <div className='text-end'>
-                            <div className='text-dark fw-bold fs-6'>Skills:</div>
-                            <div className='text-muted fs-7'>HVAC, Electrical</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className='card border border-primary'>
-                      <div className='card-body p-4'>
-                        <div className='d-flex align-items-center justify-content-between'>
-                          <div className='d-flex align-items-center'>
-                            <div className='symbol symbol-45px me-3'>
-                              <span className='symbol-label bg-light-primary text-primary fw-bold'>SJ</span>
-                            </div>
-                            <div>
-                              <div className='fw-bold text-dark'>Sarah Johnson</div>
-                              <div className='text-muted fs-7'>Field Technician</div>
-                              <div className='badge badge-light-success fs-8'>Available</div>
-                            </div>
-                          </div>
-                          <div className='text-end'>
-                            <div className='text-dark fw-bold fs-6'>Skills:</div>
-                            <div className='text-muted fs-7'>Plumbing, General</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pending Jobs */}
-                <div className='col-lg-6'>
-                  <h5 className='mb-4'>Unassigned Jobs</h5>
-                  <div className='d-flex flex-column gap-3'>
-                    <div className='card border border-warning'>
-                      <div className='card-body p-4'>
-                        <div className='d-flex align-items-center justify-content-between mb-3'>
-                          <div>
-                            <div className='fw-bold text-dark'>Emergency HVAC Repair</div>
-                            <div className='text-muted fs-7'>Williams Property - JOB-005</div>
-                            <div className='badge badge-light-danger fs-8'>URGENT</div>
-                          </div>
-                          <button className='btn btn-sm btn-primary'>
-                            Assign
-                          </button>
-                        </div>
-                        <div className='text-muted fs-7'>
-                          <i className='ki-duotone ki-geolocation fs-6 me-1'></i>
-                          789 Pine Rd, Springfield, IL
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className='card border border-warning'>
-                      <div className='card-body p-4'>
-                        <div className='d-flex align-items-center justify-content-between mb-3'>
-                          <div>
-                            <div className='fw-bold text-dark'>Routine Maintenance</div>
-                            <div className='text-muted fs-7'>Davis Home - JOB-006</div>
-                            <div className='badge badge-light-warning fs-8'>SCHEDULED</div>
-                          </div>
-                          <button className='btn btn-sm btn-primary'>
-                            Assign
-                          </button>
-                        </div>
-                        <div className='text-muted fs-7'>
-                          <i className='ki-duotone ki-geolocation fs-6 me-1'></i>
-                          321 Elm St, Springfield, IL
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </KTCardBody>
-          </KTCard>
-        </div>
-      </div>
-    </>
-  )
+  return <Navigate to='/tracking/dispatch' replace />
 }
 
 // Main Tracking Overview Component with Sub-routing
@@ -805,7 +1092,7 @@ const TrackingOverviewPage: React.FC = () => {
       <Route path="overview" element={<FleetTrackingPage />} />
       <Route path="routes" element={<RouteOptimizationPage />} />
       <Route path="live" element={<LiveMonitoringPage />} />
-      <Route path="dispatch" element={<TechnicianDispatchPage />} />
+      <Route path="dispatch" element={<DispatchPage />} />
       <Route path="customer/:trackingToken" element={<TrackingPage />} />
       <Route path="*" element={<Navigate to="/tracking/overview" replace />} />
     </Routes>

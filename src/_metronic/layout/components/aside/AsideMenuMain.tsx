@@ -60,6 +60,7 @@ export function AsideMenuMain() {
       </AsideMenuItemWithSub>
       
       <AsideMenuItemWithSub to='/customers' title='Customers' icon='profile-circle' fontIcon='bi-people'>
+        <AsideMenuItem to='/leads' title='Leads & Inquiries' hasBullet={true} />
         <AsideMenuItem to='/customers/accounts' title='Accounts' hasBullet={true} />
         <AsideMenuItem to='/customers/contacts' title='Contacts' hasBullet={true} />
         <AsideMenuItem to='/homeowner-portal' title='Homeowner Portal' hasBullet={true} />

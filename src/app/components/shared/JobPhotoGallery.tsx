@@ -142,7 +142,7 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
                   <span className="path1"></span>
                   <span className="path2"></span>
                 </i>
-                Take Photo
+                Add Photos
               </button>
               <ul className="dropdown-menu">
                 <li>

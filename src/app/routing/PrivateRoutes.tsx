@@ -34,6 +34,7 @@ const PrivateRoutes = () => {
   const PerformancePage = lazy(() => import('../pages/team/PerformancePage'))
   const TrainingPage = lazy(() => import('../pages/team/TrainingPage'))
   const TeamAnalyticsPage = lazy(() => import('../pages/team/TeamAnalyticsPage'))
+  const LeadsPage = lazy(() => import('../pages/leads/LeadsPage'))
   const SettingsPage = lazy(() => import('../pages/settings/SettingsPage'))
   const CallCenterPage = lazy(() => import('../pages/communications/CallCenterPage'))
   const VideoPage = lazy(() => import('../pages/communications/VideoPage'))
@@ -99,10 +100,10 @@ const PrivateRoutes = () => {
       <Route element={<MasterLayout />}>
         <Route element={<ProtectedLayout />}>
         {/* Redirect to Dashboard after success login/registartion */}
-        <Route path='auth/*' element={<Navigate to='/dashboard' />} />
-        <Route index element={<Navigate to='/dashboard' />} />
+        <Route path='auth/*' element={<Navigate to='/' />} />
+        <Route index element={<DashboardWrapper />} />
         
-          {/* Main Dashboard */}
+          {/* Main Dashboard - accessible via index route */}
           <Route path='dashboard' element={<DashboardWrapper />} />
         
           {/* TradeWorks Pro Core Pages */}
@@ -146,6 +147,14 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+          <Route
+            path='leads'
+            element={
+              <SuspensedView>
+                <LeadsPage />
+              </SuspensedView>
+            }
+          />
           <Route
             path='contacts'
             element={
@@ -731,4 +740,4 @@ const SuspensedView: FC<WithChildren> = ({children}) => {
   return <Suspense fallback={<TopBarProgress />}>{children}</Suspense>
 }
 
-export {PrivateRoutes}
+export default PrivateRoutes

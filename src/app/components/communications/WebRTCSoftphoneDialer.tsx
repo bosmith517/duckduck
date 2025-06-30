@@ -30,7 +30,7 @@ interface CallInfo {
   contactId?: string
 }
 
-export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onClose }) => {
+const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onClose }) => {
   const [callState, setCallState] = useState<CallState>('idle')
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
   const [callInfo, setCallInfo] = useState<CallInfo>({ name: '-', number: '-' })
@@ -122,8 +122,16 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
           }
         }
 
-        // Get WebRTC credentials
-        const { data: credentials, error } = await supabase.functions.invoke('generate-signalwire-voice-token', {})
+        // Get WebRTC credentials from Edge Function (tokens are session-based)
+        console.log('Getting WebRTC credentials from Edge Function...')
+        
+        const { data: credentials, error } = await supabase.functions.invoke('generate-signalwire-voice-token', {
+          body: { 
+            tenantId: userProfile.tenant_id,
+            userId: user.id,
+            email: user.email
+          }
+        })
         
         if (error || !credentials) {
           console.error('WebRTC credentials error:', error)
@@ -243,7 +251,38 @@ export const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisibl
         console.error('WebRTC initialization error:', error)
         setConnectionState('error')
         showToast.dismiss()
-        showToast.error('Failed to connect to VoIP system')
+        
+        // Provide specific error messages based on the error type
+        if (error instanceof Error) {
+          if (error.message.includes('SignalWire credentials not configured')) {
+            showToast.error('VoIP system not configured. Please contact your administrator.')
+          } else if (error.message.includes('User profile not found') || error.message.includes('Account setup incomplete')) {
+            showToast.error('Account setup incomplete. Please complete your company onboarding to use the phone system.')
+          } else if (error.message.includes('SIP configuration not found') || error.message.includes('complete your company onboarding')) {
+            showToast.error('Phone system not configured. Setting up now...')
+            // Try to auto-provision SIP configuration
+            setTimeout(async () => {
+              try {
+                const { data, error } = await supabase.functions.invoke('provision-sip-user')
+                if (data?.success) {
+                  showToast.success('Phone system configured! Please try again.')
+                } else {
+                  showToast.error('Phone setup requires manual configuration. Please contact support.')
+                }
+              } catch (err) {
+                showToast.error('Phone setup requires manual configuration. Please contact support.')
+              }
+            }, 1000)
+          } else if (error.message.includes('SIP endpoint creation failed')) {
+            showToast.error('Phone service provisioning in progress. This may take a few minutes.')
+          } else if (error.message.includes('Failed to get WebRTC credentials')) {
+            showToast.error('Unable to connect to phone service. Please try again in a few minutes.')
+          } else {
+            showToast.error(`Phone connection failed: ${error.message}`)
+          }
+        } else {
+          showToast.error('Failed to connect to VoIP system')
+        }
       }
     }
 

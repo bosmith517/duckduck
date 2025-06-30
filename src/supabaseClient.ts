@@ -22,7 +22,13 @@ export interface UserProfile {
   email: string
   first_name: string | null
   last_name: string | null
-  role: 'admin' | 'user' | 'manager'
+  role: 'admin' | 'user' | 'manager' // Legacy role field for existing policies
+  role_name?: 'platform_admin' | 'platform_support' | 'owner' | 'admin' | 'sales' | 'technician' | 'dispatcher' | 'viewer' | 'homeowner' | 'property_manager' // New role system
+  user_type?: string
+  role_permissions?: any
+  is_platform_user?: boolean
+  can_impersonate?: boolean
+  access_level?: number
   created_at: string
   updated_at: string
 }
@@ -87,6 +93,8 @@ export interface Job {
   tenant_id: string
   account_id: string
   contact_id?: string
+  lead_id?: string
+  assigned_technician_id?: string
   created_at: string
   updated_at: string
   status: string
@@ -108,4 +116,37 @@ export interface Job {
   // Joined data
   account?: Account
   contact?: Contact
+}
+
+export interface Lead {
+  id: string
+  tenant_id: string
+  caller_name: string
+  phone_number: string
+  email?: string
+  lead_source: string
+  initial_request: string
+  status: 'new' | 'qualified' | 'unqualified' | 'converted'
+  urgency: 'low' | 'medium' | 'high' | 'emergency'
+  estimated_value?: number
+  follow_up_date?: string
+  notes?: string
+  converted_to_job_id?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CallLog {
+  id: string
+  tenant_id: string
+  lead_id?: string
+  contact_id?: string
+  caller_name?: string
+  caller_phone?: string
+  call_type: 'inbound' | 'outbound'
+  call_direction: 'inbound' | 'outbound'
+  duration?: number
+  status: 'missed' | 'completed' | 'voicemail' | 'busy'
+  notes?: string
+  created_at: string
 }

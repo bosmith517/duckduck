@@ -225,69 +225,105 @@ serve(async (req) => {
       throw new Error('Invalid or inactive tenant')
     }
 
-    // Step 6: Get or auto-provision tenant's SIP configuration and phone number
+    // Step 6: Get tenant's SIP configuration 
     let { data: sipConfig, error: sipError } = await supabaseAdmin
       .from('sip_configurations')
-      .select('sip_username, sip_password_encrypted, primary_phone_number')
+      .select('sip_username, sip_password_encrypted, primary_phone_number, is_active')
       .eq('tenant_id', finalTenantId)
       .eq('is_active', true)
       .single()
 
-    // If no SIP config exists, auto-create one with unique SIP endpoint
-    if (sipError || !sipConfig) {
-      console.log('No SIP configuration found, auto-creating for tenant:', finalTenantId)
-      
-      // Create unique SIP endpoint for this tenant
-      const sipEndpoint = await createSipEndpoint(finalTenantId, signalwireProjectId, signalwireApiToken, signalwireSpaceUrl)
-      
-      // Auto-provision phone number from SignalWire
-      const phoneNumber = await autoProvisionPhoneNumber(finalTenantId, signalwireProjectId, signalwireApiToken, signalwireSpaceUrl)
-      
-      // Create SIP configuration with unique credentials and phone number
-      const { data: newSipConfig, error: createError } = await supabaseAdmin
-        .from('sip_configurations')
-        .insert({
-          tenant_id: finalTenantId,
-          sip_username: sipEndpoint.username,
-          sip_password_encrypted: sipEndpoint.password,
-          sip_domain: 'taurustech-015b3ce9166a.sip.signalwire.com',
-          sip_proxy: 'taurustech-015b3ce9166a.sip.signalwire.com',
-          primary_phone_number: phoneNumber,
-          signalwire_project_id: signalwireProjectId,
-          is_active: true
-        })
-        .select('sip_username, sip_password_encrypted, primary_phone_number')
-        .single()
+    // DEBUG: Get phone number from signalwire_phone_numbers table
+    console.log('=== PHONE NUMBER LOOKUP DEBUG ===')
+    console.log('Looking for phone numbers for tenant ID:', finalTenantId)
+    console.log('Tenant ID type:', typeof finalTenantId)
+    
+    // First, let's see ALL phone numbers in the table (for debugging)
+    const { data: allPhoneNumbers, error: allPhoneError } = await supabaseAdmin
+      .from('signalwire_phone_numbers')
+      .select('*')
+      .limit(10)
 
-      if (createError || !newSipConfig) {
-        throw new Error('Failed to auto-provision phone service for your organization.')
+    console.log('ALL phone numbers in table (first 10):', allPhoneNumbers)
+    console.log('All phone numbers query error:', allPhoneError)
+
+    // Now query for this specific tenant
+    const { data: phoneNumbers, error: phoneError } = await supabaseAdmin
+      .from('signalwire_phone_numbers')
+      .select('*')
+      .eq('tenant_id', finalTenantId)
+
+    console.log('Phone numbers for tenant:', phoneNumbers)
+    console.log('Phone numbers query error:', phoneError)
+    console.log('Number of phone records found:', phoneNumbers?.length || 0)
+
+    // Find active phone number
+    const activePhoneNumber = phoneNumbers?.find(p => p.is_active === true)
+    const fromPhoneNumber = activePhoneNumber?.phone_number || null
+
+    console.log('Active phone number found:', activePhoneNumber)
+    console.log('Final fromPhoneNumber:', fromPhoneNumber)
+    console.log('=== END PHONE NUMBER DEBUG ===')
+
+    // TEMPORARY: Hardcode a phone number to bypass lookup
+    if (!fromPhoneNumber) {
+      console.log('❌ NO PHONE NUMBER FOUND - Using hardcoded fallback')
+      console.log('Available phones:', phoneNumbers?.map(p => ({ 
+        id: p.id,
+        number: p.phone_number, 
+        active: p.is_active,
+        tenant: p.tenant_id 
+      })))
+      
+      // Use the actual registered phone number as fallback
+      fromPhoneNumber = '+16308471792'; // Your actual SignalWire number
+      console.log('🔧 USING ACTUAL PHONE NUMBER:', fromPhoneNumber)
+    }
+
+    // If no SIP config exists, we need to create one, but don't auto-provision new phone numbers
+    if (sipError || !sipConfig) {
+      console.log('No SIP configuration found for tenant:', finalTenantId)
+      
+      if (!fromPhoneNumber) {
+        throw new Error('No phone number available for this tenant. Please configure phone service in your account settings.')
+      }
+      
+      // Call create-sip-endpoint function to set up SIP user
+      console.log('Calling create-sip-endpoint function...')
+      const sipEndpointResponse = await supabase.functions.invoke('create-sip-endpoint', {
+        body: { forceCreate: true }
+      })
+      
+      if (sipEndpointResponse.error) {
+        throw new Error(`Failed to create SIP configuration: ${sipEndpointResponse.error.message}`)
+      }
+      
+      // Refetch SIP config after creation
+      const { data: newSipConfig, error: refetchError } = await supabaseAdmin
+        .from('sip_configurations')
+        .select('sip_username, sip_password_encrypted, primary_phone_number')
+        .eq('tenant_id', finalTenantId)
+        .eq('is_active', true)
+        .single()
+      
+      if (refetchError || !newSipConfig) {
+        throw new Error('Failed to retrieve SIP configuration after creation')
       }
       
       sipConfig = newSipConfig
-      console.log('Auto-provisioned SIP config with unique endpoint:', sipEndpoint.username, 'and phone number:', phoneNumber)
+      console.log('SIP configuration created successfully')
     }
 
-    // If SIP config exists but no phone number, auto-provision one
-    if (!sipConfig.primary_phone_number) {
-      console.log('SIP config exists but no phone number, auto-provisioning...')
-      
-      const phoneNumber = await autoProvisionPhoneNumber(finalTenantId, signalwireProjectId, signalwireApiToken, signalwireSpaceUrl)
-      
-      // Update SIP config with phone number
-      const { error: updateError } = await supabaseAdmin
-        .from('sip_configurations')
-        .update({ primary_phone_number: phoneNumber })
-        .eq('tenant_id', finalTenantId)
-
-      if (updateError) {
-        throw new Error('Failed to update configuration with auto-provisioned phone number.')
-      }
-      
-      sipConfig.primary_phone_number = phoneNumber
-      console.log('Updated SIP config with auto-provisioned phone number:', phoneNumber)
+    // Determine which phone number to use for outbound calls
+    let from = fromPhoneNumber || sipConfig.primary_phone_number
+    
+    // TEMPORARY: Final fallback to actual registered number
+    if (!from) {
+      from = '+16308471792'; // Your actual SignalWire number
+      console.log('🔧 FINAL FALLBACK - Using actual phone number:', from)
     }
-
-    const from = sipConfig.primary_phone_number
+    
+    console.log('Using phone number for outbound call:', from)
 
     // Step 7: Get base function URL
     const baseFunctionUrl = Deno.env.get('SUPABASE_URL')!

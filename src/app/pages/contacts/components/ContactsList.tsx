@@ -7,9 +7,10 @@ interface ContactsListProps {
   contacts: Contact[]
   onEdit: (contact: Contact) => void
   onDelete: (id: string) => void
+  onStartWorkflow: (contact: Contact) => void
 }
 
-export const ContactsList: React.FC<ContactsListProps> = ({ contacts, onEdit, onDelete }) => {
+export const ContactsList: React.FC<ContactsListProps> = ({ contacts, onEdit, onDelete, onStartWorkflow }) => {
   const navigate = useNavigate()
   if (contacts.length === 0) {
     return (
@@ -35,6 +36,7 @@ export const ContactsList: React.FC<ContactsListProps> = ({ contacts, onEdit, on
             <th className='min-w-125px'>Title</th>
             <th className='min-w-125px'>Contact Info</th>
             <th className='min-w-100px'>Primary</th>
+            <th className='min-w-150px'>Quick Actions</th>
             <th className='text-end min-w-100px'>Actions</th>
           </tr>
         </thead>
@@ -110,6 +112,21 @@ export const ContactsList: React.FC<ContactsListProps> = ({ contacts, onEdit, on
                   <span className='text-muted'>-</span>
                 )}
               </td>
+              <td>
+                <div className='d-flex gap-2'>
+                  <button
+                    className='btn btn-sm btn-success'
+                    onClick={() => onStartWorkflow(contact)}
+                    title='Start Customer Workflow'
+                  >
+                    <i className='ki-duotone ki-rocket fs-4'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    Start Job
+                  </button>
+                </div>
+              </td>
               <td className='text-end'>
                 <a
                   href='#'
@@ -124,6 +141,22 @@ export const ContactsList: React.FC<ContactsListProps> = ({ contacts, onEdit, on
                   className='menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-125px py-4'
                   data-kt-menu='true'
                 >
+                  <div className='menu-item px-3'>
+                    <a
+                      href='#'
+                      className='menu-link px-3'
+                      onClick={(e) => {
+                        e.preventDefault()
+                        onStartWorkflow(contact)
+                      }}
+                    >
+                      <i className='ki-duotone ki-rocket fs-5 me-2'>
+                        <span className='path1'></span>
+                        <span className='path2'></span>
+                      </i>
+                      Start Workflow
+                    </a>
+                  </div>
                   <div className='menu-item px-3'>
                     <a
                       href='#'

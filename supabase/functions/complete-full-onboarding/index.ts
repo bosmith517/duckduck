@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { UniversalLogger, loggedDatabaseOperation, loggedFunctionCall } from '../_shared/universal-logger.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  let logger: UniversalLogger | null = null
 
   try {
     console.log('Starting complete-full-onboarding function')
@@ -35,7 +38,8 @@ serve(async (req) => {
     }
 
     // Get request data
-    const { tenantId, onboardingData } = await req.json()
+    const requestData = await req.json()
+    const { tenantId, onboardingData } = requestData
     if (!tenantId || !onboardingData) {
       throw new Error('Missing tenantId or onboardingData')
     }
@@ -46,31 +50,50 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // Initialize logger
+    logger = new UniversalLogger(supabaseAdmin, 'complete-full-onboarding', tenantId, user.id)
+    logger.setRequestData(requestData)
+
     console.log('Processing onboarding completion for tenant:', tenantId)
 
-    // Step 1: Attempt to create SignalWire subproject (non-blocking)
-    // If this fails, onboarding still succeeds and we handle it separately
-    createSubprojectAsync(supabase, tenantId, onboardingData.businessName)
-      .catch(error => {
-        console.error('Background subproject creation failed:', error)
-        // Log to admin notification system but don't block onboarding
-        logSubprojectFailure(supabaseAdmin, tenantId, onboardingData.businessName, error.message)
+    // Step 1: Complete SignalWire onboarding (subproject, API token, SIP endpoint, phone number)
+    let signalwireOnboardingSuccess = false
+    try {
+      console.log('Starting complete SignalWire onboarding...')
+      
+      const signalwireResult = await supabase.functions.invoke('complete-signalwire-onboarding', {
+        body: {
+          companyName: onboardingData.businessName,
+          areaCode: onboardingData.areaCode || '630'
+        }
       })
 
-    // Step 2: Update company/tenant information
+      if (signalwireResult.error) {
+        console.error('SignalWire onboarding failed:', signalwireResult.error)
+        throw new Error(signalwireResult.error.message)
+      }
+
+      console.log('✅ Complete SignalWire onboarding successful:', signalwireResult.data)
+      signalwireOnboardingSuccess = true
+      
+    } catch (error) {
+      console.error('Complete SignalWire onboarding failed:', error)
+      // Log for admin follow-up but don't block main onboarding
+      await logSubprojectFailure(supabaseAdmin, tenantId, onboardingData.businessName, error.message)
+    }
+
+    // Step 2: Update tenant information (subscription/service level info)
     const { error: tenantError } = await supabaseAdmin
       .from('tenants')
       .update({
         company_name: onboardingData.businessName,
-        phone: onboardingData.selectedPhoneNumber || onboardingData.businessPhone,
-        email: onboardingData.businessEmail,
-        website: onboardingData.businessWebsite,
-        address: onboardingData.businessAddress,
-        license_number: onboardingData.licenseNumber,
-        insurance_number: onboardingData.insuranceNumber,
-        primary_service_type: onboardingData.selectedServiceType,
-        onboarding_completed_at: new Date().toISOString(),
-        settings: {
+        service_type: onboardingData.selectedServiceType,
+        onboarding_completed: true,
+        business_info: {
+          selected_phone: onboardingData.selectedPhoneNumber,
+          onboarding_completed_at: new Date().toISOString()
+        },
+        workflow_preferences: {
           ...onboardingData.preferences,
           branding: {
             primaryColor: onboardingData.brandColors?.primary || '#1b84ff',
@@ -86,22 +109,99 @@ serve(async (req) => {
       throw new Error('Failed to update company information')
     }
 
-    // Step 2: Create default service library entries based on selected service type
+    // Step 2.5: Create company account record with detailed business info
+    const { error: accountError } = await supabaseAdmin
+      .from('accounts')
+      .insert({
+        tenant_id: tenantId,
+        name: onboardingData.businessName,
+        type: 'company',
+        industry: onboardingData.selectedServiceType,
+        phone: onboardingData.businessPhone, // Their actual business contact number
+        email: onboardingData.businessEmail,
+        website: onboardingData.businessWebsite,
+        address_line1: onboardingData.businessAddress,
+        notes: `License Number: ${onboardingData.licenseNumber || 'Not provided'}\nInsurance Number: ${onboardingData.insuranceNumber || 'Not provided'}`,
+        account_status: 'ACTIVE'
+      })
+
+    if (accountError) {
+      console.error('Error creating company account:', accountError)
+      // Don't throw here - account creation failure shouldn't block onboarding completion
+    }
+
+    // Step 2.6: Provision selected SignalWire phone number for communications
+    let phoneProvisioningSuccess = false
+    if (onboardingData.selectedPhoneNumber) {
+      try {
+        console.log('Provisioning selected SignalWire number:', onboardingData.selectedPhoneNumber)
+        
+        const phoneProvisioningResult = await loggedFunctionCall(
+          logger,
+          'purchase-phone-number',
+          { 
+            phoneNumber: onboardingData.selectedPhoneNumber,
+            tenantId: tenantId,
+            from_onboarding: true
+          },
+          () => supabase.functions.invoke('purchase-phone-number', {
+            body: { 
+              phoneNumber: onboardingData.selectedPhoneNumber,
+              tenantId: tenantId,
+              from_onboarding: true
+            }
+          })
+        )
+
+        if (phoneProvisioningResult.error) {
+          console.error('Error provisioning SignalWire phone number:', phoneProvisioningResult.error)
+          // Don't throw - phone provisioning failure shouldn't block onboarding
+        } else {
+          console.log('SignalWire phone number provisioned successfully:', onboardingData.selectedPhoneNumber)
+          phoneProvisioningSuccess = true
+          
+          // Verify the phone number was actually saved to the database
+          const { data: savedPhone } = await loggedDatabaseOperation(
+            logger,
+            'signalwire_phone_numbers',
+            'select',
+            () => supabaseAdmin
+              .from('signalwire_phone_numbers')
+              .select('id, number, signalwire_number_id')
+              .eq('tenant_id', tenantId)
+              .eq('number', onboardingData.selectedPhoneNumber)
+              .single()
+          )
+          
+          if (!savedPhone) {
+            console.error('Phone number was not found in database after provisioning')
+            phoneProvisioningSuccess = false
+          } else {
+            console.log('Verified phone number in database:', savedPhone)
+          }
+        }
+      } catch (error) {
+        console.error('Error in SignalWire phone number provisioning:', error)
+        // Non-blocking - log for admin follow-up
+      }
+    }
+
+    // Step 3: Create default service library entries based on selected service type
     if (onboardingData.selectedServiceType) {
       await createDefaultServices(supabaseAdmin, tenantId, onboardingData.selectedServiceType)
     }
 
-    // Step 3: Create default project templates
+    // Step 4: Create default project templates
     if (onboardingData.selectedServiceType) {
       await createDefaultProjectTemplates(supabaseAdmin, tenantId, onboardingData.selectedServiceType)
     }
 
-    // Step 4: Create team members if any were added
+    // Step 5: Create team members if any were added
     if (onboardingData.teamMembers && onboardingData.teamMembers.length > 0) {
       await createTeamMembers(supabaseAdmin, tenantId, onboardingData.teamMembers)
     }
 
-    // Step 5: Mark onboarding as complete
+    // Step 6: Mark onboarding as complete
     const { error: progressError } = await supabaseAdmin
       .from('onboarding_progress')
       .update({
@@ -115,27 +215,59 @@ serve(async (req) => {
       console.error('Error updating onboarding progress:', progressError)
     }
 
-    // Step 6: Send welcome email (optional - implement if needed)
+    // Step 7: Send welcome email (optional - implement if needed)
     // await sendWelcomeEmail(user.email, onboardingData)
 
     console.log('Onboarding completed successfully for tenant:', tenantId)
 
-    return new Response(JSON.stringify({
+    // Collect final status of all operations
+    const responseData = {
       success: true,
       message: 'Onboarding completed successfully',
       tenantId,
       businessPhone: onboardingData.selectedPhoneNumber || onboardingData.businessPhone,
-      businessName: onboardingData.businessName
-    }), {
+      businessName: onboardingData.businessName,
+      completionStatus: {
+        signalwire_onboarding: signalwireOnboardingSuccess ? 'completed' : 'failed',
+        phone_provisioning: phoneProvisioningSuccess,
+        tenant_update: 'completed',
+        account_creation: 'completed',
+        services_created: 'completed',
+        templates_created: 'completed'
+      },
+      next_steps: []
+    }
+
+    // Add next steps for incomplete operations
+    if (!signalwireOnboardingSuccess) {
+      responseData.next_steps.push('SignalWire onboarding (subproject, SIP endpoint, phone number) needs manual setup')
+    }
+    if (!phoneProvisioningSuccess && onboardingData.selectedPhoneNumber) {
+      responseData.next_steps.push('Phone number provisioning needs retry')
+    }
+
+    logger.setResponseData(responseData)
+    logger.setSuccess(true)
+    await logger.saveLog()
+
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (error) {
     console.error('Error in complete-full-onboarding:', error.message)
+    
+    if (logger) {
+      logger.setError(error)
+      logger.setSuccess(false)
+      await logger.saveLog()
+    }
+    
     return new Response(JSON.stringify({ 
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      function: 'complete-full-onboarding'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

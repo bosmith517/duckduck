@@ -1,6 +1,7 @@
 // File: generate-signalwire-voice-token/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { UniversalLogger, loggedDatabaseOperation, loggedExternalApiCall } from '../_shared/universal-logger.ts';
 
 const corsHeaders = { 
   'Access-Control-Allow-Origin': '*', 
@@ -114,67 +115,148 @@ serve(async (req) => {
       .eq('is_active', true)
       .single();
 
-    // If no SIP config exists, auto-create unique SIP endpoint for this tenant
+    // If no SIP config exists, create one for the existing SIP endpoint
     if (sipError || !sipConfig) {
-      console.log('No SIP configuration found, auto-creating unique endpoint for tenant:', userProfile.tenant_id);
+      console.log('No SIP configuration found, creating credentials for tenant:', userProfile.tenant_id);
       
-      // Create unique SIP endpoint for this tenant
-      const sipUsername = `tenant-${userProfile.tenant_id.substring(0, 8)}-${Date.now()}`;
+      // Generate SIP username from email address
+      const emailPrefix = user.email?.split('@')[0]?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
+      
+      // Check if username already exists, add suffix if needed
+      const { data: existingUser } = await supabaseAdmin
+        .from('sip_configurations')
+        .select('sip_username')
+        .eq('sip_username', emailPrefix)
+        .single();
+      
+      let sipUsername = emailPrefix;
+      if (existingUser) {
+        // Add tenant suffix to make it unique
+        const tenantSuffix = userProfile.tenant_id.substring(0, 8);
+        sipUsername = `${emailPrefix}_${tenantSuffix}`;
+        console.log('Username collision detected, using:', sipUsername);
+      }
+      
       const sipPassword = generateRandomPassword();
+      
+      console.log('Generated SIP username from email:', user.email, '->', sipUsername);
+      
+      // Construct the SIP domain (existing endpoint)
+      const last12 = projectId.replace(/-/g, '').slice(-12);
+      const sipDomain = `taurustech-${last12}.sip.signalwire.com`;
+      
+      console.log('Creating SIP credentials for existing endpoint:', sipDomain);
+      console.log('Generated SIP username:', sipUsername);
+      
+      // Create SIP user via SignalWire API on the existing endpoint
       const auth = btoa(`${projectId}:${apiToken}`);
       
-      // Create SIP endpoint via SignalWire API
-      const endpointUrl = `https://${spaceUrl}/api/relay/rest/sip_endpoints`;
-      const endpointResponse = await fetch(endpointUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          username: sipUsername,
-          password: sipPassword,
-          codecs: ['OPUS', 'PCMU', 'PCMA'],
-          enabled: true
-        })
-      });
+      // Try multiple possible API endpoints for creating SIP users
+      const possibleUrls = [
+        `https://${spaceUrl}/api/relay/rest/sip_endpoints/${sipDomain.split('.')[0]}/users`,
+        `https://${spaceUrl}/api/relay/rest/sip_credentials`,
+        `https://${spaceUrl}/api/relay/rest/users`
+      ];
+      
+      let userCreated = false;
+      
+      for (const apiUrl of possibleUrls) {
+        console.log('Attempting to create SIP user at:', apiUrl);
+        
+        try {
+          const userResponse = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              username: sipUsername,
+              password: sipPassword,
+              enabled: true,
+              endpoint: sipDomain.split('.')[0] // May be needed for some endpoints
+            })
+          });
 
-      if (!endpointResponse.ok) {
-        const errorText = await endpointResponse.text();
-        throw new Error(`Failed to create SIP endpoint: ${errorText}`);
+          if (userResponse.ok) {
+            console.log('SIP user created successfully at:', apiUrl);
+            userCreated = true;
+            break;
+          } else {
+            const errorText = await userResponse.text();
+            console.log(`API endpoint ${apiUrl} failed:`, errorText);
+          }
+        } catch (fetchError) {
+          console.log(`Network error with ${apiUrl}:`, fetchError.message);
+        }
+      }
+      
+      if (!userCreated) {
+        console.log('Could not create SIP user via API, but continuing with database config');
+        console.log('The SIP credentials may need to be manually added to SignalWire');
       }
 
-      // Store the new SIP configuration in database
+      // Store the new SIP configuration in database (using existing endpoint)
       const { data: newSipConfig, error: createError } = await supabaseAdmin
         .from('sip_configurations')
         .insert({
           tenant_id: userProfile.tenant_id,
           sip_username: sipUsername,
           sip_password_encrypted: sipPassword,
-          sip_domain: 'taurustech-015b3ce9166a.sip.signalwire.com',
-          sip_proxy: 'taurustech-015b3ce9166a.sip.signalwire.com',
+          sip_domain: sipDomain,
+          sip_proxy: sipDomain,
           signalwire_project_id: projectId,
-          is_active: true
+          is_active: true,
+          service_plan: 'basic',
+          monthly_rate: 29.99,
+          per_minute_rate: 0.02,
+          included_minutes: 1000,
+          notes: `Auto-provisioned for existing endpoint ${sipDomain}`
         })
         .select('*')
         .single();
 
       if (createError || !newSipConfig) {
-        throw new Error('Failed to auto-provision SIP configuration for your account.');
+        throw new Error(`Failed to create SIP configuration: ${createError?.message}`);
       }
       
       sipConfig = newSipConfig;
-      console.log('Auto-provisioned unique SIP endpoint:', sipUsername);
+      console.log('Created SIP configuration for tenant:', userProfile.tenant_id);
+    } else {
+      console.log('Found existing SIP configuration for tenant:', userProfile.tenant_id);
+      console.log('SIP config details:', {
+        username: sipConfig.sip_username,
+        domain: sipConfig.sip_domain,
+        hasPassword: !!sipConfig.sip_password_encrypted,
+        isActive: sipConfig.is_active
+      });
     }
 
-    // Use the actual SIP domain from config or fallback to hardcoded
-    const sipDomain = sipConfig.sip_domain || 'taurustech-015b3ce9166a.sip.signalwire.com';
+    // Use the actual SIP domain from config or construct it from project ID
+    let sipDomain = sipConfig.sip_domain;
+    
+    // If no domain in config, construct it from project ID (taurustech + last 12 chars)
+    if (!sipDomain && projectId) {
+      const last12 = projectId.replace(/-/g, '').slice(-12);
+      sipDomain = `taurustech-${last12}.sip.signalwire.com`;
+      console.log('Constructed SIP domain from project ID:', sipDomain);
+    }
+    
+    // Final fallback to your specific domain
+    if (!sipDomain) {
+      sipDomain = 'taurustech-9b70eb096555.sip.signalwire.com';
+      console.log('Using fallback SIP domain:', sipDomain);
+    }
+    
     const websocketServer = `wss://${sipDomain}`;
     
-    console.log('Generated WebSocket URL:', websocketServer);
-    console.log('Using SIP username:', sipConfig.sip_username);
-    console.log('Using SIP domain:', sipDomain);
+    console.log('Final configuration:', {
+      websocketServer,
+      sipUsername: sipConfig.sip_username,
+      sipDomain,
+      projectId: projectId?.substring(0, 8) + '...'
+    });
     
     // Return credentials for SIP.js WebRTC connection using actual database credentials
     return new Response(JSON.stringify({

@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { UniversalLogger, loggedDatabaseOperation, loggedExternalApiCall } from '../_shared/universal-logger.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  let logger: UniversalLogger | null = null
 
   try {
     // Step 1: Authenticate the user
@@ -43,36 +46,46 @@ serve(async (req) => {
       throw new Error('User profile not found')
     }
 
-    // Only admins can purchase phone numbers
-    if (!['admin', 'owner'].includes(userProfile.role)) {
+    // Only admins can purchase phone numbers (unless from onboarding)
+    const requestData = await req.json()
+    const { phoneNumber, tenantId, from_onboarding = false } = requestData
+    
+    if (!from_onboarding && !['admin', 'owner'].includes(userProfile.role)) {
       throw new Error('Insufficient permissions to purchase phone numbers')
     }
 
-    // Step 3: Get request data and validate tenant ownership
-    const { phoneNumber, tenantId } = await req.json()
-    console.log('Purchase request data:', { phoneNumber, tenantId })
-    
-    if (!phoneNumber || !tenantId) {
-      throw new Error('Missing phoneNumber or tenantId in the request.')
-    }
-
-    // Validate user belongs to the specified tenant
-    if (userProfile.tenant_id !== tenantId) {
-      throw new Error('Cannot purchase phone numbers for other tenants')
-    }
-
-    // Step 4: Validate tenant exists and is active
+    // Step 3: Initialize logger and validate request
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: tenant, error: tenantError } = await supabaseAdmin
-      .from('tenants')
-      .select('id, name, is_active')
-      .eq('id', tenantId)
-      .eq('is_active', true)
-      .single()
+    logger = new UniversalLogger(supabaseAdmin, 'purchase-phone-number', tenantId, user.id)
+    logger.setRequestData(requestData)
+    
+    console.log('Purchase request data:', { phoneNumber, tenantId, from_onboarding })
+    
+    if (!phoneNumber || !tenantId) {
+      throw new Error('Missing phoneNumber or tenantId in the request.')
+    }
+
+    // Validate user belongs to the specified tenant (unless from onboarding)
+    if (!from_onboarding && userProfile.tenant_id !== tenantId) {
+      throw new Error('Cannot purchase phone numbers for other tenants')
+    }
+
+    // Step 4: Validate tenant exists and is active
+    const { data: tenant, error: tenantError } = await loggedDatabaseOperation(
+      logger,
+      'tenants',
+      'select',
+      () => supabaseAdmin
+        .from('tenants')
+        .select('id, company_name, is_active')
+        .eq('id', tenantId)
+        .eq('is_active', true)
+        .single()
+    )
 
     if (tenantError || !tenant) {
       throw new Error('Invalid or inactive tenant')
@@ -96,69 +109,109 @@ serve(async (req) => {
 
     // Step 6: Call the SignalWire API to purchase the number
     const purchaseUrl = `https://${signalwireSpaceUrl}/api/relay/rest/phone_numbers`
-    
-    const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`);
+    const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
+    const purchaseRequest = { number: phoneNumber }
 
-    const purchaseResponse = await fetch(purchaseUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ number: phoneNumber })
-    })
+    const purchasedNumberData = await loggedExternalApiCall(
+      logger,
+      'SignalWire',
+      purchaseUrl,
+      purchaseRequest,
+      async () => {
+        const purchaseResponse = await fetch(purchaseUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(purchaseRequest)
+        })
 
-    if (!purchaseResponse.ok) {
-        const errorBody = await purchaseResponse.text()
-        console.error(`SignalWire API Error - Status: ${purchaseResponse.status}`)
-        console.error(`SignalWire API Error - URL: ${purchaseUrl}`)
-        console.error(`SignalWire API Error - Body: ${errorBody}`)
-        console.error(`SignalWire API Error - Request Body: ${JSON.stringify({ number: phoneNumber })}`)
-        throw new Error(`SignalWire purchase failed: ${purchaseResponse.status} - ${errorBody}`)
-    }
-    
-    const purchasedNumberData = await purchaseResponse.json()
-    console.log('Successfully purchased number from SignalWire:', purchasedNumberData)
+        if (!purchaseResponse.ok) {
+          const errorBody = await purchaseResponse.text()
+          console.error(`SignalWire API Error - Status: ${purchaseResponse.status}`)
+          console.error(`SignalWire API Error - URL: ${purchaseUrl}`)
+          console.error(`SignalWire API Error - Body: ${errorBody}`)
+          throw new Error(`SignalWire purchase failed: ${purchaseResponse.status} - ${errorBody}`)
+        }
+        
+        const data = await purchaseResponse.json()
+        console.log('Successfully purchased number from SignalWire:', data)
+        return data
+      }
+    )
     
     // Step 7: Save the purchased number to the correct database table
-    const { data: newDbRecord, error: dbError } = await supabaseAdmin
-      .from('signalwire_phone_numbers')
-      .insert({
-        tenant_id: tenantId,
-        number: purchasedNumberData.number || phoneNumber,
-        signalwire_number_id: purchasedNumberData.id,
-        number_type: purchasedNumberData.number_type || 'longcode',
-        is_active: true,
-        sms_enabled: purchasedNumberData.capabilities?.includes('sms') || false,
-        voice_enabled: purchasedNumberData.capabilities?.includes('voice') || true,
-        fax_enabled: purchasedNumberData.capabilities?.includes('fax') || false
-      })
-      .select()
-      .single()
+    const phoneData = {
+      tenant_id: tenantId,
+      number: purchasedNumberData.number || phoneNumber,
+      signalwire_number_id: purchasedNumberData.id,
+      number_type: purchasedNumberData.number_type || 'longcode',
+      is_active: true,
+      sms_enabled: purchasedNumberData.capabilities?.includes('sms') || false,
+      voice_enabled: purchasedNumberData.capabilities?.includes('voice') || true,
+      fax_enabled: purchasedNumberData.capabilities?.includes('fax') || false,
+      purchased_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    }
+
+    const { data: newDbRecord, error: dbError } = await loggedDatabaseOperation(
+      logger,
+      'signalwire_phone_numbers',
+      'insert',
+      () => supabaseAdmin
+        .from('signalwire_phone_numbers')
+        .insert(phoneData)
+        .select()
+        .single(),
+      phoneData
+    )
 
     if (dbError) {
       console.error('DB Insert Error after purchase:', dbError)
       throw new Error(`Failed to save the purchased number to the database: ${dbError.message}`)
     }
 
+    if (!newDbRecord) {
+      throw new Error('Phone number was not saved to database - no record returned')
+    }
+
     console.log('Successfully saved purchased number to database:', newDbRecord)
 
     // Step 8: Return success response
-    return new Response(JSON.stringify({
+    const responseData = {
       success: true,
-      message: `Successfully purchased ${phoneNumber} for ${tenant.name}`,
+      message: `Successfully purchased ${phoneNumber} for ${tenant.company_name}`,
       phone_number: newDbRecord,
       tenant_id: tenantId,
-      tenant_name: tenant.name
-    }), {
+      tenant_name: tenant.company_name,
+      signalwire_data: purchasedNumberData
+    }
+
+    logger.setResponseData(responseData)
+    logger.setSuccess(true)
+    await logger.saveLog()
+
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (error) {
     console.error('Error in purchase-phone-number function:', error.message)
-    return new Response(JSON.stringify({ error: error.message }), {
+    
+    if (logger) {
+      logger.setError(error)
+      logger.setSuccess(false)
+      await logger.saveLog()
+    }
+    
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      function: 'purchase-phone-number',
+      timestamp: new Date().toISOString()
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })

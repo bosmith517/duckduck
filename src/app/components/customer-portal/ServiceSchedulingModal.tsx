@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../supabaseClient'
+import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 
 interface ServiceSchedulingModalProps {
   isOpen: boolean
@@ -33,6 +34,7 @@ const ServiceSchedulingModal: React.FC<ServiceSchedulingModalProps> = ({
   customerPhone,
   customerEmail
 }) => {
+  const { currentUser, userProfile } = useSupabaseAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([])
   const [selectedService, setSelectedService] = useState<ServiceType | null>(null)
@@ -69,7 +71,30 @@ const ServiceSchedulingModal: React.FC<ServiceSchedulingModalProps> = ({
   const loadServiceTypes = async () => {
     setLoading(true)
     try {
-      // Mock service types - in real implementation would come from database
+      // Try to load from service catalog table first
+      let serviceTypesFromDB: ServiceType[] = []
+      
+      if (userProfile?.tenant_id) {
+        const { data: services, error } = await supabase
+          .from('service_catalog')
+          .select('*')
+          .eq('tenant_id', userProfile.tenant_id)
+          .eq('is_active', true)
+          .order('category', { ascending: true })
+        
+        if (!error && services) {
+          serviceTypesFromDB = services.map(service => ({
+            id: service.id,
+            name: service.name,
+            description: service.description || '',
+            estimated_duration: service.estimated_duration || 120,
+            base_price: service.base_price || 0,
+            category: service.category || 'general'
+          }))
+        }
+      }
+      
+      // Fall back to mock services if no database services or for demo
       const mockServices: ServiceType[] = [
         {
           id: 'hvac-maintenance',
@@ -120,7 +145,9 @@ const ServiceSchedulingModal: React.FC<ServiceSchedulingModalProps> = ({
           category: 'smart'
         }
       ]
-      setServiceTypes(mockServices)
+      
+      // Use database services if available, otherwise use mock services
+      setServiceTypes(serviceTypesFromDB.length > 0 ? serviceTypesFromDB : mockServices)
     } catch (error) {
       console.error('Error loading service types:', error)
     } finally {
@@ -145,36 +172,132 @@ const ServiceSchedulingModal: React.FC<ServiceSchedulingModalProps> = ({
   }
 
   const handleSubmit = async () => {
-    if (!selectedService || !selectedDate || !selectedTime) return
+    if (!selectedService || !selectedDate || !selectedTime || !currentUser) return
 
     setSubmitting(true)
     try {
       // Calculate estimated end time
       const startDateTime = new Date(`${selectedDate}T${selectedTime}`)
       const endDateTime = new Date(startDateTime.getTime() + selectedService.estimated_duration * 60000)
-
+      
+      // Calculate urgency fee
+      let urgencyFee = 0
+      if (urgency === 'priority') urgencyFee = 50
+      else if (urgency === 'emergency') urgencyFee = 150
+      
+      const totalCost = selectedService.base_price + urgencyFee
+      
+      // Generate unique job number
+      const jobNumber = `JOB-${Date.now().toString().slice(-6)}`
+      
+      // Find or create customer account
+      let accountId = null
+      let contactId = customerId
+      
+      if (customerId) {
+        // Try to find existing contact and associated account
+        const { data: contact } = await supabase
+          .from('contacts')
+          .select('*, account:accounts(*)')
+          .eq('id', customerId)
+          .single()
+        
+        if (contact?.account) {
+          accountId = contact.account.id
+        } else {
+          // Create new account for customer
+          const { data: newAccount, error: accountError } = await supabase
+            .from('accounts')
+            .insert({
+              tenant_id: userProfile?.tenant_id || '',
+              name: customerName,
+              type: 'Customer',
+              phone: customerPhone,
+              email: customerEmail,
+              account_status: 'Active'
+            })
+            .select()
+            .single()
+          
+          if (!accountError && newAccount) {
+            accountId = newAccount.id
+            
+            // Update contact with account_id
+            await supabase
+              .from('contacts')
+              .update({ account_id: newAccount.id })
+              .eq('id', customerId)
+          }
+        }
+      }
+      
       // Create the job
-      const { data, error } = await supabase
+      const { data: job, error: jobError } = await supabase
         .from('jobs')
         .insert({
-          contact_id: customerId,
+          tenant_id: userProfile?.tenant_id || '',
+          account_id: accountId,
+          contact_id: contactId,
+          job_number: jobNumber,
           title: selectedService.name,
-          description: `${selectedService.description}${customerNotes ? `\n\nCustomer Notes: ${customerNotes}` : ''}`,
+          description: `${selectedService.description}${customerNotes ? `\n\nCustomer Notes: ${customerNotes}` : ''}\n\nScheduled via Customer Portal`,
           start_date: startDateTime.toISOString(),
-          end_date: endDateTime.toISOString(),
-          estimated_cost: selectedService.base_price,
+          due_date: endDateTime.toISOString(),
+          estimated_cost: totalCost,
+          estimated_hours: selectedService.estimated_duration / 60,
           status: 'Scheduled',
-          urgency: urgency,
-          service_type: selectedService.category,
-          location_type: 'customer_site'
+          priority: urgency === 'emergency' ? 'high' : urgency === 'priority' ? 'medium' : 'low',
+          notes: `Service Type: ${selectedService.category}\nUrgency: ${urgency}${customerNotes ? `\nCustomer Notes: ${customerNotes}` : ''}`,
+          location_address: 'Customer Location' // This should be filled from customer profile
         })
         .select()
         .single()
 
-      if (error) throw error
+      if (jobError) {
+        console.error('Job creation error:', jobError)
+        throw jobError
+      }
+      
+      console.log('Job created successfully:', job)
+      
+      // Create initial job cost entry for the service
+      if (job) {
+        await supabase
+          .from('job_costs')
+          .insert({
+            job_id: job.id,
+            description: `${selectedService.name} - Base Service Fee`,
+            amount: selectedService.base_price,
+            cost_type: 'service',
+            status: 'pending'
+          })
+        
+        // Add urgency fee if applicable
+        if (urgencyFee > 0) {
+          await supabase
+            .from('job_costs')
+            .insert({
+              job_id: job.id,
+              description: `${urgency.charAt(0).toUpperCase() + urgency.slice(1)} Service Fee`,
+              amount: urgencyFee,
+              cost_type: 'fee',
+              status: 'pending'
+            })
+        }
+      }
+      
+      // Send notification (future: integrate with notification system)
+      console.log('Appointment scheduled:', {
+        jobId: job?.id,
+        customer: customerName,
+        service: selectedService.name,
+        date: selectedDate,
+        time: selectedTime,
+        total: totalCost
+      })
 
       // Show success and close modal
-      alert('Service appointment scheduled successfully! You will receive a confirmation email shortly.')
+      alert(`Service appointment scheduled successfully!\n\nJob #: ${jobNumber}\nDate: ${new Date(selectedDate).toLocaleDateString()}\nTime: ${selectedTime}\nTotal Cost: $${totalCost}\n\nYou will receive a confirmation email shortly.`)
       onClose()
       
     } catch (error) {
@@ -383,6 +506,16 @@ const ServiceSchedulingModal: React.FC<ServiceSchedulingModalProps> = ({
                         <div className="mb-2">
                           <span className="text-muted">Base Price: </span>
                           <span className="fw-semibold">${selectedService.base_price}</span>
+                        </div>
+                        {urgency !== 'standard' && (
+                          <div className="mb-2">
+                            <span className="text-muted">Urgency Fee: </span>
+                            <span className="fw-semibold">${urgency === 'priority' ? '50' : '150'}</span>
+                          </div>
+                        )}
+                        <div className="mb-2 border-top pt-2">
+                          <span className="text-muted">Total Cost: </span>
+                          <span className="fw-bold text-primary">${selectedService.base_price + (urgency === 'priority' ? 50 : urgency === 'emergency' ? 150 : 0)}</span>
                         </div>
                         <div className="mb-2">
                           <span className="text-muted">Urgency: </span>
