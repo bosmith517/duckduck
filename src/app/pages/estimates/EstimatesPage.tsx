@@ -355,7 +355,7 @@ const EstimatesPage: React.FC = () => {
             setShowEstimateForm(false)
             setEditingEstimate(null)
           }}
-          accountId={editingEstimate?.account_id || editingEstimate?.contact_id}
+          accountId={editingEstimate?.account_id || editingEstimate?.contact_id || undefined}
         />
       )}
 

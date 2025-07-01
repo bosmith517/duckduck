@@ -703,7 +703,30 @@ const JobDetailsPage: React.FC = () => {
       {/* Edit Job Form Modal */}
       {showEditForm && job && (
         <JobForm
-          job={job}
+          job={{
+            id: job.id,
+            tenant_id: job.tenant_id,
+            account_id: job.account_id,
+            contact_id: job.contact_id,
+            created_at: job.created_at,
+            updated_at: job.updated_at,
+            status: job.status || 'draft',
+            priority: job.priority || 'medium',
+            title: job.title,
+            description: job.description,
+            start_date: job.start_date,
+            due_date: job.due_date,
+            estimated_hours: job.estimated_hours,
+            actual_hours: job.actual_hours,
+            estimated_cost: job.estimated_cost,
+            actual_cost: job.actual_cost,
+            location_address: job.location_address,
+            location_city: job.location_city,
+            location_state: job.location_state,
+            location_zip: job.location_zip,
+            notes: job.notes,
+            job_number: job.job_number
+          }}
           accounts={accounts}
           contacts={contacts}
           onSave={handleUpdateJob}

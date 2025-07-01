@@ -205,15 +205,15 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
       
       if (data) {
         // Handle business account
-        if (data.account_id && data.accounts) {
+        if (data.account_id && data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
           formik.setFieldValue('accountId', data.account_id)
-          formik.setFieldValue('clientCustomer', data.accounts.name)
+          formik.setFieldValue('clientCustomer', data.accounts[0].name || '')
           setSelectedAccountType('business')
         }
         // Handle individual customer
-        else if (data.contact_id && data.contacts) {
+        else if (data.contact_id && data.contacts && Array.isArray(data.contacts) && data.contacts.length > 0) {
           formik.setFieldValue('accountId', data.contact_id)
-          formik.setFieldValue('clientCustomer', `${data.contacts.first_name} ${data.contacts.last_name}`.trim())
+          formik.setFieldValue('clientCustomer', `${data.contacts[0].first_name || ''} ${data.contacts[0].last_name || ''}`.trim())
           setSelectedAccountType('individual')
         }
       }
@@ -247,13 +247,13 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
       // Combine accounts and individual customers
       const businessAccounts = (accountsData || []).map(account => ({
         id: account.id,
-        name: account.name,
+        name: account.name || '',
         type: 'business' as const
       }))
 
       const individualCustomers = (contactsData || []).map(contact => ({
         id: contact.id,
-        name: `${contact.first_name} ${contact.last_name}`.trim(),
+        name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
         type: 'individual' as const
       }))
 
@@ -306,7 +306,11 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
       if (error) throw error
 
-      setAvailableJobs(data || [])
+      setAvailableJobs((data || []).map(job => ({
+        ...job,
+        accounts: job.accounts ? job.accounts[0] : null,
+        contacts: job.contacts ? job.contacts[0] : null
+      })))
     } catch (error) {
       console.error('Error loading jobs:', error)
       setAvailableJobs([])

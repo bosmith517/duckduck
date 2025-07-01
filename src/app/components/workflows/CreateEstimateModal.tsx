@@ -195,7 +195,7 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
     setAiStage('s1')
     setAiGenerating(true)
     setPipelineError(null)
-    showToast.loading('Stage 1: Analyzing damage from photos...', 'ai-stage1')
+    showToast.loading('Stage 1: Analyzing damage from photos...')
 
     try {
       const photoUrls = selectedPhotos.map(p => p.file_url)
@@ -237,7 +237,7 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
 
     } catch (error) {
       console.error('Stage 1 failed:', error)
-      setPipelineError(`Stage 1 failed: ${error.message}`)
+      setPipelineError(`Stage 1 failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setTimeout(() => {
         showToast.dismiss('ai-stage1')
         showToast.error('Damage analysis failed')
@@ -259,7 +259,7 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
     setAiStage('s2')
     setAiGenerating(true)
     setPipelineError(null)
-    showToast.loading('Stage 2: Generating Better/Best scopes...', 'ai-stage2')
+    showToast.loading('Stage 2: Generating Better/Best scopes...')
 
     try {
       const serviceType = getServiceType()
@@ -295,7 +295,7 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
 
     } catch (error) {
       console.error('Stage 2 failed:', error)
-      setPipelineError(`Stage 2 failed: ${error.message}`)
+      setPipelineError(`Stage 2 failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setTimeout(() => {
         showToast.dismiss('ai-stage2')
         showToast.error('Scope extension failed')
@@ -317,7 +317,7 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
     setAiStage('s3')
     setAiGenerating(true)
     setPipelineError(null)
-    showToast.loading('Stage 3: Pricing and generating narrative...', 'ai-stage3')
+    showToast.loading('Stage 3: Pricing and generating narrative...')
 
     try {
       const serviceType = getServiceType()
@@ -384,7 +384,7 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
 
     } catch (error) {
       console.error('Stage 3 failed:', error)
-      setPipelineError(`Stage 3 failed: ${error.message}`)
+      setPipelineError(`Stage 3 failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setTimeout(() => {
         showToast.dismiss('ai-stage3')
         showToast.error('Pricing and narrative generation failed')
@@ -548,7 +548,7 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
     if (!jobDetails) return
 
     setAiGenerating(true)
-    showToast.loading('AI is analyzing photos and job details...', 'ai-pricing')
+    showToast.loading('AI is analyzing photos and job details...')
 
     try {
       // First, get photos for this job
@@ -823,13 +823,15 @@ if (data?.narrative) {
       }
 
       // Log the estimate creation activity
-      await jobActivityService.logEstimateCreated(
-        jobId,
-        userProfile.tenant_id,
-        userProfile.id,
-        estimate.id,
-        selectedTierTotal
-      )
+      if (userProfile?.tenant_id && userProfile?.id) {
+        await jobActivityService.logEstimateCreated(
+          jobId,
+          userProfile.tenant_id,
+          userProfile.id,
+          estimate.id,
+          selectedTierTotal
+        )
+      }
 
       showToast.success('Estimate created successfully!')
       onEstimateCreated(estimate.id)
@@ -1345,7 +1347,11 @@ if (data?.narrative) {
     <div
       className="card-body"
       style={{ whiteSpace: 'pre-wrap' }}
-      dangerouslySetInnerHTML={{ __html: marked(aiNarrative) }}
+      dangerouslySetInnerHTML={{ 
+        __html: typeof marked === 'function' 
+          ? marked(aiNarrative) as string
+          : aiNarrative 
+      }}
     />
   </div>
 )}
@@ -1460,7 +1466,7 @@ if (data?.narrative) {
                             <span className={`fs-4 fw-bold ${selectedTier === tier.tier_name ? 'text-success' : 'text-primary'}`}>
                               ${tier.total_amount.toFixed(2)}
                               {customTotals[tier.tier_name] && (
-                                <small className="text-muted d-block">Target: ${customTotals[tier.tier_name].toFixed(2)}</small>
+                                <small className="text-muted d-block">Target: ${customTotals[tier.tier_name]!.toFixed(2)}</small>
                               )}
                             </span>
                           </div>

@@ -217,7 +217,7 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
                       }
                     } catch (err) {
                       console.error('❌ Test exception:', err)
-                      showToast.error(`Test exception: ${err.message}`)
+                      showToast.error(`Test exception: ${err instanceof Error ? err.message : 'Unknown error'}`)
                     }
                   }}
                 >
