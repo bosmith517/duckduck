@@ -20,7 +20,7 @@ interface EstimatePhoto {
 interface Account {
   id: string
   name: string
-  type: 'business' | 'individual' | 'client' | 'customer'
+  type: 'business' | 'individual'
 }
 
 interface EstimateFormValues {
@@ -39,10 +39,10 @@ interface EstimateFormValues {
 interface Job {
   id: string
   title: string
-  account_id: string
+  account_id: string | null
   contact_id: string | null
-  accounts?: { name: string }
-  contacts?: { first_name: string; last_name: string }
+  accounts?: { name: string } | null
+  contacts?: { first_name: string; last_name: string } | null
   status: string
 }
 
@@ -130,7 +130,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
   const formik = useFormik<EstimateFormValues>({
     initialValues: {
-      clientCustomer: estimate?.accounts?.name || estimate?.contact?.name || '',
+      clientCustomer: estimate?.accounts?.name || (estimate?.contact ? `${estimate.contact.first_name} ${estimate.contact.last_name}`.trim() : '') || '',
       accountId: estimate?.account_id || estimate?.contact_id || '',
       jobId: jobId || '', // Use provided jobId or empty for selection
       projectTitle: estimate?.project_title || '',
@@ -194,18 +194,28 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
         .select(`
           id,
           account_id,
-          accounts!inner(id, name, type)
+          contact_id,
+          accounts(id, name, type),
+          contacts(id, first_name, last_name, contact_type)
         `)
         .eq('id', jobId)
         .single()
 
       if (error) throw error
       
-      if (data && data.accounts) {
-        // Prepopulate the form with job's account information
-        formik.setFieldValue('accountId', data.account_id)
-        formik.setFieldValue('clientCustomer', data.accounts.name)
-        setSelectedAccountType(data.accounts.type === 'business' ? 'business' : 'individual')
+      if (data) {
+        // Handle business account
+        if (data.account_id && data.accounts) {
+          formik.setFieldValue('accountId', data.account_id)
+          formik.setFieldValue('clientCustomer', data.accounts.name)
+          setSelectedAccountType('business')
+        }
+        // Handle individual customer
+        else if (data.contact_id && data.contacts) {
+          formik.setFieldValue('accountId', data.contact_id)
+          formik.setFieldValue('clientCustomer', `${data.contacts.first_name} ${data.contacts.last_name}`.trim())
+          setSelectedAccountType('individual')
+        }
       }
     } catch (error) {
       console.error('Error loading job details:', error)

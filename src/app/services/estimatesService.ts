@@ -204,6 +204,7 @@ class EstimatesService {
           ...jobData,
           job_number: jobNumber,
           account_id: estimate.account_id,
+          contact_id: estimate.contact_id,
           tenant_id: estimate.tenant_id,
           estimated_cost: estimate.total_amount,
         }])
