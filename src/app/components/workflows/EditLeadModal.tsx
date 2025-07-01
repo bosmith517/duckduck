@@ -16,6 +16,7 @@ interface Lead {
   id: string
   tenant_id: string
   caller_name: string
+  caller_type?: 'business' | 'individual'
   phone_number: string
   email?: string
   lead_source: string
@@ -67,6 +68,9 @@ const editLeadSchema = Yup.object().shape({
     .min(2, 'Minimum 2 characters')
     .max(100, 'Maximum 100 characters')
     .required('Caller name is required'),
+  caller_type: Yup.string()
+    .oneOf(['business', 'individual'], 'Please select caller type')
+    .required('Caller type is required'),
   phone_number: Yup.string()
     .matches(/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number')
     .required('Phone number is required'),
@@ -97,6 +101,7 @@ export const EditLeadModal: React.FC<EditLeadModalProps> = ({
   const formik = useFormik({
     initialValues: {
       caller_name: '',
+      caller_type: 'individual' as const,
       phone_number: '',
       email: '',
       lead_source: '',
@@ -144,6 +149,7 @@ export const EditLeadModal: React.FC<EditLeadModalProps> = ({
       // Populate form with existing data
       formik.setValues({
         caller_name: data.caller_name || '',
+        caller_type: data.caller_type || 'individual',
         phone_number: data.phone_number || '',
         email: data.email || '',
         lead_source: data.lead_source || '',
@@ -173,6 +179,7 @@ export const EditLeadModal: React.FC<EditLeadModalProps> = ({
     try {
       const updateData = {
         caller_name: values.caller_name,
+        caller_type: values.caller_type,
         phone_number: values.phone_number,
         email: values.email || null,
         lead_source: values.lead_source,
@@ -280,6 +287,24 @@ export const EditLeadModal: React.FC<EditLeadModalProps> = ({
                     {formik.touched.caller_name && formik.errors.caller_name && (
                       <div className="fv-plugins-message-container">
                         <span role="alert">{formik.errors.caller_name}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6 mb-7">
+                    <label className="required fw-semibold fs-6 mb-2">Caller Type</label>
+                    <select
+                      className={clsx('form-select form-select-solid', {
+                        'is-invalid': formik.touched.caller_type && formik.errors.caller_type
+                      })}
+                      {...formik.getFieldProps('caller_type')}
+                    >
+                      <option value="individual">Individual Customer</option>
+                      <option value="business">Business Client</option>
+                    </select>
+                    {formik.touched.caller_type && formik.errors.caller_type && (
+                      <div className="fv-plugins-message-container">
+                        <span role="alert">{formik.errors.caller_type}</span>
                       </div>
                     )}
                   </div>

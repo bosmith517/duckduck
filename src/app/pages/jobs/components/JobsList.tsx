@@ -11,6 +11,7 @@ interface JobsListProps {
 
 export const JobsList: React.FC<JobsListProps> = ({ jobs, onEdit, onDelete, onStatusChange }) => {
   const navigate = useNavigate()
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -233,6 +234,22 @@ export const JobsList: React.FC<JobsListProps> = ({ jobs, onEdit, onDelete, onSt
                         <span className='path2'></span>
                       </i>
                       Edit
+                    </a>
+                  </div>
+                  <div className='menu-item px-3'>
+                    <a
+                      href='#'
+                      className='menu-link px-3'
+                      onClick={(e) => {
+                        e.preventDefault()
+                        navigate('/estimates')
+                      }}
+                    >
+                      <i className='ki-duotone ki-document fs-5 me-2'>
+                        <span className='path1'></span>
+                        <span className='path2'></span>
+                      </i>
+                      Create Estimate
                     </a>
                   </div>
                   <div className='menu-item px-3'>

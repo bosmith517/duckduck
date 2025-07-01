@@ -140,14 +140,18 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
       // Try to find existing account by phone number or email first
       let account = null
       
-      const { data: existingAccount } = await supabase
+      const { data: existingAccounts, error: searchError } = await supabase
         .from('accounts')
         .select('*')
         .eq('tenant_id', userProfile.tenant_id)
         .or(`phone.eq.${leadData.phone_number},email.eq.${leadData.email}`)
-        .single()
 
-      if (existingAccount) {
+      if (searchError) throw searchError
+
+      if (existingAccounts && existingAccounts.length > 0) {
+        // Use the first matching account
+        const existingAccount = existingAccounts[0]
+        
         // Update existing account with latest information
         const { data: updatedAccount, error: updateError } = await supabase
           .from('accounts')
@@ -165,10 +169,11 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
         if (updateError) throw updateError
         account = updatedAccount
       } else {
-        // Create new account
+        // Create new account with a unique name
+        const timestamp = Date.now()
         const accountData = {
           tenant_id: userProfile.tenant_id,
-          name: `${leadData.caller_name} - ${values.property_address}`,
+          name: `${leadData.caller_name} - ${values.property_city}, ${values.property_state} (${timestamp})`,
           type: 'residential',
           phone: leadData.phone_number,
           email: leadData.email,

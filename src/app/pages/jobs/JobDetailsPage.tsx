@@ -9,6 +9,9 @@ import { trackingService } from '../../services/trackingService'
 import { showToast } from '../../utils/toast'
 import JobCostingDashboard from '../../components/billing/JobCostingDashboard'
 import JobPhotoGallery from '../../components/shared/JobPhotoGallery'
+import JobActivityTimeline from '../../components/shared/JobActivityTimeline'
+import { jobActivityService } from '../../services/jobActivityService'
+import { JobForm } from './components/JobForm'
 
 interface JobWithRelations {
   id: string
@@ -53,10 +56,18 @@ const JobDetailsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('details')
   const [trackingLoading, setTrackingLoading] = useState(false)
   const [isTracking, setIsTracking] = useState(false)
+  const [showAddNoteModal, setShowAddNoteModal] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [noteLoading, setNoteLoading] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [accounts, setAccounts] = useState<any[]>([])
+  const [contacts, setContacts] = useState<any[]>([])
 
   useEffect(() => {
     if (id && userProfile?.tenant_id) {
       fetchJob()
+      fetchAccounts()
+      fetchContacts()
     }
   }, [id, userProfile?.tenant_id])
 
@@ -87,6 +98,80 @@ const JobDetailsPage: React.FC = () => {
       navigate('/jobs')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAccounts = async () => {
+    if (!userProfile?.tenant_id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, name')
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching accounts:', error)
+        return
+      }
+
+      setAccounts(data || [])
+    } catch (error) {
+      console.error('Error fetching accounts:', error)
+    }
+  }
+
+  const fetchContacts = async () => {
+    if (!userProfile?.tenant_id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, account_id')
+        .order('last_name', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching contacts:', error)
+        return
+      }
+
+      setContacts(data || [])
+    } catch (error) {
+      console.error('Error fetching contacts:', error)
+    }
+  }
+
+  const handleUpdateJob = async (jobData: Partial<Job>) => {
+    if (!job?.id) return
+
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .update(jobData)
+        .eq('id', job.id)
+        .select(`
+          *,
+          account:accounts(id, name),
+          contact:contacts(id, first_name, last_name)
+        `)
+        .single()
+
+      if (error) {
+        console.error('Error updating job:', error)
+        showToast.error('Failed to update job')
+        return
+      }
+
+      setJob(data)
+      setShowEditForm(false)
+      showToast.success('Job updated successfully')
+      // Force refresh the page section to show updated client
+      setTimeout(() => {
+        fetchJob()
+      }, 100)
+    } catch (error) {
+      console.error('Error updating job:', error)
+      showToast.error('Failed to update job')
     }
   }
 
@@ -173,6 +258,34 @@ const JobDetailsPage: React.FC = () => {
     }
   }, [job?.status, isTracking])
 
+  const handleAddNote = () => {
+    setShowAddNoteModal(true)
+  }
+
+  const handleSaveNote = async () => {
+    if (!noteText.trim() || !job?.id || !userProfile?.id || !userProfile?.tenant_id) return
+
+    setNoteLoading(true)
+    try {
+      await jobActivityService.logNoteAdded(
+        job.id,
+        userProfile.tenant_id,
+        userProfile.id,
+        noteText.trim(),
+        false // Internal note by default
+      )
+      
+      showToast.success('Note added successfully')
+      setNoteText('')
+      setShowAddNoteModal(false)
+    } catch (error) {
+      console.error('Error adding note:', error)
+      showToast.error('Failed to add note')
+    } finally {
+      setNoteLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className='d-flex justify-content-center align-items-center' style={{ minHeight: '400px' }}>
@@ -227,7 +340,10 @@ const JobDetailsPage: React.FC = () => {
                   <i className='ki-duotone ki-arrow-left fs-2'></i>
                   Back to Jobs
                 </button>
-                <button className='btn btn-sm btn-primary'>
+                <button 
+                  className='btn btn-sm btn-primary'
+                  onClick={() => setShowEditForm(true)}
+                >
                   <i className='ki-duotone ki-pencil fs-2'></i>
                   Edit Job
                 </button>
@@ -514,21 +630,86 @@ const JobDetailsPage: React.FC = () => {
           )}
 
           {activeTab === 'activity' && (
-            <KTCard>
-              <div className='card-header'>
-                <h3 className='card-title'>Activity Timeline</h3>
-              </div>
-              <KTCardBody>
-                <div className='text-center py-10'>
-                  <div className='text-muted'>
-                    Activity timeline will be implemented in a future update.
-                  </div>
-                </div>
-              </KTCardBody>
-            </KTCard>
+            <JobActivityTimeline 
+              jobId={job.id} 
+              showCustomerView={false}
+              showAddNoteButton={true}
+              onAddNote={handleAddNote}
+            />
           )}
         </div>
       </div>
+
+      {/* Add Note Modal */}
+      {showAddNoteModal && (
+        <div className='modal fade show d-block' tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className='modal-dialog modal-dialog-centered'>
+            <div className='modal-content'>
+              <div className='modal-header'>
+                <h3 className='modal-title'>Add Job Note</h3>
+                <button
+                  type='button'
+                  className='btn-close'
+                  onClick={() => setShowAddNoteModal(false)}
+                  disabled={noteLoading}
+                ></button>
+              </div>
+              <div className='modal-body'>
+                <div className='mb-3'>
+                  <label className='form-label'>Note Content</label>
+                  <textarea
+                    className='form-control'
+                    rows={4}
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder='Enter your note...'
+                    disabled={noteLoading}
+                  />
+                </div>
+                <div className='text-muted fs-7'>
+                  This note will be visible to internal team members only.
+                </div>
+              </div>
+              <div className='modal-footer'>
+                <button
+                  type='button'
+                  className='btn btn-light'
+                  onClick={() => setShowAddNoteModal(false)}
+                  disabled={noteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type='button'
+                  className='btn btn-primary'
+                  onClick={handleSaveNote}
+                  disabled={noteLoading || !noteText.trim()}
+                >
+                  {noteLoading ? (
+                    <>
+                      <span className='spinner-border spinner-border-sm align-middle me-2'></span>
+                      Adding...
+                    </>
+                  ) : (
+                    'Add Note'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Job Form Modal */}
+      {showEditForm && job && (
+        <JobForm
+          job={job}
+          accounts={accounts}
+          contacts={contacts}
+          onSave={handleUpdateJob}
+          onCancel={() => setShowEditForm(false)}
+        />
+      )}
     </>
   )
 }

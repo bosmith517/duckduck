@@ -2,18 +2,32 @@ import React, { useState, useEffect } from 'react'
 import { useFormik, FieldArray, FormikProvider, useFormikContext } from 'formik'
 import * as Yup from 'yup'
 import clsx from 'clsx'
-import { EstimateWithAccount } from '../../../services/estimatesService'
+import { EstimateWithAccount, LineItem } from '../../../services/estimatesService'
+import PhotoCapture from '../../../components/shared/PhotoCapture'
+import { supabase } from '../../../../supabaseClient'
+import { useSupabaseAuth } from '../../../modules/auth/core/SupabaseAuth'
 
-interface LineItem {
-  id?: string
+// LineItem interface is now imported from estimatesService
+
+interface EstimatePhoto {
+  id: string
+  file_url: string
   description: string
-  quantity: number
-  unit_price: number
+  photo_type: 'general' | 'reference' | 'before' | 'after'
+  taken_at: string
+}
+
+interface Account {
+  id: string
+  name: string
+  type: 'business' | 'individual' | 'client' | 'customer'
 }
 
 interface EstimateFormValues {
-  client: string
-  projectTitle: string
+  clientCustomer: string // Display name for client/customer
+  accountId: string
+  jobId: string // Changed from projectTitle to jobId
+  projectTitle: string // Auto-filled from selected job
   description: string
   status: string
   lineItems: LineItem[]
@@ -22,10 +36,22 @@ interface EstimateFormValues {
   notes: string
 }
 
+interface Job {
+  id: string
+  title: string
+  account_id: string
+  contact_id: string | null
+  accounts?: { name: string }
+  contacts?: { first_name: string; last_name: string }
+  status: string
+}
+
 interface EstimateFormProps {
   estimate?: EstimateWithAccount | null
   onSave: (data: any) => void
   onCancel: () => void
+  jobId?: string // Optional job ID to filter photos for job-specific estimates
+  accountId?: string // Optional account ID to filter photos for account-level estimates
 }
 
 const lineItemSchema = Yup.object().shape({
@@ -44,10 +70,14 @@ const lineItemSchema = Yup.object().shape({
 })
 
 const estimateSchema = Yup.object().shape({
-  client: Yup.string()
+  clientCustomer: Yup.string()
     .min(2, 'Minimum 2 characters')
     .max(100, 'Maximum 100 characters')
-    .required('Client name is required'),
+    .required('Client/Customer name is required'),
+  accountId: Yup.string()
+    .required('Client/Customer selection is required'),
+  jobId: Yup.string()
+    .required('Job selection is required'),
   projectTitle: Yup.string()
     .min(2, 'Minimum 2 characters')
     .max(200, 'Maximum 200 characters')
@@ -64,7 +94,7 @@ const estimateSchema = Yup.object().shape({
   totalAmount: Yup.number()
     .min(0, 'Amount must be positive'),
   validUntil: Yup.date()
-    .min(new Date(), 'Valid until date must be in the future')
+    .min(new Date(new Date().setHours(0, 0, 0, 0)), 'Valid until date cannot be in the past')
     .required('Valid until date is required'),
   notes: Yup.string().max(1000, 'Maximum 1000 characters'),
 })
@@ -83,19 +113,33 @@ const TotalCalculator: React.FC = () => {
   return null
 }
 
-export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, onCancel }) => {
+export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, onCancel, jobId, accountId }) => {
+  const { userProfile } = useSupabaseAuth()
   const [loading, setLoading] = useState(false)
+  const [photos, setPhotos] = useState<EstimatePhoto[]>([])
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false)
+  const [selectedPhotoType, setSelectedPhotoType] = useState<'general' | 'reference' | 'before' | 'after'>('general')
+  const [availablePhotos, setAvailablePhotos] = useState<EstimatePhoto[]>([])
+  const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [selectedAccountType, setSelectedAccountType] = useState<'business' | 'individual' | null>(null)
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([])
+  const [showNewJobForm, setShowNewJobForm] = useState(false)
+  const [newJobTitle, setNewJobTitle] = useState('')
+  const [creatingJob, setCreatingJob] = useState(false)
 
   const formik = useFormik<EstimateFormValues>({
     initialValues: {
-      client: estimate?.accounts?.name || '',
+      clientCustomer: estimate?.accounts?.name || estimate?.contact?.name || '',
+      accountId: estimate?.account_id || estimate?.contact_id || '',
+      jobId: jobId || '', // Use provided jobId or empty for selection
       projectTitle: estimate?.project_title || '',
       description: estimate?.description || '',
       status: estimate?.status || 'draft',
-      lineItems: [
-        { description: '', quantity: 1, unit_price: 0 }
-      ],
-      totalAmount: 0,
+      lineItems: estimate?.lineItems && estimate.lineItems.length > 0 
+        ? estimate.lineItems 
+        : [{ description: '', quantity: 1, unit_price: 0 }],
+      totalAmount: estimate?.total_amount || 0,
       validUntil: estimate?.valid_until ? estimate.valid_until.split('T')[0] : '',
       notes: estimate?.notes || '',
     },
@@ -103,7 +147,14 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
     onSubmit: async (values) => {
       setLoading(true)
       try {
+        // Determine if this is a business client (account) or individual customer (contact)
+        const selectedAccount = accounts.find(acc => acc.id === values.accountId)
+        const isIndividualCustomer = selectedAccount?.type === 'individual'
+        
         const submitData = {
+          account_id: isIndividualCustomer ? null : values.accountId,
+          contact_id: isIndividualCustomer ? values.accountId : null,
+          job_id: values.jobId, // Include the selected job ID
           project_title: values.projectTitle,
           description: values.description,
           status: values.status,
@@ -120,6 +171,316 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
       }
     },
   })
+
+  // Load accounts, job details, and photos
+  useEffect(() => {
+    if (userProfile?.tenant_id) {
+      loadAccounts()
+      if (jobId) {
+        loadJobDetails()
+      }
+      if (jobId || accountId || estimate?.account_id) {
+        loadAvailablePhotos()
+      }
+    }
+  }, [userProfile?.tenant_id, jobId, accountId, estimate?.account_id])
+
+  const loadJobDetails = async () => {
+    if (!jobId) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          id,
+          account_id,
+          accounts!inner(id, name, type)
+        `)
+        .eq('id', jobId)
+        .single()
+
+      if (error) throw error
+      
+      if (data && data.accounts) {
+        // Prepopulate the form with job's account information
+        formik.setFieldValue('accountId', data.account_id)
+        formik.setFieldValue('clientCustomer', data.accounts.name)
+        setSelectedAccountType(data.accounts.type === 'business' ? 'business' : 'individual')
+      }
+    } catch (error) {
+      console.error('Error loading job details:', error)
+    }
+  }
+
+  const loadAccounts = async () => {
+    try {
+      // Load business accounts
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('accounts')
+        .select('id, name, type')
+        .eq('tenant_id', userProfile?.tenant_id)
+        .order('name')
+
+      if (accountsError) throw accountsError
+
+      // Load individual customers (contacts without accounts)
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, contact_type')
+        .eq('tenant_id', userProfile?.tenant_id)
+        .eq('contact_type', 'individual')
+        .is('account_id', null)
+        .order('last_name')
+
+      if (contactsError) throw contactsError
+
+      // Combine accounts and individual customers
+      const businessAccounts = (accountsData || []).map(account => ({
+        id: account.id,
+        name: account.name,
+        type: 'business' as const
+      }))
+
+      const individualCustomers = (contactsData || []).map(contact => ({
+        id: contact.id,
+        name: `${contact.first_name} ${contact.last_name}`.trim(),
+        type: 'individual' as const
+      }))
+
+      const combined = [...businessAccounts, ...individualCustomers]
+      setAccounts(combined)
+    } catch (error) {
+      console.error('Error loading accounts and customers:', error)
+    }
+  }
+
+
+  const handleClientChange = (accountId: string) => {
+    const selectedAccount = accounts.find(acc => acc.id === accountId)
+    if (selectedAccount) {
+      formik.setFieldValue('accountId', accountId)
+      formik.setFieldValue('clientCustomer', selectedAccount.name)
+      setSelectedAccountType(selectedAccount.type === 'business' ? 'business' : 'individual')
+      
+      // Clear job selection and load jobs for this client/customer
+      formik.setFieldValue('jobId', '')
+      formik.setFieldValue('projectTitle', '')
+      loadJobsForAccount(accountId, selectedAccount.type)
+    }
+  }
+
+  const loadJobsForAccount = async (accountId: string, accountType: 'business' | 'individual') => {
+    try {
+      let query = supabase
+        .from('jobs')
+        .select(`
+          id,
+          title,
+          account_id,
+          contact_id,
+          status,
+          accounts(name),
+          contacts(first_name, last_name)
+        `)
+        .eq('tenant_id', userProfile?.tenant_id)
+        .order('created_at', { ascending: false })
+
+      // Filter by account type
+      if (accountType === 'business') {
+        query = query.eq('account_id', accountId)
+      } else {
+        query = query.eq('contact_id', accountId)
+      }
+
+      const { data, error } = await query
+
+      if (error) throw error
+
+      setAvailableJobs(data || [])
+    } catch (error) {
+      console.error('Error loading jobs:', error)
+      setAvailableJobs([])
+    }
+  }
+
+  const handleJobChange = (jobId: string) => {
+    const selectedJob = availableJobs.find(job => job.id === jobId)
+    if (selectedJob) {
+      formik.setFieldValue('jobId', jobId)
+      formik.setFieldValue('projectTitle', selectedJob.title)
+    }
+  }
+
+  const handleCreateNewJob = async () => {
+    if (!newJobTitle.trim() || !userProfile?.tenant_id || !formik.values.accountId) return
+
+    setCreatingJob(true)
+    try {
+      // Determine job data based on account type
+      const isIndividualCustomer = selectedAccountType === 'individual'
+      
+      const jobData = {
+        title: newJobTitle.trim(),
+        tenant_id: userProfile.tenant_id,
+        account_id: isIndividualCustomer ? null : formik.values.accountId,
+        contact_id: isIndividualCustomer ? formik.values.accountId : null,
+        status: 'Scheduled',
+        description: `Job created from estimate for: ${formik.values.clientCustomer}`
+      }
+
+      const { data, error } = await supabase
+        .from('jobs')
+        .insert(jobData)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Add to jobs list and select it
+      const newJob: Job = {
+        id: data.id,
+        title: data.title,
+        account_id: data.account_id,
+        contact_id: data.contact_id,
+        status: data.status,
+        accounts: isIndividualCustomer ? undefined : { name: formik.values.clientCustomer },
+        contacts: isIndividualCustomer ? { first_name: formik.values.clientCustomer.split(' ')[0] || '', last_name: formik.values.clientCustomer.split(' ').slice(1).join(' ') || '' } : undefined
+      }
+      
+      setAvailableJobs(prev => [newJob, ...prev])
+      
+      // Select the new job
+      formik.setFieldValue('jobId', data.id)
+      formik.setFieldValue('projectTitle', data.title)
+      
+      // Reset form
+      setNewJobTitle('')
+      setShowNewJobForm(false)
+      
+    } catch (error) {
+      console.error('Error creating job:', error)
+      alert('Error creating job. Please try again.')
+    } finally {
+      setCreatingJob(false)
+    }
+  }
+
+  // Helper function to get appropriate label
+  const getClientCustomerLabel = () => {
+    if (selectedAccountType === 'individual') return 'Customer'
+    if (selectedAccountType === 'business') return 'Client' 
+    return 'Client/Customer'
+  }
+
+  const getClientCustomerPlaceholder = () => {
+    if (selectedAccountType === 'individual') return 'Select a customer...'
+    if (selectedAccountType === 'business') return 'Select a client...'
+    return 'Select a client or customer...'
+  }
+
+
+  const loadAvailablePhotos = async () => {
+    try {
+      let query = supabase
+        .from('job_photos')
+        .select(`
+          id, 
+          file_url, 
+          description, 
+          photo_type, 
+          taken_at,
+          job_id,
+          jobs!inner(account_id)
+        `)
+        .eq('tenant_id', userProfile?.tenant_id)
+
+      // Filter by job ID if provided (most specific)
+      if (jobId) {
+        query = query.eq('job_id', jobId)
+      } 
+      // Otherwise filter by account ID (less specific but still relevant)
+      else if (accountId || estimate?.account_id) {
+        const filterAccountId = accountId || estimate?.account_id
+        query = query.eq('jobs.account_id', filterAccountId)
+      }
+      // If no job or account context, don't load any photos
+      else {
+        setAvailablePhotos([])
+        return
+      }
+
+      const { data, error } = await query
+        .order('taken_at', { ascending: false })
+        .limit(50)
+
+      if (error) throw error
+      setAvailablePhotos(data || [])
+    } catch (error) {
+      console.error('Error loading available photos:', error)
+      setAvailablePhotos([])
+    }
+  }
+
+  const handlePhotoCapture = async (photoUrl: string, photoId: string) => {
+    try {
+      // If we have a jobId, save the photo to the job_photos table
+      if (jobId && userProfile?.id) {
+        await supabase
+          .from('job_photos')
+          .insert({
+            id: photoId,
+            tenant_id: userProfile.tenant_id,
+            job_id: jobId,
+            photo_type: selectedPhotoType,
+            file_path: photoUrl,
+            file_url: photoUrl,
+            description: '',
+            taken_by: userProfile.id
+          })
+      }
+
+      const newPhoto: EstimatePhoto = {
+        id: photoId,
+        file_url: photoUrl,
+        description: '',
+        photo_type: selectedPhotoType,
+        taken_at: new Date().toISOString()
+      }
+      setPhotos(prev => [...prev, newPhoto])
+      setShowPhotoCapture(false)
+      
+      // Refresh available photos to include the new one
+      loadAvailablePhotos()
+    } catch (error) {
+      console.error('Error saving photo:', error)
+      // Still add to local state even if save failed
+      const newPhoto: EstimatePhoto = {
+        id: photoId,
+        file_url: photoUrl,
+        description: '',
+        photo_type: selectedPhotoType,
+        taken_at: new Date().toISOString()
+      }
+      setPhotos(prev => [...prev, newPhoto])
+      setShowPhotoCapture(false)
+    }
+  }
+
+  const addPhotoFromLibrary = (photo: EstimatePhoto) => {
+    if (!photos.find(p => p.id === photo.id)) {
+      setPhotos(prev => [...prev, photo])
+    }
+  }
+
+  const removePhoto = (photoId: string) => {
+    setPhotos(prev => prev.filter(p => p.id !== photoId))
+  }
+
+  const updatePhotoDescription = (photoId: string, description: string) => {
+    setPhotos(prev => prev.map(p => 
+      p.id === photoId ? { ...p, description } : p
+    ))
+  }
 
   return (
     <div className='modal fade show d-block' tabIndex={-1} role='dialog'>
@@ -140,23 +501,35 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
           <form onSubmit={formik.handleSubmit} noValidate>
             <div className='modal-body'>
               <div className='row'>
-                {/* Client */}
+                {/* Client/Customer */}
                 <div className='col-md-6 mb-7'>
-                  <label className='required fw-semibold fs-6 mb-2'>Client</label>
-                  <input
-                    type='text'
+                  <label className='required fw-semibold fs-6 mb-2'>{getClientCustomerLabel()}</label>
+                  <select
                     className={clsx(
-                      'form-control form-control-solid mb-3 mb-lg-0',
-                      {'is-invalid': formik.touched.client && formik.errors.client},
-                      {'is-valid': formik.touched.client && !formik.errors.client}
+                      'form-select form-select-solid',
+                      {'is-invalid': formik.touched.accountId && formik.errors.accountId},
+                      {'is-valid': formik.touched.accountId && !formik.errors.accountId}
                     )}
-                    placeholder='Enter client name'
-                    {...formik.getFieldProps('client')}
-                    disabled={!!estimate} // Disable if editing existing estimate
-                  />
-                  {formik.touched.client && formik.errors.client && (
+                    value={formik.values.accountId}
+                    onChange={(e) => handleClientChange(e.target.value)}
+                    onBlur={formik.handleBlur}
+                    name="accountId"
+                  >
+                    <option value=''>{getClientCustomerPlaceholder()}</option>
+                    {accounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.name} {account.type === 'business' ? '(Client)' : '(Customer)'}
+                      </option>
+                    ))}
+                  </select>
+                  {formik.touched.accountId && formik.errors.accountId && (
                     <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.client}</span>
+                      <span role='alert'>{formik.errors.accountId}</span>
+                    </div>
+                  )}
+                  {accounts.length === 0 && (
+                    <div className='form-text text-muted'>
+                      No clients or customers found. Please create clients/customers in the Contacts section first.
                     </div>
                   )}
                 </div>
@@ -185,22 +558,108 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                   )}
                 </div>
 
-                {/* Project Title */}
+                {/* Job Selection */}
                 <div className='col-md-12 mb-7'>
-                  <label className='required fw-semibold fs-6 mb-2'>Project Title</label>
-                  <input
-                    type='text'
-                    className={clsx(
-                      'form-control form-control-solid mb-3 mb-lg-0',
-                      {'is-invalid': formik.touched.projectTitle && formik.errors.projectTitle},
-                      {'is-valid': formik.touched.projectTitle && !formik.errors.projectTitle}
-                    )}
-                    placeholder='Enter project title'
-                    {...formik.getFieldProps('projectTitle')}
-                  />
-                  {formik.touched.projectTitle && formik.errors.projectTitle && (
+                  <label className='required fw-semibold fs-6 mb-2'>Select Job</label>
+                  {!showNewJobForm ? (
+                    <div className='d-flex gap-2'>
+                      <select
+                        className={clsx(
+                          'form-select form-select-solid flex-grow-1',
+                          {'is-invalid': formik.touched.jobId && formik.errors.jobId},
+                          {'is-valid': formik.touched.jobId && !formik.errors.jobId}
+                        )}
+                        value={formik.values.jobId}
+                        onChange={(e) => handleJobChange(e.target.value)}
+                        onBlur={formik.handleBlur}
+                        name="jobId"
+                        disabled={!formik.values.accountId}
+                      >
+                        <option value=''>
+                          {!formik.values.accountId 
+                            ? 'Please select a client/customer first' 
+                            : availableJobs.length === 0 
+                            ? 'No jobs found for this client/customer'
+                            : 'Select a job...'}
+                        </option>
+                        {availableJobs.map(job => (
+                          <option key={job.id} value={job.id}>
+                            {job.title} ({job.status})
+                          </option>
+                        ))}
+                      </select>
+                      {formik.values.accountId && (
+                        <button
+                          type='button'
+                          className='btn btn-light-primary btn-sm'
+                          onClick={() => setShowNewJobForm(true)}
+                          title='Create new job'
+                        >
+                          <i className='ki-duotone ki-plus fs-3'></i>
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className='d-flex flex-column gap-2'>
+                      <input
+                        type='text'
+                        className='form-control form-control-solid'
+                        placeholder='Enter job title'
+                        value={newJobTitle}
+                        onChange={(e) => setNewJobTitle(e.target.value)}
+                      />
+                      <div className='d-flex gap-2'>
+                        <button
+                          type='button'
+                          className='btn btn-primary btn-sm'
+                          onClick={handleCreateNewJob}
+                          disabled={!newJobTitle.trim() || creatingJob}
+                        >
+                          {creatingJob ? (
+                            <>
+                              <span className='spinner-border spinner-border-sm align-middle me-2'></span>
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <i className='ki-duotone ki-check fs-3 me-1'></i>
+                              Create Job
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type='button'
+                          className='btn btn-light btn-sm'
+                          onClick={() => {
+                            setShowNewJobForm(false)
+                            setNewJobTitle('')
+                          }}
+                        >
+                          <i className='ki-duotone ki-cross fs-3 me-1'></i>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {formik.touched.jobId && formik.errors.jobId && (
                     <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.projectTitle}</span>
+                      <span role='alert'>{formik.errors.jobId}</span>
+                    </div>
+                  )}
+                  
+                  {/* Display selected job title (read-only) */}
+                  {formik.values.jobId && formik.values.projectTitle && (
+                    <div className='mt-3'>
+                      <label className='fw-semibold fs-6 mb-2'>Project Title</label>
+                      <input
+                        type='text'
+                        className='form-control form-control-solid bg-light'
+                        value={formik.values.projectTitle}
+                        readOnly
+                      />
+                      <div className='form-text text-muted'>
+                        Project title is automatically filled from the selected job
+                      </div>
                     </div>
                   )}
                 </div>
@@ -418,6 +877,146 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                     </div>
                   )}
                 </div>
+
+                {/* Photos Section */}
+                <div className='col-md-12 mb-7'>
+                  <div className='card'>
+                    <div className='card-header'>
+                      <h3 className='card-title'>Photos</h3>
+                      <div className='card-toolbar'>
+                        <button
+                          type='button'
+                          className='btn btn-sm btn-light-primary me-2'
+                          onClick={() => setShowPhotoLibrary(!showPhotoLibrary)}
+                        >
+                          <i className='ki-duotone ki-picture fs-6 me-1'></i>
+                          Browse Photos
+                        </button>
+                        <div className='btn-group'>
+                          <button
+                            type='button'
+                            className='btn btn-sm btn-primary dropdown-toggle'
+                            data-bs-toggle='dropdown'
+                          >
+                            <i className='ki-duotone ki-camera fs-6 me-1'></i>
+                            Add Photo
+                          </button>
+                          <ul className='dropdown-menu'>
+                            {(['general', 'reference', 'before', 'after'] as const).map(type => (
+                              <li key={type}>
+                                <a
+                                  className='dropdown-item'
+                                  href='#'
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    setSelectedPhotoType(type)
+                                    setShowPhotoCapture(true)
+                                  }}
+                                >
+                                  {type.charAt(0).toUpperCase() + type.slice(1)} Photo
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                    <div className='card-body'>
+                      {/* Photo Library */}
+                      {showPhotoLibrary && (
+                        <div className='mb-4'>
+                          <h6 className='mb-3'>Available Photos</h6>
+                          <div className='row g-3'>
+                            {availablePhotos.length === 0 ? (
+                              <div className='col-12'>
+                                <div className='alert alert-info'>
+                                  No photos available. Take some photos first!
+                                </div>
+                              </div>
+                            ) : (
+                              availablePhotos.map(photo => (
+                                <div key={photo.id} className='col-md-3'>
+                                  <div className='card card-bordered h-100'>
+                                    <div className='card-body p-2'>
+                                      <img
+                                        src={photo.file_url}
+                                        alt={photo.description}
+                                        className='w-100 rounded mb-2'
+                                        style={{ height: '120px', objectFit: 'cover' }}
+                                      />
+                                      <div className='text-truncate small mb-2'>
+                                        {photo.description || 'No description'}
+                                      </div>
+                                      <button
+                                        type='button'
+                                        className='btn btn-sm btn-light-primary w-100'
+                                        onClick={() => addPhotoFromLibrary(photo)}
+                                        disabled={photos.some(p => p.id === photo.id)}
+                                      >
+                                        {photos.some(p => p.id === photo.id) ? 'Added' : 'Add to Estimate'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Selected Photos */}
+                      <div>
+                        <h6 className='mb-3'>Selected Photos ({photos.length})</h6>
+                        {photos.length === 0 ? (
+                          <div className='alert alert-light border-dashed border-gray-300'>
+                            <div className='text-center py-3'>
+                              <i className='ki-duotone ki-picture fs-3x text-gray-400 mb-3'></i>
+                              <div className='text-gray-600'>No photos selected</div>
+                              <div className='text-gray-400 fs-7'>Add photos to support your estimate</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className='row g-3'>
+                            {photos.map(photo => (
+                              <div key={photo.id} className='col-md-4'>
+                                <div className='card card-bordered h-100'>
+                                  <div className='card-body p-3'>
+                                    <div className='position-relative mb-3'>
+                                      <img
+                                        src={photo.file_url}
+                                        alt={photo.description}
+                                        className='w-100 rounded'
+                                        style={{ height: '150px', objectFit: 'cover' }}
+                                      />
+                                      <button
+                                        type='button'
+                                        className='btn btn-icon btn-circle btn-sm btn-danger position-absolute top-0 end-0 mt-2 me-2'
+                                        onClick={() => removePhoto(photo.id)}
+                                        title='Remove photo'
+                                      >
+                                        <i className='ki-duotone ki-cross fs-6'></i>
+                                      </button>
+                                      <span className={`badge badge-light-primary position-absolute top-0 start-0 mt-2 ms-2`}>
+                                        {photo.photo_type}
+                                      </span>
+                                    </div>
+                                    <textarea
+                                      className='form-control form-control-sm'
+                                      rows={2}
+                                      placeholder='Add description...'
+                                      value={photo.description}
+                                      onChange={(e) => updatePhotoDescription(photo.id, e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -434,6 +1033,12 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                 type='submit'
                 className='btn btn-primary'
                 disabled={loading || !formik.isValid}
+                onClick={() => {
+                  if (!formik.isValid) {
+                    console.log('Form validation errors:', formik.errors)
+                    console.log('Form values:', formik.values)
+                  }
+                }}
               >
                 {loading ? (
                   <>
@@ -448,6 +1053,17 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
           </form>
         </div>
       </div>
+      
+      {/* Photo Capture Modal */}
+      {showPhotoCapture && (
+        <PhotoCapture
+          isOpen={showPhotoCapture}
+          onClose={() => setShowPhotoCapture(false)}
+          onPhotoSaved={handlePhotoCapture}
+          photoType={selectedPhotoType}
+          title={`Capture ${selectedPhotoType} Photo`}
+        />
+      )}
     </div>
   )
 }

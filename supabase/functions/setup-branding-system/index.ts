@@ -21,7 +21,7 @@ serve(async (req) => {
       -- Create tenant_branding table for white-label settings
       CREATE TABLE IF NOT EXISTS tenant_branding (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         company_name TEXT NOT NULL,
         logo_url TEXT,
         primary_color TEXT DEFAULT '#007bff',
@@ -47,7 +47,7 @@ serve(async (req) => {
       -- Create communication_preferences table for smart communication
       CREATE TABLE IF NOT EXISTS communication_preferences (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         customer_id UUID, -- Can be contact_id or account_id
         customer_type TEXT CHECK (customer_type IN ('contact', 'account')),
         
@@ -85,7 +85,7 @@ serve(async (req) => {
       -- Create communication_log table for tracking interactions
       CREATE TABLE IF NOT EXISTS communication_log (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         customer_id UUID NOT NULL,
         customer_type TEXT NOT NULL CHECK (customer_type IN ('contact', 'account')),
         job_id UUID REFERENCES jobs(id) ON DELETE SET NULL,
@@ -119,7 +119,7 @@ serve(async (req) => {
       -- Create auto_followup_sequences table
       CREATE TABLE IF NOT EXISTS auto_followup_sequences (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         description TEXT,
         
@@ -145,7 +145,7 @@ serve(async (req) => {
       -- Create email_templates table for branded communications
       CREATE TABLE IF NOT EXISTS email_templates (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         template_name TEXT NOT NULL,
         template_type TEXT NOT NULL CHECK (template_type IN ('welcome', 'job_scheduled', 'job_update', 'estimate', 'invoice', 'completion', 'followup', 'escalation')),
         
@@ -310,7 +310,7 @@ serve(async (req) => {
         </div>',
         'Welcome {customer_name}! Access your service portal: {portal_url}. Best regards, {company_name}',
         true
-      FROM companies c
+      FROM tenants c
       WHERE NOT EXISTS (
         SELECT 1 FROM email_templates et 
         WHERE et.tenant_id = c.id AND et.template_name = 'Welcome Portal'

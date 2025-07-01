@@ -4,8 +4,10 @@ import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import { estimatesService, EstimateWithAccount } from '../../services/estimatesService'
 import { ConvertToJobModal } from './components/ConvertToJobModal'
 import { EstimateForm } from './components/EstimateForm'
+import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 
 const EstimatesPage: React.FC = () => {
+  const { userProfile } = useSupabaseAuth()
   const [estimates, setEstimates] = useState<EstimateWithAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -33,8 +35,17 @@ const EstimatesPage: React.FC = () => {
   }
 
   const handleCreateEstimate = async (estimateData: any) => {
+    if (!userProfile?.tenant_id) {
+      alert('Authentication error. Please refresh and try again.')
+      return
+    }
+
     try {
-      await estimatesService.createEstimate(estimateData)
+      const estimateWithTenant = {
+        ...estimateData,
+        tenant_id: userProfile.tenant_id
+      }
+      await estimatesService.createEstimate(estimateWithTenant)
       setShowEstimateForm(false)
       loadEstimates()
       // Show success toast
@@ -211,15 +222,20 @@ const EstimatesPage: React.FC = () => {
                             </a>
                           </td>
                           <td>
-                            <span className='text-dark fw-bold d-block fs-6'>
-                              {estimate.accounts?.name || 'Unknown Client'}
-                            </span>
+                            <div className='d-flex flex-column'>
+                              <span className='text-dark fw-bold d-block fs-6'>
+                                {estimate.accounts?.name || estimate.contact?.name || 'Unknown Client'}
+                              </span>
+                              {estimate.contact && (
+                                <span className='badge badge-light-info fs-8'>Customer</span>
+                              )}
+                              {estimate.accounts && (
+                                <span className='badge badge-light-primary fs-8'>Business Client</span>
+                              )}
+                            </div>
                           </td>
                           <td>
-                            <div className='d-flex flex-column'>
-                              <span className='text-dark fw-bold fs-6'>{estimate.project_title}</span>
-                              <span className='text-muted fw-semibold fs-7'>{estimate.description}</span>
-                            </div>
+                            <span className='text-dark fw-bold fs-6'>{estimate.project_title}</span>
                           </td>
                           <td>
                             <span className={getStatusBadge(estimate.status)}>
@@ -250,10 +266,18 @@ const EstimatesPage: React.FC = () => {
                                 href='#'
                                 className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
                                 title='View/Edit'
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.preventDefault()
-                                  setEditingEstimate(estimate)
-                                  setShowEstimateForm(true)
+                                  try {
+                                    // Load full estimate with line items
+                                    const fullEstimate = await estimatesService.getEstimateById(estimate.id)
+                                    if (fullEstimate) {
+                                      setEditingEstimate(fullEstimate as EstimateWithAccount)
+                                      setShowEstimateForm(true)
+                                    }
+                                  } catch (error) {
+                                    console.error('Error loading estimate for editing:', error)
+                                  }
                                 }}
                               >
                                 <i className='ki-duotone ki-pencil fs-3'>
@@ -331,6 +355,7 @@ const EstimatesPage: React.FC = () => {
             setShowEstimateForm(false)
             setEditingEstimate(null)
           }}
+          accountId={editingEstimate?.account_id || editingEstimate?.contact_id}
         />
       )}
 

@@ -392,17 +392,13 @@ const TemplateDrivenEstimates: React.FC = () => {
         .from('estimates')
         .insert({
           tenant_id: userProfile?.tenant_id,
-          account_id: quickEstimate.customer_id, // estimates table uses account_id
+          account_id: quickEstimate.customer_id,
           project_title: `${selectedTemplate.name} - ${quickEstimate.selected_tier?.toUpperCase()} Package`,
-          description: selectedTemplate.description,
+          description: `${selectedTemplate.description}\n\nTemplate Variables: ${JSON.stringify(quickEstimate.custom_variables || {})}`,
           total_amount: finalPrice,
-          status: 'Draft',
-          valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days, date only
-          template_id: selectedTemplate.id,
-          selected_tier: quickEstimate.selected_tier,
-          custom_variables: quickEstimate.custom_variables,
-          created_from_template: true,
-          estimated_duration_days: calculateEstimatedDuration(selectedTemplate, quickEstimate.custom_variables || {})
+          status: 'draft',
+          valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          notes: `Created from template: ${selectedTemplate.name} (${selectedTemplate.id})`
         })
         .select()
         .single()
@@ -410,7 +406,7 @@ const TemplateDrivenEstimates: React.FC = () => {
       if (estimateError) throw estimateError
 
       // Create line items from template
-      const lineItems = selectedTemplate.line_items.map(item => {
+      const lineItems = selectedTemplate.line_items.map((item, index) => {
         let quantity = item.quantity
         let unitPrice = item.unit_price
 
@@ -429,15 +425,11 @@ const TemplateDrivenEstimates: React.FC = () => {
         return {
           tenant_id: userProfile?.tenant_id,
           estimate_id: estimate.id,
-          name: item.name,
-          description: item.description,
-          category: item.category,
-          unit_type: item.unit_type,
-          unit_price: unitPrice,
+          description: item.name || item.description,
           quantity: quantity,
-          total_price: unitPrice * quantity,
-          markup_percentage: item.markup_percentage || 0,
-          notes: item.notes
+          unit_price: unitPrice,
+          line_total: unitPrice * quantity,
+          sort_order: index
         }
       })
 

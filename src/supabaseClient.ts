@@ -70,7 +70,9 @@ export interface Account {
 export interface Contact {
   id: string
   tenant_id: string
-  account_id: string
+  account_id?: string | null // Nullable for individual customers
+  lead_id?: string // Original lead that was converted
+  contact_type?: 'individual' | 'business_contact' // Type of contact
   name?: string
   first_name: string
   last_name: string

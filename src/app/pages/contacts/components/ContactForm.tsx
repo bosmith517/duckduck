@@ -20,7 +20,14 @@ const contactSchema = Yup.object().shape({
     .min(2, 'Minimum 2 characters')
     .max(50, 'Maximum 50 characters')
     .required('Last name is required'),
-  account_id: Yup.string().required('Account is required'),
+  contact_type: Yup.string()
+    .oneOf(['individual', 'business_contact'], 'Please select contact type')
+    .required('Contact type is required'),
+  account_id: Yup.string().when('contact_type', {
+    is: 'business_contact',
+    then: (schema) => schema.required('Account is required for business contacts'),
+    otherwise: (schema) => schema.nullable()
+  }),
   title: Yup.string().max(100, 'Maximum 100 characters'),
   email: Yup.string().email('Invalid email format').max(100, 'Maximum 100 characters'),
   phone: Yup.string().max(20, 'Maximum 20 characters'),
@@ -36,6 +43,7 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
     initialValues: {
       first_name: contact?.first_name || '',
       last_name: contact?.last_name || '',
+      contact_type: contact?.contact_type || 'individual',
       account_id: contact?.account_id || '',
       title: contact?.title || '',
       email: contact?.email || '',
@@ -116,34 +124,65 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
                   )}
                 </div>
 
-                {/* Account */}
+                {/* Contact Type */}
                 <div className='col-md-12 mb-7'>
-                  <label className='required fw-semibold fs-6 mb-2'>Account</label>
+                  <label className='required fw-semibold fs-6 mb-2'>Contact Type</label>
                   <select
                     className={clsx(
                       'form-select form-select-solid',
-                      {'is-invalid': formik.touched.account_id && formik.errors.account_id},
-                      {'is-valid': formik.touched.account_id && !formik.errors.account_id}
+                      {'is-invalid': formik.touched.contact_type && formik.errors.contact_type},
+                      {'is-valid': formik.touched.contact_type && !formik.errors.contact_type}
                     )}
-                    {...formik.getFieldProps('account_id')}
+                    {...formik.getFieldProps('contact_type')}
+                    onChange={(e) => {
+                      formik.setFieldValue('contact_type', e.target.value)
+                      // Clear account_id when switching to individual
+                      if (e.target.value === 'individual') {
+                        formik.setFieldValue('account_id', '')
+                      }
+                    }}
                   >
-                    <option value=''>Select an account</option>
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
+                    <option value='individual'>Individual Customer</option>
+                    <option value='business_contact'>Business Contact</option>
                   </select>
-                  {formik.touched.account_id && formik.errors.account_id && (
+                  {formik.touched.contact_type && formik.errors.contact_type && (
                     <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.account_id}</span>
+                      <span role='alert'>{formik.errors.contact_type}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Title */}
-                <div className='col-md-12 mb-7'>
-                  <label className='fw-semibold fs-6 mb-2'>Title</label>
+                {/* Account - Only show for business contacts */}
+                {formik.values.contact_type === 'business_contact' && (
+                  <div className='col-md-12 mb-7'>
+                    <label className='required fw-semibold fs-6 mb-2'>Account</label>
+                    <select
+                      className={clsx(
+                        'form-select form-select-solid',
+                        {'is-invalid': formik.touched.account_id && formik.errors.account_id},
+                        {'is-valid': formik.touched.account_id && !formik.errors.account_id}
+                      )}
+                      {...formik.getFieldProps('account_id')}
+                    >
+                      <option value=''>Select an account</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                    {formik.touched.account_id && formik.errors.account_id && (
+                      <div className='fv-plugins-message-container'>
+                        <span role='alert'>{formik.errors.account_id}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Title - Only show for business contacts */}
+                {formik.values.contact_type === 'business_contact' && (
+                  <div className='col-md-12 mb-7'>
+                    <label className='fw-semibold fs-6 mb-2'>Job Title</label>
                   <input
                     type='text'
                     className={clsx(
@@ -151,15 +190,16 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
                       {'is-invalid': formik.touched.title && formik.errors.title},
                       {'is-valid': formik.touched.title && !formik.errors.title}
                     )}
-                    placeholder='Enter job title'
-                    {...formik.getFieldProps('title')}
-                  />
-                  {formik.touched.title && formik.errors.title && (
-                    <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.title}</span>
-                    </div>
-                  )}
-                </div>
+                      placeholder='Enter job title'
+                      {...formik.getFieldProps('title')}
+                    />
+                    {formik.touched.title && formik.errors.title && (
+                      <div className='fv-plugins-message-container'>
+                        <span role='alert'>{formik.errors.title}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Email */}
                 <div className='col-md-6 mb-7'>
@@ -221,21 +261,23 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
                   )}
                 </div>
 
-                {/* Primary Contact */}
-                <div className='col-md-6 mb-7'>
-                  <div className='form-check form-check-custom form-check-solid'>
-                    <input
-                      className='form-check-input'
-                      type='checkbox'
-                      id='is_primary'
-                      {...formik.getFieldProps('is_primary')}
-                      checked={formik.values.is_primary}
-                    />
-                    <label className='form-check-label fw-semibold fs-6' htmlFor='is_primary'>
-                      Primary Contact
-                    </label>
+                {/* Primary Contact - Only show for business contacts */}
+                {formik.values.contact_type === 'business_contact' && (
+                  <div className='col-md-6 mb-7'>
+                    <div className='form-check form-check-custom form-check-solid'>
+                      <input
+                        className='form-check-input'
+                        type='checkbox'
+                        id='is_primary'
+                        {...formik.getFieldProps('is_primary')}
+                        checked={formik.values.is_primary}
+                      />
+                      <label className='form-check-label fw-semibold fs-6' htmlFor='is_primary'>
+                        Primary Contact
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Notes */}
                 <div className='col-md-12 mb-7'>

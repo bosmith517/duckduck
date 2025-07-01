@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Job } from '../../../../supabaseClient'
 
 interface JobsKanbanProps {
@@ -9,6 +10,8 @@ interface JobsKanbanProps {
 }
 
 export const JobsKanban: React.FC<JobsKanbanProps> = ({ jobs, onEdit, onDelete, onStatusChange }) => {
+  const navigate = useNavigate()
+  
   const statuses: { key: Job['status']; label: string; color: string }[] = [
     { key: 'draft', label: 'Draft', color: 'secondary' },
     { key: 'scheduled', label: 'Scheduled', color: 'info' },
@@ -178,30 +181,87 @@ export const JobsKanban: React.FC<JobsKanbanProps> = ({ jobs, onEdit, onDelete, 
                         </div>
 
                         <div className='d-flex justify-content-between align-items-center'>
-                          <div className='btn-group' role='group'>
-                            <button
-                              type='button'
-                              className='btn btn-sm btn-light-primary'
-                              onClick={() => onEdit(job)}
-                            >
-                              <i className='ki-duotone ki-pencil fs-6'>
-                                <span className='path1'></span>
-                                <span className='path2'></span>
-                              </i>
-                            </button>
-                            <button
-                              type='button'
-                              className='btn btn-sm btn-light-danger'
-                              onClick={() => onDelete(job.id)}
-                            >
-                              <i className='ki-duotone ki-trash fs-6'>
-                                <span className='path1'></span>
-                                <span className='path2'></span>
-                                <span className='path3'></span>
-                                <span className='path4'></span>
-                                <span className='path5'></span>
-                              </i>
-                            </button>
+                          <a
+                            href='#'
+                            className='btn btn-light btn-active-light-primary btn-sm'
+                            data-kt-menu-trigger='click'
+                            data-kt-menu-placement='bottom-end'
+                          >
+                            Actions
+                            <i className='ki-duotone ki-down fs-5 m-0'></i>
+                          </a>
+                          <div
+                            className='menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-125px py-4'
+                            data-kt-menu='true'
+                          >
+                            <div className='menu-item px-3'>
+                              <a
+                                href='#'
+                                className='menu-link px-3'
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  navigate(`/jobs/${job.id}`)
+                                }}
+                              >
+                                <i className='ki-duotone ki-eye fs-5 me-2'>
+                                  <span className='path1'></span>
+                                  <span className='path2'></span>
+                                  <span className='path3'></span>
+                                </i>
+                                View
+                              </a>
+                            </div>
+                            <div className='menu-item px-3'>
+                              <a
+                                href='#'
+                                className='menu-link px-3'
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  onEdit(job)
+                                }}
+                              >
+                                <i className='ki-duotone ki-pencil fs-5 me-2'>
+                                  <span className='path1'></span>
+                                  <span className='path2'></span>
+                                </i>
+                                Edit
+                              </a>
+                            </div>
+                            <div className='menu-item px-3'>
+                              <a
+                                href='#'
+                                className='menu-link px-3'
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  navigate('/estimates')
+                                }}
+                              >
+                                <i className='ki-duotone ki-document fs-5 me-2'>
+                                  <span className='path1'></span>
+                                  <span className='path2'></span>
+                                </i>
+                                Create Estimate
+                              </a>
+                            </div>
+                            <div className='menu-item px-3'>
+                              <a
+                                href='#'
+                                className='menu-link px-3'
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  onDelete(job.id)
+                                }}
+                              >
+                                <i className='ki-duotone ki-trash fs-5 me-2'>
+                                  <span className='path1'></span>
+                                  <span className='path2'></span>
+                                  <span className='path3'></span>
+                                  <span className='path4'></span>
+                                  <span className='path5'></span>
+                                </i>
+                                Delete
+                              </a>
+                            </div>
                           </div>
 
                           {job.estimated_hours && (

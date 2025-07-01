@@ -9,7 +9,7 @@ interface PhotoCaptureProps {
   onPhotoSaved: (photoUrl: string, photoId: string) => void
   jobId?: string
   costEntryId?: string
-  photoType: 'receipt' | 'job_progress' | 'before' | 'after' | 'general'
+  photoType: 'receipt' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'
   title?: string
 }
 
@@ -225,7 +225,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       })
       
       showToast.success('Photo captured successfully!')
-      stopCamera()
+      // Don't stop camera - allow multiple photos
     }, 'image/jpeg', 0.9)
   }
 
@@ -524,22 +524,52 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                   />
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
                   
+                  {/* Photo count badge */}
+                  {photos.length > 0 && (
+                    <div className="position-absolute top-0 end-0 m-3">
+                      <span className="badge bg-success fs-6">
+                        {photos.length} photo{photos.length !== 1 ? 's' : ''} taken
+                      </span>
+                    </div>
+                  )}
+                  
                   <div className="position-absolute bottom-0 start-50 translate-middle-x mb-3">
-                    <div className="d-flex gap-2">
+                    <div className="d-flex gap-2 align-items-center">
                       <button
-                        className="btn btn-success btn-lg rounded-circle"
+                        className="btn btn-success btn-lg rounded-circle shadow"
                         onClick={capturePhoto}
-                        style={{ width: '60px', height: '60px' }}
+                        style={{ width: '70px', height: '70px' }}
                       >
-                        <i className="ki-duotone ki-camera fs-2">
+                        <i className="ki-duotone ki-camera fs-1">
                           <span className="path1"></span>
                           <span className="path2"></span>
                         </i>
                       </button>
+                      
+                      {photos.length > 0 && (
+                        <button
+                          className="btn btn-primary btn-lg shadow"
+                          onClick={stopCamera}
+                        >
+                          <i className="ki-duotone ki-check fs-6 me-1">
+                            <span className="path1"></span>
+                            <span className="path2"></span>
+                          </i>
+                          Done ({photos.length})
+                        </button>
+                      )}
+                      
                       <button
-                        className="btn btn-secondary btn-lg rounded-circle"
-                        onClick={stopCamera}
-                        style={{ width: '60px', height: '60px' }}
+                        className="btn btn-secondary btn-lg rounded-circle shadow"
+                        onClick={() => {
+                          stopCamera()
+                          // Clear any photos taken during this session if needed
+                          if (photos.length === 0) {
+                            onClose()
+                          }
+                        }}
+                        style={{ width: '50px', height: '50px' }}
+                        title="Cancel"
                       >
                         <i className="ki-duotone ki-cross fs-2">
                           <span className="path1"></span>
@@ -567,32 +597,33 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                 </div>
                 
                 <div className="row g-3 mb-6">
-                  <div className="col-12 col-md-6">
-                    <label htmlFor="camera-input" className="btn btn-primary w-100 py-4 mb-0">
+                  <div className="col-12">
+                    <label htmlFor="camera-batch-input" className="btn btn-primary w-100 py-4 mb-0">
                       <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
                         <span className="path1"></span>
                         <span className="path2"></span>
                       </i>
-                      <div className="fw-bold">Take Photo</div>
-                      <small className="text-white-75">Open camera</small>
+                      <div className="fw-bold">Take Photos</div>
+                      <small className="text-white-75">Use camera (multiple photos)</small>
                     </label>
                     <input
-                      id="camera-input"
+                      id="camera-batch-input"
                       type="file"
                       accept="image/*"
+                      multiple
                       capture="environment"
                       style={{ display: 'none' }}
                       onChange={handleFileSelect}
                     />
                   </div>
-                  <div className="col-12 col-md-6">
+                  <div className="col-12">
                     <label htmlFor="gallery-input" className="btn btn-light-primary w-100 py-4 mb-0">
                       <i className="ki-duotone ki-folder-up fs-2x mb-2 text-primary">
                         <span className="path1"></span>
                         <span className="path2"></span>
                       </i>
                       <div className="fw-bold">Choose from Gallery</div>
-                      <small className="text-primary">Select photos</small>
+                      <small className="text-primary">Select multiple photos</small>
                     </label>
                     <input
                       id="gallery-input"

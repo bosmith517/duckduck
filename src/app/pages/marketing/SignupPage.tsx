@@ -127,7 +127,7 @@ const SignupPage: React.FC = () => {
 
       // Create company record
       const { error: companyError } = await supabase
-        .from('companies')
+        .from('tenants')
         .insert({
           name: formData.companyName,
           business_type: formData.businessType,

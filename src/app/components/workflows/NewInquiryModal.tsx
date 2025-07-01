@@ -15,6 +15,7 @@ interface Lead {
   id: string
   tenant_id: string
   caller_name: string
+  caller_type: 'business' | 'individual'
   phone_number: string
   email?: string
   lead_source: string
@@ -59,6 +60,9 @@ const inquirySchema = Yup.object().shape({
     .min(2, 'Minimum 2 characters')
     .max(100, 'Maximum 100 characters')
     .required('Caller name is required'),
+  caller_type: Yup.string()
+    .oneOf(['business', 'individual'], 'Please select caller type')
+    .required('Caller type is required'),
   phone_number: Yup.string()
     .matches(/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number')
     .required('Phone number is required'),
@@ -82,9 +86,23 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
   const { userProfile } = useSupabaseAuth()
   const [loading, setLoading] = useState(false)
 
+  // Helper functions for dynamic labels
+  const getCallerLabel = (callerType: string) => {
+    return callerType === 'business' ? 'Client Name (Business/Company)' : 'Customer Name (Individual)'
+  }
+
+  const getCallerPlaceholder = (callerType: string) => {
+    return callerType === 'business' ? 'Enter business/company name' : 'Enter customer name'
+  }
+
+  const getModalTitle = (callerType: string) => {
+    return callerType === 'business' ? 'New Client Inquiry' : 'New Customer Inquiry'
+  }
+
   const formik = useFormik({
     initialValues: {
       caller_name: '',
+      caller_type: 'individual', // 'business' for clients, 'individual' for customers
       phone_number: '',
       email: '',
       lead_source: '',
@@ -112,6 +130,7 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
       const leadData = {
         tenant_id: userProfile.tenant_id,
         caller_name: values.caller_name,
+        caller_type: values.caller_type, // 'business' for clients, 'individual' for customers
         phone_number: values.phone_number,
         email: values.email || null,
         lead_source: values.lead_source,
@@ -227,7 +246,7 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
                 <span className="path1"></span>
                 <span className="path2"></span>
               </i>
-              New Customer Inquiry
+{getModalTitle(formik.values.caller_type)}
             </h5>
             <button
               type="button"
@@ -264,13 +283,31 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
                 </div>
 
                 <div className="col-md-6 mb-7">
-                  <label className="required fw-semibold fs-6 mb-2">Caller Name</label>
+                  <label className="required fw-semibold fs-6 mb-2">Caller Type</label>
+                  <select
+                    className={clsx('form-select form-select-solid', {
+                      'is-invalid': formik.touched.caller_type && formik.errors.caller_type
+                    })}
+                    {...formik.getFieldProps('caller_type')}
+                  >
+                    <option value="individual">Customer (Individual)</option>
+                    <option value="business">Client (Business/Company)</option>
+                  </select>
+                  {formik.touched.caller_type && formik.errors.caller_type && (
+                    <div className="fv-plugins-message-container">
+                      <span role="alert">{formik.errors.caller_type}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-md-6 mb-7">
+                  <label className="required fw-semibold fs-6 mb-2">{getCallerLabel(formik.values.caller_type)}</label>
                   <input
                     type="text"
                     className={clsx('form-control form-control-solid', {
                       'is-invalid': formik.touched.caller_name && formik.errors.caller_name
                     })}
-                    placeholder="Enter caller's name"
+                    placeholder={getCallerPlaceholder(formik.values.caller_type)}
                     {...formik.getFieldProps('caller_name')}
                   />
                   {formik.touched.caller_name && formik.errors.caller_name && (

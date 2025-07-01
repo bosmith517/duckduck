@@ -21,7 +21,7 @@ serve(async (req) => {
       -- Create estimate_templates table for template-driven estimates
       CREATE TABLE IF NOT EXISTS estimate_templates (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         description TEXT,
         service_type TEXT NOT NULL,
@@ -58,7 +58,7 @@ serve(async (req) => {
       -- Create estimate_line_items table for detailed line items
       CREATE TABLE IF NOT EXISTS estimate_line_items (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         estimate_id UUID NOT NULL REFERENCES estimates(id) ON DELETE CASCADE,
         template_line_item_id UUID,
         
@@ -88,7 +88,7 @@ serve(async (req) => {
       -- Create estimate_variables table for template variable tracking
       CREATE TABLE IF NOT EXISTS estimate_variables (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         estimate_id UUID NOT NULL REFERENCES estimates(id) ON DELETE CASCADE,
         
         variable_name TEXT NOT NULL,
@@ -113,7 +113,7 @@ serve(async (req) => {
       -- Create template_usage_analytics table for tracking
       CREATE TABLE IF NOT EXISTS template_usage_analytics (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         template_id UUID NOT NULL REFERENCES estimate_templates(id) ON DELETE CASCADE,
         
         -- Usage details

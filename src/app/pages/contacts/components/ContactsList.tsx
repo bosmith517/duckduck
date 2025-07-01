@@ -32,7 +32,7 @@ export const ContactsList: React.FC<ContactsListProps> = ({ contacts, onEdit, on
         <thead>
           <tr className='text-start text-muted fw-bolder fs-7 text-uppercase gs-0'>
             <th className='min-w-125px'>Name</th>
-            <th className='min-w-125px'>Account</th>
+            <th className='min-w-125px'>Type / Account</th>
             <th className='min-w-125px'>Title</th>
             <th className='min-w-125px'>Contact Info</th>
             <th className='min-w-100px'>Primary</th>
@@ -61,8 +61,15 @@ export const ContactsList: React.FC<ContactsListProps> = ({ contacts, onEdit, on
                 </div>
               </td>
               <td>
-                <div className='text-gray-800'>
-                  {contact.account?.name || '-'}
+                <div className='d-flex flex-column'>
+                  <div className='d-flex align-items-center mb-1'>
+                    <span className={`badge ${contact.contact_type === 'individual' ? 'badge-light-info' : 'badge-light-primary'} fw-bolder me-2`}>
+                      {contact.contact_type === 'individual' ? 'Customer' : 'Business Contact'}
+                    </span>
+                  </div>
+                  <div className='text-gray-800'>
+                    {contact.account?.name || (contact.contact_type === 'individual' ? 'Individual Customer' : 'No Account')}
+                  </div>
                 </div>
               </td>
               <td>

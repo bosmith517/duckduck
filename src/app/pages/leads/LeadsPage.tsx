@@ -10,6 +10,7 @@ interface Lead {
   id: string
   tenant_id: string
   caller_name: string
+  caller_type?: 'business' | 'individual'
   phone_number: string
   email?: string
   lead_source: string

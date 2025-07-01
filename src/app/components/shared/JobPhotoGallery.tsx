@@ -3,10 +3,13 @@ import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { showToast } from '../../utils/toast'
 import PhotoCapture from './PhotoCapture'
+import PhotoViewer from './PhotoViewer'
+import AIAnalysisButton from './AIAnalysisButton'
+import CreateEstimateModal from '../workflows/CreateEstimateModal'
 
 interface JobPhoto {
   id: string
-  photo_type: 'receipt' | 'job_progress' | 'before' | 'after' | 'general'
+  photo_type: 'receipt' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'
   file_url: string
   description: string
   taken_at: string
@@ -36,12 +39,15 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
   const [loading, setLoading] = useState(true)
   const [showPhotoCapture, setShowPhotoCapture] = useState(false)
   const [selectedPhotoType, setSelectedPhotoType] = useState<'receipt' | 'job_progress' | 'before' | 'after' | 'general'>('job_progress')
-  const [selectedPhoto, setSelectedPhoto] = useState<JobPhoto | null>(null)
-  const [showLightbox, setShowLightbox] = useState(false)
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0)
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false)
+  const [showEstimateModal, setShowEstimateModal] = useState(false)
+  const [jobDetails, setJobDetails] = useState<any>(null)
 
   useEffect(() => {
     if (jobId && userProfile?.tenant_id) {
       loadPhotos()
+      loadJobDetails()
     }
   }, [jobId, userProfile?.tenant_id])
 
@@ -63,6 +69,58 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadJobDetails = async () => {
+    try {
+      // First get the job details
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single()
+
+      if (jobError) throw jobError
+
+      // Then get estimates for the same account (if job has account_id)
+      let estimates: Array<{id: string, status: string, created_at: string}> = []
+      if (jobData.account_id) {
+        const { data: estimateData, error: estimateError } = await supabase
+          .from('estimates')
+          .select('id, status, created_at')
+          .eq('account_id', jobData.account_id)
+          .order('created_at', { ascending: false })
+
+        if (!estimateError) {
+          estimates = estimateData || []
+        }
+      }
+
+      setJobDetails({ ...jobData, estimates })
+    } catch (error) {
+      console.error('Error loading job details:', error)
+    }
+  }
+
+  // Check if job needs an estimate based on status and existing estimates
+  const needsEstimate = () => {
+    if (!jobDetails) return false
+    
+    // More flexible status checking - if photos exist, likely ready for estimate
+    const statusesNeedingEstimate = [
+      'needs_assessment', 'needs_estimate', 'site_visit_complete', 
+      'draft', 'scheduled', 'in_progress' // Added common statuses
+    ]
+    
+    // Check if job status indicates estimate is needed OR if we have photos (site visit done)
+    const statusNeedsEstimate = statusesNeedingEstimate.includes(jobDetails.status) || photos.length > 0
+    
+    // Check if there are no existing estimates or only draft estimates
+    const hasNoFinalEstimate = !jobDetails.estimates || 
+      jobDetails.estimates.length === 0 || 
+      jobDetails.estimates.every((est: any) => est.status === 'draft' || est.status === 'Draft')
+    
+    return statusNeedsEstimate && hasNoFinalEstimate
   }
 
   const getPhotoTypeLabel = (type: string) => {
@@ -96,8 +154,9 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
   }, {} as Record<string, JobPhoto[]>)
 
   const handlePhotoClick = (photo: JobPhoto) => {
-    setSelectedPhoto(photo)
-    setShowLightbox(true)
+    const index = photos.findIndex(p => p.id === photo.id)
+    setSelectedPhotoIndex(index >= 0 ? index : 0)
+    setShowPhotoViewer(true)
   }
 
   const formatDate = (dateString: string) => {
@@ -121,29 +180,83 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
 
   return (
     <div className="job-photo-gallery">
-      {showTitle && (
+      {(showTitle || allowCapture) && (
         <div className="d-flex justify-content-between align-items-center mb-4">
-          <h6 className="mb-0">
-            <i className="ki-duotone ki-picture fs-4 text-primary me-2">
-              <span className="path1"></span>
-              <span className="path2"></span>
-            </i>
-            Job Photos ({photos.length})
-          </h6>
+          {showTitle && (
+            <h6 className="mb-0">
+              <i className="ki-duotone ki-picture fs-4 text-primary me-2">
+                <span className="path1"></span>
+                <span className="path2"></span>
+              </i>
+              Job Photos ({photos.length})
+            </h6>
+          )}
+          {!showTitle && <div></div>} {/* Spacer when no title */}
           {allowCapture && (
-            <div className="dropdown">
-              <button
-                className="btn btn-primary btn-sm dropdown-toggle"
-                type="button"
-                data-bs-toggle="dropdown"
-                aria-expanded="false"
-              >
-                <i className="ki-duotone ki-camera fs-5 me-2">
-                  <span className="path1"></span>
-                  <span className="path2"></span>
-                </i>
-                Add Photos
-              </button>
+            <div className="d-flex gap-2">
+              {/* AI Analysis Button - Debug Version */}
+              {photos.length > 0 && (
+                <button
+                  className="btn btn-light-info btn-sm"
+                  onClick={async () => {
+                    console.log('🔍 Testing AI Analysis...')
+                    try {
+                      const { data, error } = await supabase.functions.invoke('test-ai-analysis', {
+                        body: {
+                          jobId,
+                          photoUrls: photos.map(p => p.file_url),
+                          test: true
+                        }
+                      })
+                      console.log('✅ Test result:', data)
+                      if (error) {
+                        console.error('❌ Test error:', error)
+                        showToast.error(`Test failed: ${error.message}`)
+                      } else {
+                        showToast.success('Test successful! Check console for details.')
+                      }
+                    } catch (err) {
+                      console.error('❌ Test exception:', err)
+                      showToast.error(`Test exception: ${err.message}`)
+                    }
+                  }}
+                >
+                  <i className="ki-duotone ki-abstract-39 fs-5 me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  Test AI
+                </button>
+              )}
+              
+              {/* Create Estimate Button */}
+              {needsEstimate() && (
+                <button
+                  className="btn btn-success btn-sm"
+                  onClick={() => setShowEstimateModal(true)}
+                  title="Create estimate for this job"
+                >
+                  <i className="ki-duotone ki-document fs-5 me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  Create Estimate
+                </button>
+              )}
+              
+              <div className="dropdown">
+                <button
+                  className="btn btn-primary btn-sm dropdown-toggle"
+                  type="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                >
+                  <i className="ki-duotone ki-camera fs-5 me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  Add Photos
+                </button>
               <ul className="dropdown-menu">
                 <li>
                   <a
@@ -214,6 +327,7 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
                   </a>
                 </li>
               </ul>
+              </div>
             </div>
           )}
         </div>
@@ -355,43 +469,41 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
         title={`${getPhotoTypeLabel(selectedPhotoType)} Documentation`}
       />
 
-      {/* Lightbox Modal */}
-      {showLightbox && selectedPhoto && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1070 }}>
-          <div className="modal-dialog modal-xl modal-dialog-centered">
-            <div className="modal-content bg-transparent border-0">
-              <div className="modal-header border-0 pb-0">
-                <div className="d-flex align-items-center">
-                  <span className={`badge badge-${getPhotoTypeColor(selectedPhoto.photo_type)} me-3`}>
-                    {getPhotoTypeLabel(selectedPhoto.photo_type)}
-                  </span>
-                  <div className="text-white">
-                    <div className="fw-bold">{selectedPhoto.description || 'No description'}</div>
-                    <div className="fs-7 opacity-75">
-                      {formatDate(selectedPhoto.taken_at)} • {selectedPhoto.taken_by_name}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white"
-                  onClick={() => setShowLightbox(false)}
-                ></button>
-              </div>
-              <div className="modal-body p-0">
-                <div className="text-center">
-                  <img
-                    src={selectedPhoto.file_url}
-                    alt={selectedPhoto.description}
-                    className="img-fluid"
-                    style={{ maxHeight: '80vh', objectFit: 'contain' }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Photo Viewer Modal */}
+      <PhotoViewer
+        photos={photos}
+        initialIndex={selectedPhotoIndex}
+        isOpen={showPhotoViewer}
+        onClose={() => setShowPhotoViewer(false)}
+        onDelete={async (photoId) => {
+          try {
+            const { error } = await supabase
+              .from('job_photos')
+              .delete()
+              .eq('id', photoId)
+
+            if (error) throw error
+
+            showToast.success('Photo deleted successfully')
+            loadPhotos() // Refresh the gallery
+          } catch (error) {
+            console.error('Error deleting photo:', error)
+            showToast.error('Failed to delete photo')
+          }
+        }}
+      />
+
+      {/* Create Estimate Modal */}
+      <CreateEstimateModal
+        jobId={jobId}
+        isOpen={showEstimateModal}
+        onClose={() => setShowEstimateModal(false)}
+        onEstimateCreated={(estimateId) => {
+          showToast.success('Estimate created! Ready to present to customer.')
+          setShowEstimateModal(false)
+          loadJobDetails() // Refresh job details to update estimate status
+        }}
+      />
     </div>
   )
 }

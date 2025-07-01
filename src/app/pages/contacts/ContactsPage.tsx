@@ -115,7 +115,8 @@ const ContactsPage: React.FC = () => {
       const newContact: Contact = {
         id: `contact_${Date.now()}`,
         tenant_id: userProfile.tenant_id,
-        account_id: contactData.account_id || '1',
+        contact_type: contactData.contact_type || 'individual',
+        account_id: contactData.contact_type === 'individual' ? null : (contactData.account_id || '1'),
         first_name: contactData.first_name || '',
         last_name: contactData.last_name || '',
         title: contactData.title || '',
@@ -133,6 +134,7 @@ const ContactsPage: React.FC = () => {
         first_name: newContact.first_name,
         last_name: newContact.last_name,
         name: `${newContact.first_name} ${newContact.last_name}`.trim(),
+        contact_type: newContact.contact_type,
         account_id: newContact.account_id,
         title: newContact.title,
         email: newContact.email,
@@ -173,7 +175,8 @@ const ContactsPage: React.FC = () => {
       const newContact: Contact = {
         id: `contact_${Date.now()}`,
         tenant_id: userProfile.tenant_id,
-        account_id: contactData.account_id || '1',
+        contact_type: contactData.contact_type || 'individual',
+        account_id: contactData.contact_type === 'individual' ? null : (contactData.account_id || '1'),
         first_name: contactData.first_name || '',
         last_name: contactData.last_name || '',
         title: contactData.title || '',
@@ -202,6 +205,8 @@ const ContactsPage: React.FC = () => {
         .from('contacts')
         .update({
           ...contactData,
+          // If switching to individual, clear account_id
+          account_id: contactData.contact_type === 'individual' ? null : contactData.account_id,
           updated_at: new Date().toISOString()
         })
         .eq('id', id)

@@ -1,9 +1,20 @@
 import { supabase } from '../../supabaseClient'
 
+export interface LineItem {
+  id?: string
+  description: string
+  quantity: number
+  unit_price: number
+  line_total?: number
+  item_type?: 'service' | 'material' | 'labor' | 'other'
+  sort_order?: number
+}
+
 export interface Estimate {
   id: string
   tenant_id: string
-  account_id: string
+  account_id?: string | null // Nullable for individual customers
+  contact_id?: string | null // For individual customers
   status: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
   total_amount: number
   created_at: string
@@ -17,11 +28,17 @@ export interface Estimate {
   labor_cost?: number
   material_cost?: number
   notes?: string
+  lineItems?: LineItem[]
 }
 
 export interface EstimateWithAccount extends Estimate {
   accounts: {
     name: string
+  } | null
+  contact: {
+    name: string
+    first_name: string
+    last_name: string
   } | null
 }
 
@@ -32,7 +49,8 @@ class EstimatesService {
         .from('estimates')
         .select(`
           *,
-          accounts!inner(name)
+          accounts(name),
+          contacts(name, first_name, last_name)
         `)
         .order('created_at', { ascending: false })
 
@@ -47,7 +65,10 @@ class EstimatesService {
           estimate_number.ilike.%${searchTerm}%,
           project_title.ilike.%${searchTerm}%,
           description.ilike.%${searchTerm}%,
-          accounts.name.ilike.%${searchTerm}%
+          accounts.name.ilike.%${searchTerm}%,
+          contacts.name.ilike.%${searchTerm}%,
+          contacts.first_name.ilike.%${searchTerm}%,
+          contacts.last_name.ilike.%${searchTerm}%
         `)
       }
 
@@ -58,6 +79,8 @@ class EstimatesService {
         throw error
       }
 
+      // For the list view, we don't need line items for performance
+      // Line items will be fetched when viewing individual estimates
       return data || []
     } catch (error) {
       console.error('Error in getEstimates:', error)
@@ -65,15 +88,18 @@ class EstimatesService {
     }
   }
 
-  async createEstimate(estimateData: Partial<Estimate>): Promise<Estimate> {
+  async createEstimate(estimateData: Partial<Estimate> & { lineItems?: LineItem[] }): Promise<EstimateWithAccount> {
     try {
       // Generate estimate number
       const estimateNumber = await this.generateEstimateNumber()
       
+      // Extract line items from estimate data
+      const { lineItems, ...estimateFields } = estimateData
+      
       const { data, error } = await supabase
         .from('estimates')
         .insert([{
-          ...estimateData,
+          ...estimateFields,
           estimate_number: estimateNumber,
         }])
         .select()
@@ -84,19 +110,28 @@ class EstimatesService {
         throw error
       }
 
-      return data
+      // Create line items if provided
+      if (lineItems && lineItems.length > 0) {
+        await this.createLineItems(data.id, data.tenant_id, lineItems)
+      }
+
+      // Return estimate with line items
+      return await this.getEstimateWithLineItems(data.id)
     } catch (error) {
       console.error('Error in createEstimate:', error)
       throw error
     }
   }
 
-  async updateEstimate(id: string, estimateData: Partial<Estimate>): Promise<Estimate> {
+  async updateEstimate(id: string, estimateData: Partial<Estimate> & { lineItems?: LineItem[] }): Promise<EstimateWithAccount> {
     try {
+      // Extract line items from estimate data
+      const { lineItems, ...estimateFields } = estimateData
+      
       const { data, error } = await supabase
         .from('estimates')
         .update({
-          ...estimateData,
+          ...estimateFields,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -108,7 +143,22 @@ class EstimatesService {
         throw error
       }
 
-      return data
+      // Update line items if provided
+      if (lineItems !== undefined) {
+        // Delete existing line items
+        await supabase
+          .from('estimate_line_items')
+          .delete()
+          .eq('estimate_id', id)
+        
+        // Create new line items
+        if (lineItems.length > 0) {
+          await this.createLineItems(id, data.tenant_id, lineItems)
+        }
+      }
+
+      // Return estimate with line items
+      return await this.getEstimateWithLineItems(id)
     } catch (error) {
       console.error('Error in updateEstimate:', error)
       throw error
@@ -218,6 +268,78 @@ class EstimatesService {
 
     const sequence = String((count || 0) + 1).padStart(4, '0')
     return `JOB-${year}${month}${day}-${sequence}`
+  }
+
+  private async createLineItems(estimateId: string, tenantId: string, lineItems: LineItem[]): Promise<void> {
+    const lineItemsToInsert = lineItems.map((item, index) => ({
+      estimate_id: estimateId,
+      tenant_id: tenantId,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      line_total: item.quantity * item.unit_price,
+      item_type: item.item_type || 'service',
+      sort_order: index
+    }))
+
+    const { error } = await supabase
+      .from('estimate_line_items')
+      .insert(lineItemsToInsert)
+
+    if (error) {
+      console.error('Error creating line items:', error)
+      throw error
+    }
+  }
+
+  private async getEstimateWithLineItems(estimateId: string): Promise<EstimateWithAccount> {
+    const { data: estimate, error: estimateError } = await supabase
+      .from('estimates')
+      .select(`
+        *,
+        accounts(name),
+        contacts(name, first_name, last_name)
+      `)
+      .eq('id', estimateId)
+      .single()
+
+    if (estimateError) {
+      console.error('Error fetching estimate:', estimateError)
+      throw estimateError
+    }
+
+    const { data: lineItems, error: lineItemsError } = await supabase
+      .from('estimate_line_items')
+      .select('*')
+      .eq('estimate_id', estimateId)
+      .order('sort_order')
+
+    if (lineItemsError) {
+      console.error('Error fetching line items:', lineItemsError)
+      throw lineItemsError
+    }
+
+    return {
+      ...estimate,
+      lineItems: lineItems?.map(item => ({
+        id: item.id,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unit_price: Number(item.unit_price),
+        line_total: Number(item.line_total),
+        item_type: item.item_type,
+        sort_order: item.sort_order
+      })) || []
+    }
+  }
+
+  async getEstimateById(id: string): Promise<EstimateWithAccount | null> {
+    try {
+      return await this.getEstimateWithLineItems(id)
+    } catch (error) {
+      console.error('Error in getEstimateById:', error)
+      return null
+    }
   }
 }
 

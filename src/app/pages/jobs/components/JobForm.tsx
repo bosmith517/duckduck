@@ -5,6 +5,14 @@ import clsx from 'clsx'
 import { Job, Account, Contact } from '../../../../supabaseClient'
 import JobCostingDashboard from '../../../components/billing/JobCostingDashboard'
 import JobPhotoGallery from '../../../components/shared/JobPhotoGallery'
+import { useSupabaseAuth } from '../../../modules/auth/core/SupabaseAuth'
+import { supabase } from '../../../../supabaseClient'
+
+interface ClientCustomer {
+  id: string
+  name: string
+  type: 'business' | 'individual'
+}
 
 interface JobFormProps {
   job?: Job | null
@@ -19,8 +27,10 @@ const jobSchema = Yup.object().shape({
     .min(2, 'Minimum 2 characters')
     .max(200, 'Maximum 200 characters')
     .required('Job title is required'),
-  account_id: Yup.string().required('Account is required'),
-  contact_id: Yup.string(),
+  clientCustomerId: Yup.string().required('Client/Customer selection is required'),
+  clientCustomerName: Yup.string().required('Client/Customer name is required'),
+  account_id: Yup.string(), // Optional now
+  contact_id: Yup.string(), // Optional now
   description: Yup.string().max(2000, 'Maximum 2000 characters'),
   status: Yup.string().required('Status is required'),
   priority: Yup.string().required('Priority is required'),
@@ -38,13 +48,18 @@ const jobSchema = Yup.object().shape({
 })
 
 export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSave, onCancel }) => {
+  const { userProfile } = useSupabaseAuth()
   const [loading, setLoading] = useState(false)
   const [filteredContacts, setFilteredContacts] = useState<typeof contacts>([])
   const [activeTab, setActiveTab] = useState('details')
+  const [allClientCustomers, setAllClientCustomers] = useState<ClientCustomer[]>([])
+  const [selectedClientType, setSelectedClientType] = useState<'business' | 'individual' | null>(null)
 
   const formik = useFormik({
     initialValues: {
       title: job?.title || '',
+      clientCustomerId: job?.account_id || job?.contact_id || '',
+      clientCustomerName: '', // Will be set when component loads
       account_id: job?.account_id || '',
       contact_id: job?.contact_id || '',
       description: job?.description || '',
@@ -66,15 +81,28 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
     onSubmit: async (values) => {
       setLoading(true)
       try {
+        // Determine if this is a business client (account) or individual customer (contact)
+        const selectedClient = allClientCustomers.find(c => c.id === values.clientCustomerId)
+        const isIndividualCustomer = selectedClient?.type === 'individual'
+        
         const submitData = {
-          ...values,
-          contact_id: values.contact_id || undefined,
-          start_date: values.start_date || undefined,
-          due_date: values.due_date || undefined,
-          estimated_hours: values.estimated_hours ? Number(values.estimated_hours) : undefined,
-          actual_hours: values.actual_hours ? Number(values.actual_hours) : undefined,
-          estimated_cost: values.estimated_cost ? Number(values.estimated_cost) : undefined,
-          actual_cost: values.actual_cost ? Number(values.actual_cost) : undefined,
+          title: values.title,
+          account_id: isIndividualCustomer ? null : values.clientCustomerId,
+          contact_id: isIndividualCustomer ? values.clientCustomerId : null,
+          description: values.description || null,
+          status: values.status,
+          priority: values.priority,
+          start_date: values.start_date || null,
+          due_date: values.due_date || null,
+          estimated_hours: values.estimated_hours ? Number(values.estimated_hours) : null,
+          actual_hours: values.actual_hours ? Number(values.actual_hours) : null,
+          estimated_cost: values.estimated_cost ? Number(values.estimated_cost) : null,
+          actual_cost: values.actual_cost ? Number(values.actual_cost) : null,
+          location_address: values.location_address || null,
+          location_city: values.location_city || null,
+          location_state: values.location_state || null,
+          location_zip: values.location_zip || null,
+          notes: values.notes || null,
         }
         await onSave(submitData)
       } catch (error) {
@@ -85,21 +113,113 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
     },
   })
 
-  // Filter contacts based on selected account
+  // Load combined client/customer list on component mount
   useEffect(() => {
-    if (formik.values.account_id) {
-      const accountContacts = contacts.filter(contact => contact.account_id === formik.values.account_id)
-      setFilteredContacts(accountContacts)
-      
-      // Clear contact selection if it's not valid for the selected account
-      if (formik.values.contact_id && !accountContacts.find(c => c.id === formik.values.contact_id)) {
-        formik.setFieldValue('contact_id', '')
-      }
-    } else {
-      setFilteredContacts([])
-      formik.setFieldValue('contact_id', '')
+    if (userProfile?.tenant_id) {
+      loadClientCustomers()
     }
-  }, [formik.values.account_id, contacts])
+  }, [userProfile?.tenant_id])
+
+  // Set initial client/customer name for existing jobs
+  useEffect(() => {
+    if (job && allClientCustomers.length > 0) {
+      const selectedClient = allClientCustomers.find(c => c.id === formik.values.clientCustomerId)
+      if (selectedClient) {
+        formik.setFieldValue('clientCustomerName', selectedClient.name)
+        setSelectedClientType(selectedClient.type)
+      }
+    }
+  }, [job, allClientCustomers])
+
+  // Update client fields when job prop changes (after save)
+  useEffect(() => {
+    if (job && allClientCustomers.length > 0) {
+      const newClientId = job.account_id || job.contact_id
+      if (newClientId && newClientId !== formik.values.clientCustomerId) {
+        const selectedClient = allClientCustomers.find(c => c.id === newClientId)
+        if (selectedClient) {
+          formik.setFieldValue('clientCustomerId', newClientId)
+          formik.setFieldValue('clientCustomerName', selectedClient.name)
+          formik.setFieldValue('account_id', job.account_id || '')
+          formik.setFieldValue('contact_id', job.contact_id || '')
+          setSelectedClientType(selectedClient.type)
+        }
+      }
+    }
+  }, [job?.account_id, job?.contact_id, allClientCustomers])
+
+  const loadClientCustomers = async () => {
+    try {
+      // Load business accounts
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('accounts')
+        .select('id, name, type')
+        .eq('tenant_id', userProfile?.tenant_id)
+        .order('name')
+
+      if (accountsError) throw accountsError
+
+      // Load individual customers (contacts without accounts)
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id, first_name, last_name, contact_type')
+        .eq('tenant_id', userProfile?.tenant_id)
+        .eq('contact_type', 'individual')
+        .is('account_id', null)
+        .order('last_name')
+
+      if (contactsError) throw contactsError
+
+      // Combine accounts and individual customers
+      const businessClients = (accountsData || []).map(account => ({
+        id: account.id,
+        name: account.name,
+        type: 'business' as const
+      }))
+
+      const individualCustomers = (contactsData || []).map(contact => ({
+        id: contact.id,
+        name: `${contact.first_name} ${contact.last_name}`.trim(),
+        type: 'individual' as const
+      }))
+
+      const combined = [...businessClients, ...individualCustomers]
+      setAllClientCustomers(combined)
+    } catch (error) {
+      console.error('Error loading clients and customers:', error)
+    }
+  }
+
+  const handleClientCustomerChange = (clientCustomerId: string) => {
+    const selectedClient = allClientCustomers.find(c => c.id === clientCustomerId)
+    if (selectedClient) {
+      formik.setFieldValue('clientCustomerId', clientCustomerId)
+      formik.setFieldValue('clientCustomerName', selectedClient.name)
+      setSelectedClientType(selectedClient.type)
+      
+      // Set appropriate account_id or contact_id based on type
+      if (selectedClient.type === 'business') {
+        formik.setFieldValue('account_id', clientCustomerId)
+        formik.setFieldValue('contact_id', null)
+      } else {
+        formik.setFieldValue('account_id', null)
+        formik.setFieldValue('contact_id', clientCustomerId)
+      }
+    }
+  }
+
+  // Helper function to get appropriate label
+  const getClientCustomerLabel = () => {
+    if (selectedClientType === 'individual') return 'Customer'
+    if (selectedClientType === 'business') return 'Client' 
+    return 'Client/Customer'
+  }
+
+  const getClientCustomerPlaceholder = () => {
+    if (selectedClientType === 'individual') return 'Select a customer...'
+    if (selectedClientType === 'business') return 'Select a client...'
+    return 'Select a client or customer...'
+  }
 
   return (
     <div className='modal fade show d-block' tabIndex={-1} role='dialog'>
@@ -209,53 +329,35 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
                   )}
                 </div>
 
-                {/* Account */}
-                <div className='col-md-6 mb-7'>
-                  <label className='required fw-semibold fs-6 mb-2'>Account</label>
+                {/* Client/Customer Selection */}
+                <div className='col-md-12 mb-7'>
+                  <label className='required fw-semibold fs-6 mb-2'>{getClientCustomerLabel()}</label>
                   <select
                     className={clsx(
                       'form-select form-select-solid',
-                      {'is-invalid': formik.touched.account_id && formik.errors.account_id},
-                      {'is-valid': formik.touched.account_id && !formik.errors.account_id}
+                      {'is-invalid': formik.touched.clientCustomerId && formik.errors.clientCustomerId},
+                      {'is-valid': formik.touched.clientCustomerId && !formik.errors.clientCustomerId}
                     )}
-                    {...formik.getFieldProps('account_id')}
+                    value={formik.values.clientCustomerId}
+                    onChange={(e) => handleClientCustomerChange(e.target.value)}
+                    onBlur={formik.handleBlur}
+                    name="clientCustomerId"
                   >
-                    <option value=''>Select an account</option>
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
+                    <option value=''>{getClientCustomerPlaceholder()}</option>
+                    {allClientCustomers.map(client => (
+                      <option key={client.id} value={client.id}>
+                        {client.name} {client.type === 'business' ? '(Client)' : '(Customer)'}
                       </option>
                     ))}
                   </select>
-                  {formik.touched.account_id && formik.errors.account_id && (
+                  {formik.touched.clientCustomerId && formik.errors.clientCustomerId && (
                     <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.account_id}</span>
+                      <span role='alert'>{formik.errors.clientCustomerId}</span>
                     </div>
                   )}
-                </div>
-
-                {/* Contact */}
-                <div className='col-md-6 mb-7'>
-                  <label className='fw-semibold fs-6 mb-2'>Contact</label>
-                  <select
-                    className={clsx(
-                      'form-select form-select-solid',
-                      {'is-invalid': formik.touched.contact_id && formik.errors.contact_id},
-                      {'is-valid': formik.touched.contact_id && !formik.errors.contact_id}
-                    )}
-                    {...formik.getFieldProps('contact_id')}
-                    disabled={!formik.values.account_id}
-                  >
-                    <option value=''>Select a contact (optional)</option>
-                    {filteredContacts.map((contact) => (
-                      <option key={contact.id} value={contact.id}>
-                        {contact.first_name} {contact.last_name}
-                      </option>
-                    ))}
-                  </select>
-                  {formik.touched.contact_id && formik.errors.contact_id && (
-                    <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.contact_id}</span>
+                  {allClientCustomers.length === 0 && (
+                    <div className='form-text text-muted'>
+                      No clients or customers found. Please create clients/customers in the Contacts section first.
                     </div>
                   )}
                 </div>

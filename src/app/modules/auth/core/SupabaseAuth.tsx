@@ -54,37 +54,82 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
   useEffect(() => {
     setAuthLoading(true)
 
-    // This listener just sets the raw session/user and stops the loading state.
+    // This listener sets the session/user and loads user profile/tenant data
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       
-      // Set a basic user for now if session exists
       if (session?.user) {
-        const basicUserModel: UserModel = {
-          id: 1,
-          username: session.user.email || 'user',
-          password: undefined,
-          email: session.user.email || '',
-          first_name: session.user.user_metadata?.first_name || 'User',
-          last_name: session.user.user_metadata?.last_name || '',
-          fullname: `${session.user.user_metadata?.first_name || 'User'} ${session.user.user_metadata?.last_name || ''}`.trim(),
-          roles: [1],
-        }
-        setCurrentUser(basicUserModel)
+        // Load profile data asynchronously without blocking
+        loadUserProfile(session.user.id)
       } else {
         setCurrentUser(undefined)
         setUserProfile(undefined)
         setTenant(undefined)
+        setAuthLoading(false)
       }
-      
-      setAuthLoading(false)
     })
 
     return () => {
       subscription.unsubscribe()
     }
   }, [])
+
+  // Separate async function to load user profile
+  const loadUserProfile = async (userId: string) => {
+    try {
+      // Load user profile from database
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (profileError) {
+        console.error('Error loading user profile:', profileError)
+        setAuthLoading(false)
+        return
+      }
+
+      setUserProfile(profile)
+
+      // Load tenant information
+      if (profile?.tenant_id) {
+        const { data: tenantData, error: tenantError } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('id', profile.tenant_id)
+          .single()
+
+        if (tenantError) {
+          console.error('Error loading tenant:', tenantError)
+        } else {
+          setTenant(tenantData)
+        }
+      }
+
+      // Get the current user from Supabase auth
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      
+      // Set user model
+      const userModel: UserModel = {
+        id: 1,
+        username: currentUser?.email || 'user',
+        password: undefined,
+        email: currentUser?.email || '',
+        first_name: profile?.first_name || currentUser?.user_metadata?.first_name || 'User',
+        last_name: profile?.last_name || currentUser?.user_metadata?.last_name || '',
+        fullname: `${profile?.first_name || currentUser?.user_metadata?.first_name || 'User'} ${profile?.last_name || currentUser?.user_metadata?.last_name || ''}`.trim(),
+        roles: [profile?.role === 'admin' ? 1 : profile?.role === 'agent' ? 2 : 3],
+      }
+      setCurrentUser(userModel)
+
+    } catch (error) {
+      console.error('Error loading user profile:', error)
+    } finally {
+      setAuthLoading(false)
+    }
+  }
 
   const signIn = async (email: string, password: string) => {
     try {
