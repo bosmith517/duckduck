@@ -3,6 +3,8 @@ import { useFormik } from 'formik'
 import * as Yup from 'yup'
 import clsx from 'clsx'
 import { Contact, Account } from '../../../../supabaseClient'
+import { AddressInput } from '../../../components/shared/AddressInput'
+import { FormattedAddress } from '../../../utils/addressUtils'
 
 interface ContactFormProps {
   contact?: Contact | null
@@ -32,6 +34,10 @@ const contactSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email format').max(100, 'Maximum 100 characters'),
   phone: Yup.string().max(20, 'Maximum 20 characters'),
   mobile: Yup.string().max(20, 'Maximum 20 characters'),
+  address: Yup.string().max(200, 'Maximum 200 characters'),
+  city: Yup.string().max(100, 'Maximum 100 characters'),
+  state: Yup.string().max(50, 'Maximum 50 characters'),
+  zip: Yup.string().max(20, 'Maximum 20 characters'),
   is_primary: Yup.boolean(),
   notes: Yup.string().max(1000, 'Maximum 1000 characters'),
 })
@@ -49,6 +55,10 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
       email: contact?.email || '',
       phone: contact?.phone || '',
       mobile: contact?.mobile || '',
+      address: contact?.address || '',
+      city: contact?.city || '',
+      state: contact?.state || '',
+      zip: contact?.zip || '',
       is_primary: contact?.is_primary || false,
       notes: contact?.notes || '',
     },
@@ -64,6 +74,13 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
       }
     },
   })
+
+  const handleAddressChange = (address: FormattedAddress) => {
+    formik.setFieldValue('address', address.street_address)
+    formik.setFieldValue('city', address.city)
+    formik.setFieldValue('state', address.state)
+    formik.setFieldValue('zip', address.zip)
+  }
 
   return (
     <div className='modal fade show d-block' tabIndex={-1} role='dialog'>
@@ -278,6 +295,55 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
                     </div>
                   </div>
                 )}
+
+                {/* Address Section */}
+                <div className='col-md-12 mb-7'>
+                  <div className='separator border-gray-200 my-4'></div>
+                  <h6 className='fw-bold text-gray-800 fs-6 mb-4'>Address Information</h6>
+                  
+                  <AddressInput
+                    value={formik.values.address}
+                    onChange={handleAddressChange}
+                    onInputChange={(value) => formik.setFieldValue('address', value)}
+                    label='Address'
+                    placeholder='Enter contact address...'
+                    className='mb-3'
+                  />
+                  
+                  {/* Address Details (Auto-populated from autocomplete) */}
+                  <div className='row'>
+                    <div className='col-md-5 mb-3'>
+                      <label className='fw-semibold fs-6 mb-2'>City</label>
+                      <input
+                        type='text'
+                        className='form-control form-control-solid'
+                        placeholder='City (auto-filled)'
+                        value={formik.values.city}
+                        onChange={(e) => formik.setFieldValue('city', e.target.value)}
+                      />
+                    </div>
+                    <div className='col-md-4 mb-3'>
+                      <label className='fw-semibold fs-6 mb-2'>State</label>
+                      <input
+                        type='text'
+                        className='form-control form-control-solid'
+                        placeholder='State (auto-filled)'
+                        value={formik.values.state}
+                        onChange={(e) => formik.setFieldValue('state', e.target.value)}
+                      />
+                    </div>
+                    <div className='col-md-3 mb-3'>
+                      <label className='fw-semibold fs-6 mb-2'>ZIP Code</label>
+                      <input
+                        type='text'
+                        className='form-control form-control-solid'
+                        placeholder='ZIP (auto-filled)'
+                        value={formik.values.zip}
+                        onChange={(e) => formik.setFieldValue('zip', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 {/* Notes */}
                 <div className='col-md-12 mb-7'>

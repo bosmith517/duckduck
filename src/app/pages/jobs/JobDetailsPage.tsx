@@ -12,6 +12,7 @@ import JobPhotoGallery from '../../components/shared/JobPhotoGallery'
 import JobActivityTimeline from '../../components/shared/JobActivityTimeline'
 import { jobActivityService } from '../../services/jobActivityService'
 import { JobForm } from './components/JobForm'
+import ClientPortalService from '../../services/clientPortalService'
 
 interface JobWithRelations {
   id: string
@@ -62,12 +63,15 @@ const JobDetailsPage: React.FC = () => {
   const [showEditForm, setShowEditForm] = useState(false)
   const [accounts, setAccounts] = useState<any[]>([])
   const [contacts, setContacts] = useState<any[]>([])
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [portalUrl, setPortalUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (id && userProfile?.tenant_id) {
       fetchJob()
       fetchAccounts()
       fetchContacts()
+      checkExistingPortal()
     }
   }, [id, userProfile?.tenant_id])
 
@@ -286,6 +290,69 @@ const JobDetailsPage: React.FC = () => {
     }
   }
 
+  const checkExistingPortal = async () => {
+    if (!id) return
+
+    try {
+      const { data: token, error } = await supabase
+        .from('client_portal_tokens')
+        .select('token')
+        .eq('job_id', id)
+        .eq('is_active', true)
+        .single()
+
+      if (token && !error) {
+        const existingPortalUrl = `${window.location.origin}/portal/${token.token}`
+        setPortalUrl(existingPortalUrl)
+        console.log('Existing portal found:', existingPortalUrl)
+      }
+    } catch (error) {
+      console.log('No existing portal found for this job')
+    }
+  }
+
+  const handleGeneratePortal = async () => {
+    if (!job?.id) return
+
+    setPortalLoading(true)
+    const loadingToast = showToast.loading('Generating customer portal...')
+
+    try {
+      // Try to generate portal (SMS might fail but portal could still be created)
+      await ClientPortalService.autoGeneratePortalForJob(job.id)
+      
+      // Always check if a portal token exists after attempting generation
+      const { data: token, error: tokenError } = await supabase
+        .from('client_portal_tokens')
+        .select('token')
+        .eq('job_id', job.id)
+        .eq('is_active', true)
+        .single()
+
+      if (token && !tokenError) {
+        const portalUrl = `${window.location.origin}/portal/${token.token}`
+        setPortalUrl(portalUrl)
+        showToast.dismiss(loadingToast)
+        showToast.success('Customer portal generated! SMS notification may have failed, but portal is accessible.')
+        
+        // Log the portal URL to console for easy access
+        console.log('Portal URL:', portalUrl)
+        
+        // Also copy to clipboard for convenience
+        navigator.clipboard.writeText(portalUrl)
+        showToast.info('Portal URL copied to clipboard!')
+      } else {
+        throw new Error('Failed to generate portal token')
+      }
+    } catch (error: any) {
+      console.error('Error generating portal:', error)
+      showToast.dismiss(loadingToast)
+      showToast.error(error.message || 'Failed to generate customer portal')
+    } finally {
+      setPortalLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className='d-flex justify-content-center align-items-center' style={{ minHeight: '400px' }}>
@@ -340,6 +407,27 @@ const JobDetailsPage: React.FC = () => {
                   <i className='ki-duotone ki-arrow-left fs-2'></i>
                   Back to Jobs
                 </button>
+                
+                {/* Customer Portal Button */}
+                <button
+                  className='btn btn-sm btn-success me-2'
+                  onClick={handleGeneratePortal}
+                  disabled={portalLoading || !(job?.account_id || job?.contact_id)}
+                  title={!(job?.account_id || job?.contact_id) ? 'Job must have a customer assigned' : 'Generate customer portal access'}
+                >
+                  {portalLoading ? (
+                    <>
+                      <span className='spinner-border spinner-border-sm me-2'></span>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <i className='ki-duotone ki-user-tick fs-2 me-1'></i>
+                      Generate Portal
+                    </>
+                  )}
+                </button>
+                
                 <button 
                   className='btn btn-sm btn-primary'
                   onClick={() => setShowEditForm(true)}
@@ -514,6 +602,25 @@ const JobDetailsPage: React.FC = () => {
                           {job.start_date ? new Date(job.start_date).toLocaleDateString() : 'Not set'}
                         </span>
                       </div>
+                      {/* Customer Portal URL */}
+                      {portalUrl && (
+                        <div className='alert alert-success d-flex align-items-center p-5 mb-4'>
+                          <i className='ki-duotone ki-user-tick fs-2hx text-success me-4'>
+                            <span className='path1'></span>
+                            <span className='path2'></span>
+                            <span className='path3'></span>
+                          </i>
+                          <div className='d-flex flex-column'>
+                            <h5 className='mb-1'>Customer Portal Generated!</h5>
+                            <span className='fw-bold'>Portal Link:</span>
+                            <a href={portalUrl} target='_blank' rel='noopener noreferrer' className='link-primary fw-semibold'>
+                              {portalUrl}
+                            </a>
+                            <span className='text-muted fs-7 mt-1'>Customer has been notified via SMS/email</span>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className='d-flex justify-content-between mb-4'>
                         <span className='text-muted fw-semibold'>Location</span>
                         <span className='fw-bold'>

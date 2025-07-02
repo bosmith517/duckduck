@@ -5,6 +5,8 @@ import clsx from 'clsx'
 import { Job, Account, Contact } from '../../../../supabaseClient'
 import JobCostingDashboard from '../../../components/billing/JobCostingDashboard'
 import JobPhotoGallery from '../../../components/shared/JobPhotoGallery'
+import { AddressInput } from '../../../components/shared/AddressInput'
+import { FormattedAddress } from '../../../utils/addressUtils'
 import { useSupabaseAuth } from '../../../modules/auth/core/SupabaseAuth'
 import { supabase } from '../../../../supabaseClient'
 
@@ -87,8 +89,8 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
         
         const submitData = {
           title: values.title,
-          account_id: isIndividualCustomer ? undefined : values.clientCustomerId,
-          contact_id: isIndividualCustomer ? values.clientCustomerId : undefined,
+          account_id: isIndividualCustomer ? null : values.clientCustomerId,
+          contact_id: isIndividualCustomer ? values.clientCustomerId : null,
           description: values.description || undefined,
           status: values.status,
           priority: values.priority,
@@ -104,9 +106,17 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
           location_zip: values.location_zip || undefined,
           notes: values.notes || undefined,
         }
+        
+        console.log('Submitting job data:', submitData)
+        console.log('Selected client:', selectedClient)
+        console.log('Is individual customer:', isIndividualCustomer)
+        
         await onSave(submitData)
       } catch (error) {
         console.error('Error saving job:', error)
+        // Show user-friendly error message
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+        alert(`Failed to save job: ${errorMessage}`)
       } finally {
         setLoading(false)
       }
@@ -219,6 +229,13 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
     if (selectedClientType === 'individual') return 'Select a customer...'
     if (selectedClientType === 'business') return 'Select a client...'
     return 'Select a client or customer...'
+  }
+
+  const handleLocationAddressChange = (address: FormattedAddress) => {
+    formik.setFieldValue('location_address', address.street_address)
+    formik.setFieldValue('location_city', address.city)
+    formik.setFieldValue('location_state', address.state)
+    formik.setFieldValue('location_zip', address.zip)
   }
 
   return (
@@ -533,84 +550,53 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
                   )}
                 </div>
 
-                {/* Location Address */}
+                {/* Location Address with Autocomplete */}
                 <div className='col-md-12 mb-7'>
-                  <label className='fw-semibold fs-6 mb-2'>Location Address</label>
-                  <input
-                    type='text'
-                    className={clsx(
-                      'form-control form-control-solid mb-3 mb-lg-0',
-                      {'is-invalid': formik.touched.location_address && formik.errors.location_address},
-                      {'is-valid': formik.touched.location_address && !formik.errors.location_address}
-                    )}
-                    placeholder='Enter job location address'
-                    {...formik.getFieldProps('location_address')}
+                  <AddressInput
+                    value={formik.values.location_address}
+                    onChange={handleLocationAddressChange}
+                    onInputChange={(value) => formik.setFieldValue('location_address', value)}
+                    label='Job Location'
+                    placeholder='Enter job location address...'
+                    error={formik.touched.location_address && formik.errors.location_address ? formik.errors.location_address : undefined}
                   />
-                  {formik.touched.location_address && formik.errors.location_address && (
-                    <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.location_address}</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Location City */}
-                <div className='col-md-4 mb-7'>
+                {/* Address Details (Auto-populated from autocomplete) */}
+                <div className='col-md-5 mb-7'>
                   <label className='fw-semibold fs-6 mb-2'>City</label>
                   <input
                     type='text'
-                    className={clsx(
-                      'form-control form-control-solid mb-3 mb-lg-0',
-                      {'is-invalid': formik.touched.location_city && formik.errors.location_city},
-                      {'is-valid': formik.touched.location_city && !formik.errors.location_city}
-                    )}
-                    placeholder='Enter city'
-                    {...formik.getFieldProps('location_city')}
+                    className='form-control form-control-solid'
+                    placeholder='City (auto-filled)'
+                    value={formik.values.location_city}
+                    onChange={(e) => formik.setFieldValue('location_city', e.target.value)}
+                    readOnly={false}
                   />
-                  {formik.touched.location_city && formik.errors.location_city && (
-                    <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.location_city}</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Location State */}
                 <div className='col-md-4 mb-7'>
                   <label className='fw-semibold fs-6 mb-2'>State</label>
                   <input
                     type='text'
-                    className={clsx(
-                      'form-control form-control-solid mb-3 mb-lg-0',
-                      {'is-invalid': formik.touched.location_state && formik.errors.location_state},
-                      {'is-valid': formik.touched.location_state && !formik.errors.location_state}
-                    )}
-                    placeholder='Enter state'
-                    {...formik.getFieldProps('location_state')}
+                    className='form-control form-control-solid'
+                    placeholder='State (auto-filled)'
+                    value={formik.values.location_state}
+                    onChange={(e) => formik.setFieldValue('location_state', e.target.value)}
+                    readOnly={false}
                   />
-                  {formik.touched.location_state && formik.errors.location_state && (
-                    <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.location_state}</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Location ZIP */}
-                <div className='col-md-4 mb-7'>
+                <div className='col-md-3 mb-7'>
                   <label className='fw-semibold fs-6 mb-2'>ZIP Code</label>
                   <input
                     type='text'
-                    className={clsx(
-                      'form-control form-control-solid mb-3 mb-lg-0',
-                      {'is-invalid': formik.touched.location_zip && formik.errors.location_zip},
-                      {'is-valid': formik.touched.location_zip && !formik.errors.location_zip}
-                    )}
-                    placeholder='Enter ZIP code'
-                    {...formik.getFieldProps('location_zip')}
+                    className='form-control form-control-solid'
+                    placeholder='ZIP (auto-filled)'
+                    value={formik.values.location_zip}
+                    onChange={(e) => formik.setFieldValue('location_zip', e.target.value)}
+                    readOnly={false}
                   />
-                  {formik.touched.location_zip && formik.errors.location_zip && (
-                    <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.location_zip}</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Notes */}

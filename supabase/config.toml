@@ -137,3 +137,14 @@ entrypoint = "./functions/generate-estimate/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/generate-estimate/*.html" ]
+
+# Property Data Integration
+[functions.get-property-data]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/get-property-data/index.ts"
+
+[functions.scrape-property-data]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/scrape-property-data/index.ts"

@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../../../supabaseClient'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+import ClientPortalService from '../../services/clientPortalService'
+import { propertyService } from '../../services/propertyService'
 import SmartDashboard from '../../components/customer-portal/SmartDashboard'
 import JobHistoryTimeline from '../../components/customer-portal/JobHistoryTimeline'
 import ChatWidget from '../../components/customer-portal/ChatWidget'
@@ -82,7 +84,7 @@ interface JobHistory {
 }
 
 const CustomerPortalPage: React.FC = () => {
-  const { customerId, trackingToken } = useParams<{ customerId: string; trackingToken?: string }>()
+  const { customerId, trackingToken, token } = useParams<{ customerId?: string; trackingToken?: string; token?: string }>()
   
   // State management
   const [customer, setCustomer] = useState<CustomerData | null>(null)
@@ -130,12 +132,16 @@ const CustomerPortalPage: React.FC = () => {
   const markerRef = useRef<mapboxgl.Marker | null>(null)
   const realtimeChannelRef = useRef<any>(null)
 
-  // Load initial data
+  // Load initial data based on access method
   useEffect(() => {
-    if (customerId) {
+    if (token) {
+      // Token-based access (from portal link)
+      loadPortalDataByToken()
+    } else if (customerId) {
+      // Direct customer ID access
       loadCustomerData()
     }
-  }, [customerId])
+  }, [token, customerId])
 
   // Set up tracking if token provided
   useEffect(() => {
@@ -143,6 +149,118 @@ const CustomerPortalPage: React.FC = () => {
       initializeTracking()
     }
   }, [trackingToken])
+
+  const loadPortalDataByToken = async () => {
+    if (!token) return
+
+    try {
+      setLoading(true)
+      
+      // Validate portal token and get job access
+      const portalData = await ClientPortalService.validatePortalAccess(token)
+      
+      if (!portalData) {
+        setError('Invalid or expired portal link. Please contact us for assistance.')
+        return
+      }
+
+      // Get the job and customer data from the portal response
+      const job = portalData.jobs
+      if (!job) {
+        setError('Unable to load job information.')
+        return
+      }
+
+      // Determine if customer is a contact or account
+      const customerData = job.contacts || job.accounts
+      if (!customerData) {
+        setError('Unable to load customer information.')
+        return
+      }
+
+      // Transform the data to match CustomerData interface
+      const transformedCustomer: CustomerData = {
+        id: job.contact_id || job.account_id || '',
+        first_name: job.contacts?.first_name || job.accounts?.name?.split(' ')[0] || '',
+        last_name: job.contacts?.last_name || '',
+        email: job.contacts?.email || job.accounts?.email || '',
+        phone: job.contacts?.phone || job.accounts?.phone || '',
+        address: job.location_address || '',
+        city: job.location_city || '',
+        state: job.location_state || '',
+        zip_code: job.location_zip || ''
+      }
+
+      setCustomer(transformedCustomer)
+
+      // Set current job
+      if (job) {
+        setCurrentJob({
+          id: job.id,
+          title: job.title || 'Service',
+          description: job.description || '',
+          scheduled_date: job.start_date || '',
+          estimated_duration: 2, // Default 2 hours
+          status: job.status || 'Scheduled',
+          technician_name: 'TBD',
+          technician_phone: null,
+          service_type: job.title || 'Service',
+          priority: job.priority || 'medium'
+        })
+      }
+
+      // Get real property data from Redfin
+      if (transformedCustomer.address) {
+        const fullAddress = `${transformedCustomer.address}, ${transformedCustomer.city}, ${transformedCustomer.state} ${transformedCustomer.zip_code}`
+        
+        try {
+          console.log('🏠 Loading property data for customer portal:', fullAddress)
+          // Clear cache first to test the function
+          propertyService.clearCache(fullAddress)
+          const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, job?.tenant_id)
+          console.log('🏠 Property data loaded:', propertyData)
+          setPropertyData(propertyData)
+        } catch (error) {
+          console.error('❌ Error loading property data:', error)
+          // Fallback to basic data
+          setPropertyData({
+            address: fullAddress,
+            streetViewUrl: `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${encodeURIComponent(fullAddress)}&key=${import.meta.env.VITE_GOOGLE_PLACES_API_KEY}`,
+            propertyType: 'Residential Property'
+          })
+        }
+      }
+
+      // Load job history for this customer
+      const customerIdToUse = job.contact_id || job.account_id
+      if (customerIdToUse) {
+        const { data: historyData } = await supabase
+          .from('jobs')
+          .select('id, start_date, title, status, estimated_cost')
+          .or(`contact_id.eq.${customerIdToUse},account_id.eq.${customerIdToUse}`)
+          .in('status', ['Completed', 'Cancelled'])
+          .order('start_date', { ascending: false })
+          .limit(10)
+
+        if (historyData) {
+          setJobHistory(historyData.map(job => ({
+            id: job.id,
+            date: job.start_date,
+            service: job.title,
+            status: job.status,
+            technician: 'N/A',
+            cost: job.estimated_cost || 0
+          })))
+        }
+      }
+
+    } catch (error: any) {
+      console.error('Error loading portal data:', error)
+      setError('Unable to load portal. Please try again or contact support.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadCustomerData = async () => {
     try {
@@ -158,25 +276,26 @@ const CustomerPortalPage: React.FC = () => {
       if (customerError) throw customerError
       setCustomer(customerData)
 
-      // Generate mock property data based on customer address
+      // Get real property data based on customer address
       if (customerData) {
         const fullAddress = `${customerData.address_line1 || customerData.address}, ${customerData.city}, ${customerData.state} ${customerData.zip_code}`
-        const encodedAddress = encodeURIComponent(fullAddress)
         
-        setPropertyData({
-          address: fullAddress,
-          streetViewUrl: `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${encodedAddress}&key=YOUR_GOOGLE_MAPS_KEY`,
-          zestimate: 485000,
-          yearBuilt: 2018,
-          squareFootage: 1850,
-          lotSize: '0.18 acres',
-          bedrooms: 3,
-          bathrooms: 2,
-          propertyType: 'Single Family Home',
-          lastSoldDate: '2021-03-15',
-          lastSoldPrice: 425000,
-          taxAssessment: 462000
-        })
+        try {
+          console.log('🏠 Loading property data for customer portal:', fullAddress)
+          // Clear cache first to test the function
+          propertyService.clearCache(fullAddress)
+          const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, job?.tenant_id)
+          console.log('🏠 Property data loaded:', propertyData)
+          setPropertyData(propertyData)
+        } catch (error) {
+          console.error('❌ Error loading property data:', error)
+          // Fallback to basic data
+          setPropertyData({
+            address: fullAddress,
+            streetViewUrl: `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${encodeURIComponent(fullAddress)}&key=${import.meta.env.VITE_GOOGLE_PLACES_API_KEY}`,
+            propertyType: 'Residential Property'
+          })
+        }
       }
 
       // Load current active job
@@ -593,7 +712,7 @@ const CustomerPortalPage: React.FC = () => {
                       {propertyData ? (
                         <div
                           className="w-100 rounded-top bg-light d-flex align-items-center justify-content-center"
-                          style={{ height: '300px', backgroundImage: `url('https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=300&fit=crop')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                          style={{ height: '300px', backgroundImage: `url('${propertyData.streetViewUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                         >
                           <div className="position-absolute bottom-0 start-0 end-0 bg-gradient-dark p-3">
                             <h4 className="text-white fw-bold mb-1">{propertyData.address}</h4>
@@ -644,7 +763,7 @@ const CustomerPortalPage: React.FC = () => {
                                 <span className="path2"></span>
                                 <span className="path3"></span>
                               </i>
-                              <div className="fw-bold text-dark fs-4">${propertyData.zestimate?.toLocaleString()}</div>
+                              <div className="fw-bold text-dark fs-4">{propertyData.zestimate ? `$${propertyData.zestimate.toLocaleString()}` : 'Not available'}</div>
                               <div className="text-muted fs-7">Estimated Value</div>
                             </div>
                           </div>
@@ -654,7 +773,7 @@ const CustomerPortalPage: React.FC = () => {
                                 <span className="path1"></span>
                                 <span className="path2"></span>
                               </i>
-                              <div className="fw-bold text-dark fs-4">{propertyData.squareFootage?.toLocaleString()}</div>
+                              <div className="fw-bold text-dark fs-4">{propertyData.squareFootage ? propertyData.squareFootage.toLocaleString() : 'Not available'}</div>
                               <div className="text-muted fs-7">Square Feet</div>
                             </div>
                           </div>
@@ -664,7 +783,7 @@ const CustomerPortalPage: React.FC = () => {
                                 <span className="path1"></span>
                                 <span className="path2"></span>
                               </i>
-                              <div className="fw-bold text-dark fs-4">{propertyData.bedrooms}BD/{propertyData.bathrooms}BA</div>
+                              <div className="fw-bold text-dark fs-4">{propertyData.bedrooms && propertyData.bathrooms ? `${propertyData.bedrooms}BD/${propertyData.bathrooms}BA` : 'Not available'}</div>
                               <div className="text-muted fs-7">Bed/Bath</div>
                             </div>
                           </div>
@@ -677,31 +796,34 @@ const CustomerPortalPage: React.FC = () => {
                           <div className="col-md-6">
                             <div className="d-flex justify-content-between mb-3">
                               <span className="text-muted">Lot Size:</span>
-                              <span className="fw-semibold">{propertyData.lotSize}</span>
+                              <span className="fw-semibold">{propertyData.lotSize || 'Not available'}</span>
                             </div>
                             <div className="d-flex justify-content-between mb-3">
                               <span className="text-muted">Year Built:</span>
-                              <span className="fw-semibold">{propertyData.yearBuilt}</span>
+                              <span className="fw-semibold">{propertyData.yearBuilt || 'Not available'}</span>
                             </div>
                             <div className="d-flex justify-content-between mb-3">
                               <span className="text-muted">Property Type:</span>
-                              <span className="fw-semibold">{propertyData.propertyType}</span>
+                              <span className="fw-semibold">{propertyData.propertyType || 'Residential Property'}</span>
                             </div>
                           </div>
                           <div className="col-md-6">
                             <div className="d-flex justify-content-between mb-3">
                               <span className="text-muted">Last Sold:</span>
                               <span className="fw-semibold">
-                                ${propertyData.lastSoldPrice?.toLocaleString()} ({new Date(propertyData.lastSoldDate || '').getFullYear()})
+                                {propertyData.lastSoldPrice && propertyData.lastSoldDate ? 
+                                  `$${propertyData.lastSoldPrice.toLocaleString()} (${new Date(propertyData.lastSoldDate).getFullYear()})` : 
+                                  'Not available'
+                                }
                               </span>
                             </div>
                             <div className="d-flex justify-content-between mb-3">
                               <span className="text-muted">Tax Assessment:</span>
-                              <span className="fw-semibold">${propertyData.taxAssessment?.toLocaleString()}</span>
+                              <span className="fw-semibold">{propertyData.taxAssessment ? `$${propertyData.taxAssessment.toLocaleString()}` : 'Not available'}</span>
                             </div>
                             <div className="d-flex justify-content-between mb-3">
                               <span className="text-muted">Data Source:</span>
-                              <span className="fw-semibold text-primary">Zillow API</span>
+                              <span className="fw-semibold text-primary">Redfin API</span>
                             </div>
                           </div>
                         </div>

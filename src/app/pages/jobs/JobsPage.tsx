@@ -125,6 +125,7 @@ const JobsPage: React.FC = () => {
 
       if (error) {
         console.error('Error creating job:', error)
+        alert(`Failed to create job: ${error.message}`)
         return
       }
 
@@ -132,6 +133,8 @@ const JobsPage: React.FC = () => {
       setShowForm(false)
     } catch (error) {
       console.error('Error creating job:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to create job: ${errorMessage}`)
     }
   }
 
@@ -150,6 +153,7 @@ const JobsPage: React.FC = () => {
 
       if (error) {
         console.error('Error updating job:', error)
+        alert(`Failed to update job: ${error.message}`)
         return
       }
 
@@ -160,6 +164,8 @@ const JobsPage: React.FC = () => {
       setShowForm(false)
     } catch (error) {
       console.error('Error updating job:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      alert(`Failed to update job: ${errorMessage}`)
     }
   }
 

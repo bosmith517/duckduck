@@ -4,6 +4,7 @@ import * as Yup from 'yup'
 import clsx from 'clsx'
 import { EstimateWithAccount, LineItem } from '../../../services/estimatesService'
 import PhotoCapture from '../../../components/shared/PhotoCapture'
+import { LineItemUploader } from '../../../components/estimates/LineItemUploader'
 import { supabase } from '../../../../supabaseClient'
 import { useSupabaseAuth } from '../../../modules/auth/core/SupabaseAuth'
 
@@ -127,6 +128,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
   const [showNewJobForm, setShowNewJobForm] = useState(false)
   const [newJobTitle, setNewJobTitle] = useState('')
   const [creatingJob, setCreatingJob] = useState(false)
+  const [showLineItemUploader, setShowLineItemUploader] = useState(false)
 
   const formik = useFormik<EstimateFormValues>({
     initialValues: {
@@ -496,6 +498,12 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
     ))
   }
 
+  const handleLineItemsImport = (importedLineItems: LineItem[]) => {
+    // Replace existing line items with imported ones
+    formik.setFieldValue('lineItems', importedLineItems)
+    setShowLineItemUploader(false)
+  }
+
   return (
     <div className='modal fade show d-block' tabIndex={-1} role='dialog'>
       <div className='modal-dialog modal-dialog-centered modal-xl' role='document'>
@@ -705,7 +713,18 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                     <div className='card card-bordered'>
                       <div className='card-header'>
                         <h6 className='card-title'>Line Items</h6>
-                        <div className='card-toolbar'>
+                        <div className='card-toolbar d-flex gap-2 align-items-center'>
+                          <button
+                            type='button'
+                            className='btn btn-sm btn-light-success'
+                            onClick={() => setShowLineItemUploader(true)}
+                          >
+                            <i className='ki-duotone ki-document-up fs-6 me-1'>
+                              <span className='path1'></span>
+                              <span className='path2'></span>
+                            </i>
+                            Import from File
+                          </button>
                           <span className='text-muted fs-7'>
                             {formik.values.lineItems.length} item{formik.values.lineItems.length !== 1 ? 's' : ''}
                           </span>
@@ -1076,6 +1095,14 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
           onPhotoSaved={handlePhotoCapture}
           photoType={selectedPhotoType}
           title={`Capture ${selectedPhotoType} Photo`}
+        />
+      )}
+
+      {/* Line Item Uploader Modal */}
+      {showLineItemUploader && (
+        <LineItemUploader
+          onLineItemsImported={handleLineItemsImport}
+          onCancel={() => setShowLineItemUploader(false)}
         />
       )}
     </div>

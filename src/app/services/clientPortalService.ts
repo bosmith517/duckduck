@@ -44,6 +44,7 @@ export class ClientPortalService {
         .insert({
           job_id: jobId,
           customer_id: customerId,
+          contact_id: customerId, // Also set contact_id for backward compatibility
           tenant_id: tenantId,
           token: token,
           expires_at: expiresAt.toISOString(),
@@ -74,8 +75,7 @@ export class ClientPortalService {
         .select(`
           *,
           accounts:account_id(name, phone, email),
-          contacts:contact_id(first_name, last_name, phone, email),
-          tenants:tenant_id(company_name, phone, website)
+          contacts:contact_id(first_name, last_name, phone, email)
         `)
         .eq('id', jobId)
         .single()
@@ -118,10 +118,10 @@ export class ClientPortalService {
       // Generate portal URL 
       const baseUrl = window.location.origin
       const portalUrl = `${baseUrl}/portal/${portalToken?.token}`
-      const companyName = job.tenants?.company_name || 'TradeWorks Pro'
+      const companyName = job.accounts?.name || 'TradeWorks Pro'
 
       // Send welcome SMS with portal link
-      const smsMessage = `Hi ${customerName}! Here is your private portal for your ${job.service_type || 'service'} with ${companyName}: ${portalUrl}. Track progress, view invoices, and communicate with us securely.`
+      const smsMessage = `Hi ${customerName}! Here is your private portal for your ${job.service_type || 'service'} with ${companyName}: ${portalUrl}. Track progress, view invoices, and communicate with us securely. Questions? Call (312) 680-5945 or visit tradeworkspro.com`
 
       const { error: smsError } = await supabase.functions.invoke('send-sms', {
         body: {
@@ -152,6 +152,7 @@ export class ClientPortalService {
           </ul>
           <p><a href="${portalUrl}" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Access Your Portal</a></p>
           <p>Your portal link: <a href="${portalUrl}">${portalUrl}</a></p>
+          <p>Questions? Call us at (312) 680-5945 or visit <a href="https://tradeworkspro.com">tradeworkspro.com</a></p>
           <p>Best regards,<br>${companyName}</p>
         `
 
@@ -166,11 +167,13 @@ export class ClientPortalService {
       }
 
       // Log the portal creation activity
-      await this.logPortalActivity(portalToken?.id, 'login', {
-        activity_description: 'Portal token generated and welcome message sent',
-        customer_name: customerName,
-        job_id: jobId
-      })
+      if (portalToken?.id) {
+        await this.logPortalActivity(portalToken.id, 'login', {
+          activity_description: 'Portal token generated and welcome message sent',
+          customer_name: customerName,
+          job_id: jobId
+        })
+      }
 
       return true
     } catch (error) {
@@ -191,8 +194,7 @@ export class ClientPortalService {
           jobs:job_id(
             *,
             accounts:account_id(name, phone, email),
-            contacts:contact_id(first_name, last_name, phone, email),
-            tenants:tenant_id(company_name, logo_url, primary_color)
+            contacts:contact_id(first_name, last_name, phone, email)
           )
         `)
         .eq('token', token)
@@ -239,14 +241,27 @@ export class ClientPortalService {
     metadata: any = {}
   ): Promise<void> {
     try {
+      // Get the tenant_id from the portal token
+      const { data: tokenData } = await supabase
+        .from('client_portal_tokens')
+        .select('tenant_id')
+        .eq('id', portalTokenId)
+        .single()
+
+      if (!tokenData?.tenant_id) {
+        console.warn('Could not get tenant_id for portal activity logging')
+        return
+      }
+
       await supabase
         .from('portal_activity_log')
         .insert({
           portal_token_id: portalTokenId,
+          tenant_id: tokenData.tenant_id,
           activity_type: activityType,
-          page_visited: window.location.pathname,
+          page_visited: typeof window !== 'undefined' ? window.location.pathname : undefined,
           ip_address: this.getClientIP(),
-          user_agent: navigator.userAgent,
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
           metadata: metadata,
           created_at: new Date().toISOString()
         })
@@ -359,7 +374,7 @@ export class ClientPortalService {
         .select(`
           *,
           contacts:contact_id(first_name, last_name, phone),
-          tenants:tenant_id(company_name)
+          accounts:account_id(name)
         `)
         .eq('id', jobId)
         .single()
@@ -368,7 +383,7 @@ export class ClientPortalService {
 
       const customerName = `${job.contacts.first_name} ${job.contacts.last_name || ''}`.trim()
       const portalUrl = this.generateBrandedPortalUrl(analytics.token.token)
-      const companyName = job.tenants?.company_name || 'TradeWorks Pro'
+      const companyName = job.accounts?.name || 'TradeWorks Pro'
 
       const reminderMessage = `Hi ${customerName}! Don't forget to check your project portal for updates on your ${job.service_type}: ${portalUrl} - ${companyName}`
 

@@ -79,6 +79,7 @@ const AppRoutes: FC = () => {
         <Route path='customer-tracking/:trackingToken' element={<TrackingPage />} />
         <Route path='customer/:customerId' element={<CustomerPortalPage />} />
         <Route path='customer/:customerId/track/:trackingToken' element={<CustomerPortalPage />} />
+        <Route path='portal/:token' element={<CustomerPortalPage />} />
         
         {/* Marketing routes - always accessible */}
         <Route path='/' element={<LandingPage />} />
