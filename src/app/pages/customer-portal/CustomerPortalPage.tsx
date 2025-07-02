@@ -203,7 +203,7 @@ const CustomerPortalPage: React.FC = () => {
           estimated_duration: 2, // Default 2 hours
           status: job.status || 'Scheduled',
           technician_name: 'TBD',
-          technician_phone: null,
+          technician_phone: undefined,
           service_type: job.title || 'Service',
           priority: job.priority || 'medium'
         })
@@ -217,7 +217,7 @@ const CustomerPortalPage: React.FC = () => {
           console.log('🏠 Loading property data for customer portal:', fullAddress)
           // Clear cache first to test the function
           propertyService.clearCache(fullAddress)
-          const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, job?.tenant_id)
+          const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, customerData.tenant_id)
           console.log('🏠 Property data loaded:', propertyData)
           setPropertyData(propertyData)
         } catch (error) {
@@ -284,7 +284,7 @@ const CustomerPortalPage: React.FC = () => {
           console.log('🏠 Loading property data for customer portal:', fullAddress)
           // Clear cache first to test the function
           propertyService.clearCache(fullAddress)
-          const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, job?.tenant_id)
+          const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, customerData.tenant_id)
           console.log('🏠 Property data loaded:', propertyData)
           setPropertyData(propertyData)
         } catch (error) {

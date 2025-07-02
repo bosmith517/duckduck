@@ -38,12 +38,12 @@ export interface PlaceResult {
 /**
  * Parse Google Places API result into standardized address format
  */
-export function parseGooglePlaceResult(place: google.maps.places.PlaceResult): FormattedAddress {
+export function parseGooglePlaceResult(place: any): FormattedAddress {
   const components: AddressComponents = {}
   
   // Parse address components
   if (place.address_components) {
-    place.address_components.forEach(component => {
+    place.address_components.forEach((component: any) => {
       const types = component.types
       
       if (types.includes('street_number')) {

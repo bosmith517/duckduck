@@ -89,8 +89,8 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
         
         const submitData = {
           title: values.title,
-          account_id: isIndividualCustomer ? null : values.clientCustomerId,
-          contact_id: isIndividualCustomer ? values.clientCustomerId : null,
+          account_id: isIndividualCustomer ? undefined : values.clientCustomerId,
+          contact_id: isIndividualCustomer ? values.clientCustomerId : undefined,
           description: values.description || undefined,
           status: values.status,
           priority: values.priority,
@@ -210,9 +210,9 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
       // Set appropriate account_id or contact_id based on type
       if (selectedClient.type === 'business') {
         formik.setFieldValue('account_id', clientCustomerId)
-        formik.setFieldValue('contact_id', null)
+        formik.setFieldValue('contact_id', '')
       } else {
-        formik.setFieldValue('account_id', null)
+        formik.setFieldValue('account_id', '')
         formik.setFieldValue('contact_id', clientCustomerId)
       }
     }

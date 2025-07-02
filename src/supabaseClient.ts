@@ -82,6 +82,10 @@ export interface Contact {
   email?: string
   phone?: string
   mobile?: string
+  address?: string
+  city?: string
+  state?: string
+  zip?: string
   is_primary?: boolean // Local storage only field
   notes?: string
   created_at: string

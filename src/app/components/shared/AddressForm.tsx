@@ -245,7 +245,6 @@ export const AddressForm: React.FC<AddressFormProps> = ({
             label='Search Address'
             disabled={disabled}
             required={required}
-            countries={compact ? ['us'] : undefined}
           />
           
           <div className='d-flex justify-content-end mt-2'>

@@ -533,50 +533,67 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                     </div>
                   )}
                   
-                  <div className="position-absolute bottom-0 start-50 translate-middle-x mb-3">
-                    <div className="d-flex gap-2 align-items-center">
-                      <button
-                        className="btn btn-success btn-lg rounded-circle shadow"
-                        onClick={capturePhoto}
-                        style={{ width: '70px', height: '70px' }}
-                      >
-                        <i className="ki-duotone ki-camera fs-1">
-                          <span className="path1"></span>
-                          <span className="path2"></span>
-                        </i>
-                      </button>
-                      
+                  <div className="position-absolute bottom-0 start-0 end-0 p-3 bg-gradient-dark">
+                    <div className="d-flex justify-content-center align-items-center gap-3">
                       {photos.length > 0 && (
                         <button
                           className="btn btn-primary btn-lg shadow"
                           onClick={stopCamera}
+                          style={{ minWidth: '100px' }}
                         >
                           <i className="ki-duotone ki-check fs-6 me-1">
                             <span className="path1"></span>
                             <span className="path2"></span>
                           </i>
-                          Done ({photos.length})
+                          Done
                         </button>
                       )}
                       
                       <button
-                        className="btn btn-secondary btn-lg rounded-circle shadow"
+                        className="btn btn-success btn-lg rounded-circle shadow position-relative"
+                        onClick={capturePhoto}
+                        style={{ width: '80px', height: '80px' }}
+                        title="Take Photo"
+                      >
+                        <i className="ki-duotone ki-camera fs-1">
+                          <span className="path1"></span>
+                          <span className="path2"></span>
+                        </i>
+                        {photos.length > 0 && (
+                          <span 
+                            className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+                            style={{ fontSize: '0.75rem' }}
+                          >
+                            {photos.length}
+                          </span>
+                        )}
+                      </button>
+                      
+                      <button
+                        className="btn btn-light btn-lg rounded-circle shadow"
                         onClick={() => {
                           stopCamera()
-                          // Clear any photos taken during this session if needed
                           if (photos.length === 0) {
                             onClose()
                           }
                         }}
-                        style={{ width: '50px', height: '50px' }}
+                        style={{ width: '60px', height: '60px' }}
                         title="Cancel"
                       >
-                        <i className="ki-duotone ki-cross fs-2">
+                        <i className="ki-duotone ki-cross fs-3">
                           <span className="path1"></span>
                           <span className="path2"></span>
                         </i>
                       </button>
                     </div>
+                    
+                    {photos.length > 0 && (
+                      <div className="text-center mt-2">
+                        <small className="text-white bg-dark bg-opacity-75 px-3 py-1 rounded-pill">
+                          📸 {photos.length} photo{photos.length !== 1 ? 's' : ''} • Tap to take more
+                        </small>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -585,26 +602,48 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             {/* Photo Capture Options */}
             {!showCamera && (
               <div>
-                <div className="alert alert-info d-flex align-items-center mb-4">
-                  <i className="ki-duotone ki-information fs-2x text-info me-3">
+                <div className="alert alert-primary d-flex align-items-center mb-4">
+                  <i className="ki-duotone ki-camera fs-2x text-primary me-3">
                     <span className="path1"></span>
                     <span className="path2"></span>
-                    <span className="path3"></span>
                   </i>
                   <div>
-                    <strong>Add photos:</strong> Take photos directly with your camera or select from your gallery.
+                    <strong>📱 iPhone Bulk Photo Capture:</strong> Use "Quick Camera" for fastest multiple photo taking, or select multiple photos from your gallery at once.
                   </div>
                 </div>
                 
                 <div className="row g-3 mb-6">
                   <div className="col-12">
-                    <label htmlFor="camera-batch-input" className="btn btn-primary w-100 py-4 mb-0">
+                    <button
+                      className="btn btn-primary w-100 py-4"
+                      onClick={startCamera}
+                      disabled={cameraLoading}
+                    >
+                      {cameraLoading ? (
+                        <>
+                          <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+                          Starting Camera...
+                        </>
+                      ) : (
+                        <>
+                          <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
+                            <span className="path1"></span>
+                            <span className="path2"></span>
+                          </i>
+                          <div className="fw-bold">Take Multiple Photos</div>
+                          <small className="text-white-75">Use camera to take several photos in a row</small>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="col-12">
+                    <label htmlFor="camera-batch-input" className="btn btn-success w-100 py-4 mb-0">
                       <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
                         <span className="path1"></span>
                         <span className="path2"></span>
                       </i>
-                      <div className="fw-bold">Take Photos</div>
-                      <small className="text-white-75">Use camera (multiple photos)</small>
+                      <div className="fw-bold">Quick Camera (iPhone)</div>
+                      <small className="text-white-75">Take multiple photos quickly</small>
                     </label>
                     <input
                       id="camera-batch-input"
@@ -623,7 +662,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                         <span className="path2"></span>
                       </i>
                       <div className="fw-bold">Choose from Gallery</div>
-                      <small className="text-primary">Select multiple photos</small>
+                      <small className="text-primary">Select multiple photos at once</small>
                     </label>
                     <input
                       id="gallery-input"
