@@ -158,13 +158,13 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
       if (emailError && emailError.code !== 'PGRST116') throw emailError
       
       // Combine results and remove duplicates
-      const existingContacts = []
+      const existingContacts: any[] = []
       if (existingByPhone && existingByPhone.length > 0) {
         existingContacts.push(...existingByPhone)
       }
       if (existingByEmail && existingByEmail.length > 0) {
         existingByEmail.forEach(emailContact => {
-          if (!existingContacts.find(c => c.id === emailContact.id)) {
+          if (!existingContacts.find((c: any) => c.id === emailContact.id)) {
             existingContacts.push(emailContact)
           }
         })

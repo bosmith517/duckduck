@@ -89,8 +89,8 @@ const ProfileHeader: React.FC = () => {
   }
 
   const getAvatarUrl = () => {
-    if (userProfile?.avatar_url) {
-      return userProfile.avatar_url
+    if ((userProfile as any)?.avatar_url) {
+      return (userProfile as any).avatar_url
     }
     return toAbsoluteUrl('/media/avatars/300-1.jpg')
   }
@@ -147,16 +147,16 @@ const ProfileHeader: React.FC = () => {
                     <div className='d-flex flex-wrap fw-bold fs-6 mb-4 pe-2'>
                       <span className='d-flex align-items-center text-gray-500 me-5 mb-2'>
                         <KTIcon iconName='profile-circle' className='fs-4 me-1' />
-                        {userProfile?.role?.charAt(0).toUpperCase() + userProfile?.role?.slice(1)}
+                        {userProfile?.role ? (userProfile.role.charAt(0).toUpperCase() + userProfile.role.slice(1)) : 'User'}
                       </span>
                       <span className='d-flex align-items-center text-gray-500 me-5 mb-2'>
                         <KTIcon iconName='sms' className='fs-4 me-1' />
                         {userProfile?.email}
                       </span>
-                      {userProfile?.phone && (
+                      {(userProfile as any)?.phone && (
                         <span className='d-flex align-items-center text-gray-500 mb-2'>
                           <KTIcon iconName='phone' className='fs-4 me-1' />
-                          {userProfile.phone}
+                          {(userProfile as any).phone}
                         </span>
                       )}
                     </div>

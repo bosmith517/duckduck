@@ -40,17 +40,17 @@ export const CompanyInformation: React.FC = () => {
   const formik = useFormik({
     initialValues: {
       name: tenant?.name || '',
-      website: tenant?.website || '',
-      phone: tenant?.phone || '',
-      email: tenant?.email || '',
-      address_line1: tenant?.address_line1 || '',
-      address_line2: tenant?.address_line2 || '',
-      city: tenant?.city || '',
-      state: tenant?.state || '',
-      zip_code: tenant?.zip_code || '',
-      tax_id: tenant?.tax_id || '',
-      business_license: tenant?.business_license || '',
-      description: tenant?.description || ''
+      website: (tenant as any)?.website || '',
+      phone: (tenant as any)?.phone || '',
+      email: (tenant as any)?.email || '',
+      address_line1: (tenant as any)?.address_line1 || '',
+      address_line2: (tenant as any)?.address_line2 || '',
+      city: (tenant as any)?.city || '',
+      state: (tenant as any)?.state || '',
+      zip_code: (tenant as any)?.zip_code || '',
+      tax_id: (tenant as any)?.tax_id || '',
+      business_license: (tenant as any)?.business_license || '',
+      description: (tenant as any)?.description || ''
     },
     validationSchema: companySchema,
     enableReinitialize: true,
@@ -160,7 +160,7 @@ export const CompanyInformation: React.FC = () => {
               />
               {formik.touched.website && formik.errors.website && (
                 <div className='fv-plugins-message-container'>
-                  <span role='alert'>{formik.errors.website}</span>
+                  <span role='alert'>{String(formik.errors.website)}</span>
                 </div>
               )}
             </div>
@@ -182,7 +182,7 @@ export const CompanyInformation: React.FC = () => {
               />
               {formik.touched.phone && formik.errors.phone && (
                 <div className='fv-plugins-message-container'>
-                  <span role='alert'>{formik.errors.phone}</span>
+                  <span role='alert'>{String(formik.errors.phone)}</span>
                 </div>
               )}
             </div>
@@ -201,7 +201,7 @@ export const CompanyInformation: React.FC = () => {
               />
               {formik.touched.email && formik.errors.email && (
                 <div className='fv-plugins-message-container'>
-                  <span role='alert'>{formik.errors.email}</span>
+                  <span role='alert'>{String(formik.errors.email)}</span>
                 </div>
               )}
             </div>
@@ -216,7 +216,7 @@ export const CompanyInformation: React.FC = () => {
                 onInputChange={(value) => formik.setFieldValue('address_line1', value)}
                 label='Business Address'
                 placeholder='Enter business address...'
-                error={formik.touched.address_line1 && formik.errors.address_line1 ? formik.errors.address_line1 : undefined}
+                error={formik.touched.address_line1 && formik.errors.address_line1 ? String(formik.errors.address_line1) : undefined}
               />
             </div>
           </div>
@@ -285,7 +285,7 @@ export const CompanyInformation: React.FC = () => {
               />
               {formik.touched.tax_id && formik.errors.tax_id && (
                 <div className='fv-plugins-message-container'>
-                  <span role='alert'>{formik.errors.tax_id}</span>
+                  <span role='alert'>{String(formik.errors.tax_id)}</span>
                 </div>
               )}
             </div>
@@ -304,7 +304,7 @@ export const CompanyInformation: React.FC = () => {
               />
               {formik.touched.business_license && formik.errors.business_license && (
                 <div className='fv-plugins-message-container'>
-                  <span role='alert'>{formik.errors.business_license}</span>
+                  <span role='alert'>{String(formik.errors.business_license)}</span>
                 </div>
               )}
             </div>

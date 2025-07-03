@@ -265,7 +265,6 @@ const JobPhotosTab: React.FC<JobPhotosTabProps> = ({ jobId, tenantId }) => {
         initialIndex={selectedPhotoIndex}
         isOpen={showPhotoViewer}
         onClose={() => setShowPhotoViewer(false)}
-        readOnly={true}
       />
     </div>
   )

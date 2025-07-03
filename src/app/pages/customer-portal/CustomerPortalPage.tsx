@@ -218,7 +218,8 @@ const CustomerPortalPage: React.FC = () => {
         address: job.location_address || '',
         city: job.location_city || '',
         state: job.location_state || '',
-        zip_code: job.location_zip || ''
+        zip_code: job.location_zip || '',
+        tenant_id: job.tenant_id || ''
       }
 
       setCustomer(transformedCustomer)

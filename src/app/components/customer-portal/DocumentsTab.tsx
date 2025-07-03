@@ -64,7 +64,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ jobId, tenantId, contactId 
       const transformedDocs = (data || []).map(doc => ({
         ...doc,
         uploaded_by_name: doc.user_profiles 
-          ? `${doc.user_profiles.first_name} ${doc.user_profiles.last_name}`.trim()
+          ? `${(doc.user_profiles as any)?.first_name || ''} ${(doc.user_profiles as any)?.last_name || ''}`.trim()
           : 'Team Member'
       }))
 

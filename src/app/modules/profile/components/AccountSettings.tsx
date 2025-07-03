@@ -46,8 +46,8 @@ export const AccountSettings: React.FC = () => {
       first_name: userProfile?.first_name || '',
       last_name: userProfile?.last_name || '',
       email: userProfile?.email || '',
-      phone: userProfile?.phone || '',
-      title: userProfile?.title || ''
+      phone: (userProfile as any)?.phone || '',
+      title: (userProfile as any)?.title || ''
     },
     validationSchema: accountSchema,
     enableReinitialize: true,
@@ -213,7 +213,7 @@ export const AccountSettings: React.FC = () => {
                   />
                   {accountFormik.touched.phone && accountFormik.errors.phone && (
                     <div className='fv-plugins-message-container'>
-                      <span role='alert'>{accountFormik.errors.phone}</span>
+                      <span role='alert'>{String(accountFormik.errors.phone)}</span>
                     </div>
                   )}
                 </div>
@@ -234,7 +234,7 @@ export const AccountSettings: React.FC = () => {
                   />
                   {accountFormik.touched.title && accountFormik.errors.title && (
                     <div className='fv-plugins-message-container'>
-                      <span role='alert'>{accountFormik.errors.title}</span>
+                      <span role='alert'>{String(accountFormik.errors.title)}</span>
                     </div>
                   )}
                 </div>

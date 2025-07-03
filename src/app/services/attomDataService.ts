@@ -262,7 +262,7 @@ class AttomDataService {
     } catch (error) {
       console.error('Error fetching stored property data:', error)
       // Re-throw with better error message if it's a database structure issue
-      if (error.message?.includes('table not found') || error.message?.includes('relation') || error.message?.includes('permission denied')) {
+      if ((error as any)?.message?.includes('table not found') || (error as any)?.message?.includes('relation') || (error as any)?.message?.includes('permission denied')) {
         throw error
       }
       return null
