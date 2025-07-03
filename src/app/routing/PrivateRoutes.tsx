@@ -352,7 +352,7 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        <Route path='profile' element={<Navigate to='/profile/overview' />} />
+        <Route path='profile' element={<Navigate to='/profile/account' />} />
         <Route
           path='account/*'
           element={

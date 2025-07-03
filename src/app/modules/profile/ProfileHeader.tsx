@@ -1,13 +1,99 @@
-
-import React from 'react'
-import {KTIcon, toAbsoluteUrl} from '../../../_metronic/helpers'
-import {Link, useLocation} from 'react-router-dom'
-import {Dropdown1} from '../../../_metronic/partials'
+import React, { useState, useRef } from 'react'
+import { KTIcon, toAbsoluteUrl } from '../../../_metronic/helpers'
+import { Link, useLocation } from 'react-router-dom'
 import { Toolbar } from '../../../_metronic/layout/components/toolbar/Toolbar'
 import { Content } from '../../../_metronic/layout/components/Content'
+import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { supabase } from '../../../supabaseClient'
+import { showToast } from '../../utils/toast'
 
 const ProfileHeader: React.FC = () => {
   const location = useLocation()
+  const { userProfile, tenant } = useSupabaseAuth()
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !userProfile?.id) return
+
+    setUploading(true)
+    const loadingToast = showToast.loading('Uploading avatar...')
+
+    try {
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        showToast.error('File size must be less than 2MB')
+        return
+      }
+
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        showToast.error('Please select an image file')
+        return
+      }
+
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${userProfile.tenant_id}/${userProfile.id}/avatar.${fileExt}`
+
+      // Upload to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        })
+
+      if (uploadError) throw uploadError
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      // Update user profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', userProfile.id)
+
+      if (updateError) throw updateError
+
+      showToast.dismiss(loadingToast)
+      showToast.success('Avatar updated successfully!')
+      
+      // Force a page refresh to update the avatar
+      window.location.reload()
+
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      showToast.dismiss(loadingToast)
+      showToast.error('Failed to upload avatar. Please try again.')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const getDisplayName = () => {
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name} ${userProfile.last_name}`
+    }
+    return userProfile?.email || 'User'
+  }
+
+  const getAvatarUrl = () => {
+    if (userProfile?.avatar_url) {
+      return userProfile.avatar_url
+    }
+    return toAbsoluteUrl('/media/avatars/300-1.jpg')
+  }
 
   return (
     <>
@@ -18,8 +104,31 @@ const ProfileHeader: React.FC = () => {
             <div className='d-flex flex-wrap flex-sm-nowrap mb-3'>
               <div className='me-7 mb-4'>
                 <div className='symbol symbol-100px symbol-lg-160px symbol-fixed position-relative'>
-                  <img src={toAbsoluteUrl('/media/avatars/300-1.jpg')} alt='Metornic' />
-                  <div className='position-absolute translate-middle bottom-0 start-100 mb-6 bg-success rounded-circle border border-4 border-white h-20px w-20px'></div>
+                  <img 
+                    src={getAvatarUrl()} 
+                    alt='Profile Avatar'
+                    className='cursor-pointer'
+                    onClick={handleAvatarClick}
+                    style={{ objectFit: 'cover' }}
+                  />
+                  <div 
+                    className='position-absolute translate-middle bottom-0 start-100 mb-6 bg-primary rounded-circle border border-4 border-white h-20px w-20px cursor-pointer d-flex align-items-center justify-content-center'
+                    onClick={handleAvatarClick}
+                    title='Change avatar'
+                  >
+                    {uploading ? (
+                      <div className='spinner-border spinner-border-sm text-white' style={{ width: '10px', height: '10px' }}></div>
+                    ) : (
+                      <KTIcon iconName='pencil' className='fs-7 text-white' />
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type='file'
+                    accept='image/*'
+                    onChange={handleAvatarUpload}
+                    style={{ display: 'none' }}
+                  />
                 </div>
               </div>
 
@@ -27,67 +136,29 @@ const ProfileHeader: React.FC = () => {
                 <div className='d-flex justify-content-between align-items-start flex-wrap mb-2'>
                   <div className='d-flex flex-column'>
                     <div className='d-flex align-items-center mb-2'>
-                      <a href='#' className='text-gray-800 text-hover-primary fs-2 fw-bolder me-1'>
-                        Max Smith
-                      </a>
-                      <a href='#'>
-                        <KTIcon iconName='verify' className='fs-1 text-primary' />
-                      </a>
+                      <span className='text-gray-800 fs-2 fw-bolder me-1'>
+                        {getDisplayName()}
+                      </span>
+                      {userProfile?.role === 'admin' && (
+                        <KTIcon iconName='crown' className='fs-1 text-warning' />
+                      )}
                     </div>
 
                     <div className='d-flex flex-wrap fw-bold fs-6 mb-4 pe-2'>
-                      <a
-                        href='#'
-                        className='d-flex align-items-center text-gray-500 text-hover-primary me-5 mb-2'
-                      >
+                      <span className='d-flex align-items-center text-gray-500 me-5 mb-2'>
                         <KTIcon iconName='profile-circle' className='fs-4 me-1' />
-                        Developer
-                      </a>
-                      <a
-                        href='#'
-                        className='d-flex align-items-center text-gray-500 text-hover-primary me-5 mb-2'
-                      >
-                        <KTIcon iconName='geolocation' className='fs-4 me-1' />
-                        SF, Bay Area
-                      </a>
-                      <a
-                        href='#'
-                        className='d-flex align-items-center text-gray-500 text-hover-primary mb-2'
-                      >
-                        <KTIcon iconName='sms' className='fs-4 me-1' />
-                        max@kt.com
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className='d-flex my-4'>
-                    <a href='#' className='btn btn-sm btn-light me-2' id='kt_user_follow_button'>
-                      <KTIcon iconName='check' className='fs-3 d-none' />
-
-                      <span className='indicator-label'>Follow</span>
-                      <span className='indicator-progress'>
-                        Please wait...
-                        <span className='spinner-border spinner-border-sm align-middle ms-2'></span>
+                        {userProfile?.role?.charAt(0).toUpperCase() + userProfile?.role?.slice(1)}
                       </span>
-                    </a>
-                    <a
-                      href='#'
-                      className='btn btn-sm btn-primary me-3'
-                      data-bs-toggle='modal'
-                      data-bs-target='#kt_modal_offer_a_deal'
-                    >
-                      Hire Me
-                    </a>
-                    <div className='me-0'>
-                      <button
-                        className='btn btn-sm btn-icon btn-bg-light btn-active-color-primary'
-                        data-kt-menu-trigger='click'
-                        data-kt-menu-placement='bottom-end'
-                        data-kt-menu-flip='top-end'
-                      >
-                        <i className='bi bi-three-dots fs-3'></i>
-                      </button>
-                      <Dropdown1 />
+                      <span className='d-flex align-items-center text-gray-500 me-5 mb-2'>
+                        <KTIcon iconName='sms' className='fs-4 me-1' />
+                        {userProfile?.email}
+                      </span>
+                      {userProfile?.phone && (
+                        <span className='d-flex align-items-center text-gray-500 mb-2'>
+                          <KTIcon iconName='phone' className='fs-4 me-1' />
+                          {userProfile.phone}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -97,44 +168,29 @@ const ProfileHeader: React.FC = () => {
                     <div className='d-flex flex-wrap'>
                       <div className='border border-gray-300 border-dashed rounded min-w-125px py-3 px-4 me-6 mb-3'>
                         <div className='d-flex align-items-center'>
-                          <KTIcon iconName='arrow-up' className='fs-3 text-success me-2' />
-                          <div className='fs-2 fw-bolder'>4500$</div>
+                          <KTIcon iconName='buildings' className='fs-3 text-primary me-2' />
+                          <div className='fs-2 fw-bolder'>{tenant?.name || 'Company'}</div>
                         </div>
-
-                        <div className='fw-bold fs-6 text-gray-500'>Earnings</div>
+                        <div className='fw-bold fs-6 text-gray-500'>Organization</div>
                       </div>
 
                       <div className='border border-gray-300 border-dashed rounded min-w-125px py-3 px-4 me-6 mb-3'>
                         <div className='d-flex align-items-center'>
-                          <KTIcon iconName='arrow-down' className='fs-3 text-danger me-2' />
-                          <div className='fs-2 fw-bolder'>75</div>
+                          <KTIcon iconName='calendar' className='fs-3 text-success me-2' />
+                          <div className='fs-2 fw-bolder'>
+                            {userProfile?.created_at ? new Date(userProfile.created_at).toLocaleDateString() : 'N/A'}
+                          </div>
                         </div>
-
-                        <div className='fw-bold fs-6 text-gray-500'>Jobs</div>
+                        <div className='fw-bold fs-6 text-gray-500'>Member Since</div>
                       </div>
 
                       <div className='border border-gray-300 border-dashed rounded min-w-125px py-3 px-4 me-6 mb-3'>
                         <div className='d-flex align-items-center'>
-                          <KTIcon iconName='arrow-up' className='fs-3 text-success me-2' />
-                          <div className='fs-2 fw-bolder'>60%</div>
+                          <KTIcon iconName='shield-tick' className='fs-3 text-success me-2' />
+                          <div className='fs-2 fw-bolder'>Active</div>
                         </div>
-
-                        <div className='fw-bold fs-6 text-gray-500'>Success Rate</div>
+                        <div className='fw-bold fs-6 text-gray-500'>Account Status</div>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className='d-flex align-items-center w-200px w-sm-300px flex-column mt-3'>
-                    <div className='d-flex justify-content-between w-100 mt-auto mb-2'>
-                      <span className='fw-bold fs-6 text-gray-500'>Profile Compleation</span>
-                      <span className='fw-bolder fs-6'>50%</span>
-                    </div>
-                    <div className='h-5px mx-3 w-100 bg-light mb-3'>
-                      <div
-                        className='bg-success rounded h-5px'
-                        role='progressbar'
-                        style={{width: '50%'}}
-                      ></div>
                     </div>
                   </div>
                 </div>
@@ -147,33 +203,44 @@ const ProfileHeader: React.FC = () => {
                   <Link
                     className={
                       `nav-link text-active-primary me-6 ` +
-                      (location.pathname === '/profile/overview' && 'active')
+                      (location.pathname === '/profile/account' && 'active')
                     }
-                    to='/profile/overview'
+                    to='/profile/account'
                   >
-                    Overview
+                    Account Settings
                   </Link>
                 </li>
                 <li className='nav-item'>
                   <Link
                     className={
                       `nav-link text-active-primary me-6 ` +
-                      (location.pathname === '/profile/projects' && 'active')
+                      (location.pathname === '/profile/company' && 'active')
                     }
-                    to='/profile/projects'
+                    to='/profile/company'
                   >
-                    Jobs
+                    Company Information
                   </Link>
                 </li>
                 <li className='nav-item'>
                   <Link
                     className={
                       `nav-link text-active-primary me-6 ` +
-                      (location.pathname === '/profile/campaigns' && 'active')
+                      (location.pathname === '/profile/notifications' && 'active')
                     }
-                    to='/profile/campaigns'
+                    to='/profile/notifications'
                   >
-                    Campaigns
+                    Notifications
+                  </Link>
+                </li>
+                <li className='nav-item'>
+                  <Link
+                    className={
+                      `nav-link text-active-primary me-6 ` +
+                      (location.pathname === '/profile/security' && 'active')
+                    }
+                    to='/profile/security'
+                  >
+                    Security
                   </Link>
                 </li>
                 <li className='nav-item'>
@@ -185,17 +252,6 @@ const ProfileHeader: React.FC = () => {
                     to='/profile/documents'
                   >
                     Documents
-                  </Link>
-                </li>
-                <li className='nav-item'>
-                  <Link
-                    className={
-                      `nav-link text-active-primary me-6 ` +
-                      (location.pathname === '/profile/connections' && 'active')
-                    }
-                    to='/profile/connections'
-                  >
-                    Connections
                   </Link>
                 </li>
               </ul>

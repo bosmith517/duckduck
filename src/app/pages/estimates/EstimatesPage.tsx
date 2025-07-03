@@ -5,6 +5,7 @@ import { estimatesService, EstimateWithAccount } from '../../services/estimatesS
 import { ConvertToJobModal } from './components/ConvertToJobModal'
 import { EstimateForm } from './components/EstimateForm'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { jobActivityService } from '../../services/jobActivityService'
 
 const EstimatesPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
@@ -45,7 +46,23 @@ const EstimatesPage: React.FC = () => {
         ...estimateData,
         tenant_id: userProfile.tenant_id
       }
-      await estimatesService.createEstimate(estimateWithTenant)
+      const createdEstimate = await estimatesService.createEstimate(estimateWithTenant)
+      
+      // Log estimate creation activity if job_id exists
+      if (userProfile?.id && estimateData.job_id) {
+        try {
+          await jobActivityService.logEstimateCreated(
+            estimateData.job_id,
+            userProfile.tenant_id,
+            userProfile.id,
+            createdEstimate.id,
+            estimateData.total_amount || 0
+          )
+        } catch (logError) {
+          console.error('Failed to log estimate creation activity:', logError)
+        }
+      }
+      
       setShowEstimateForm(false)
       loadEstimates()
       // Show success toast

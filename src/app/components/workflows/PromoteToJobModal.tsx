@@ -4,6 +4,7 @@ import * as Yup from 'yup'
 import clsx from 'clsx'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { jobActivityService } from '../../services/jobActivityService'
 
 interface PromoteToJobModalProps {
   isOpen: boolean
@@ -136,25 +137,46 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
 
       if (leadUpdateError) throw leadUpdateError
 
-      // Step 2: Check if Account already exists, if not create one
-      // Try to find existing account by phone number or email first
-      let account = null
+      // Step 2: Find or create contact (accounts and contacts are now equivalent)
+      let contact = null
       
-      const { data: existingAccounts, error: searchError } = await supabase
-        .from('accounts')
+      // Search for existing contact by phone or email
+      const { data: existingByPhone, error: phoneError } = await supabase
+        .from('contacts')
         .select('*')
         .eq('tenant_id', userProfile.tenant_id)
-        .or(`phone.eq.${leadData.phone_number},email.eq.${leadData.email}`)
-
-      if (searchError) throw searchError
-
-      if (existingAccounts && existingAccounts.length > 0) {
-        // Use the first matching account
-        const existingAccount = existingAccounts[0]
+        .eq('phone', leadData.phone_number)
         
-        // Update existing account with latest information
-        const { data: updatedAccount, error: updateError } = await supabase
-          .from('accounts')
+      if (phoneError && phoneError.code !== 'PGRST116') throw phoneError
+      
+      const { data: existingByEmail, error: emailError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('tenant_id', userProfile.tenant_id)
+        .eq('email', leadData.email)
+        
+      if (emailError && emailError.code !== 'PGRST116') throw emailError
+      
+      // Combine results and remove duplicates
+      const existingContacts = []
+      if (existingByPhone && existingByPhone.length > 0) {
+        existingContacts.push(...existingByPhone)
+      }
+      if (existingByEmail && existingByEmail.length > 0) {
+        existingByEmail.forEach(emailContact => {
+          if (!existingContacts.find(c => c.id === emailContact.id)) {
+            existingContacts.push(emailContact)
+          }
+        })
+      }
+
+      if (existingContacts && existingContacts.length > 0) {
+        // Use the first matching contact
+        const existingContact = existingContacts[0]
+        
+        // Update existing contact with latest information
+        const { data: updatedContact, error: updateError } = await supabase
+          .from('contacts')
           .update({
             address_line1: values.property_address,
             city: values.property_city,
@@ -162,69 +184,67 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
             zip_code: values.property_zip,
             updated_at: new Date().toISOString()
           })
-          .eq('id', existingAccount.id)
+          .eq('id', existingContact.id)
           .select()
           .single()
 
         if (updateError) throw updateError
-        account = updatedAccount
+        contact = updatedContact
       } else {
-        // Create new account with a unique name
-        const timestamp = Date.now()
-        const accountData = {
+        // Create new contact
+        const contactData = {
           tenant_id: userProfile.tenant_id,
-          name: `${leadData.caller_name} - ${values.property_city}, ${values.property_state} (${timestamp})`,
-          type: 'residential',
+          first_name: leadData.caller_name.split(' ')[0] || leadData.caller_name,
+          last_name: leadData.caller_name.split(' ').slice(1).join(' ') || '',
+          name: leadData.caller_name,
           phone: leadData.phone_number,
           email: leadData.email,
+          contact_type: 'individual',
           address_line1: values.property_address,
           city: values.property_city,
           state: values.property_state,
           zip_code: values.property_zip,
-          account_status: 'active',
           notes: `Created from lead: ${leadData.initial_request}`,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
 
-        const { data: newAccount, error: accountError } = await supabase
-          .from('accounts')
-          .insert(accountData)
+        const { data: newContact, error: contactError } = await supabase
+          .from('contacts')
+          .insert(contactData)
           .select()
           .single()
 
-        if (accountError) throw accountError
-        account = newAccount
+        if (contactError) {
+          // Handle potential duplicates
+          if (contactError.code === '23505') {
+            console.log('Contact already exists, searching again...')
+            const { data: existingByName, error: nameError } = await supabase
+              .from('contacts')
+              .select('*')
+              .eq('tenant_id', userProfile.tenant_id)
+              .ilike('name', `%${leadData.caller_name}%`)
+              .limit(1)
+              
+            if (nameError) throw nameError
+            
+            if (existingByName && existingByName.length > 0) {
+              contact = existingByName[0]
+            } else {
+              throw new Error(`Contact creation failed: ${contactError.message}`)
+            }
+          } else {
+            throw contactError
+          }
+        } else {
+          contact = newContact
+        }
       }
 
-      // Step 3: Create Contact Record
-      const contactData = {
-        tenant_id: userProfile.tenant_id,
-        account_id: account.id,
-        first_name: leadData.caller_name.split(' ')[0] || leadData.caller_name,
-        last_name: leadData.caller_name.split(' ').slice(1).join(' ') || '',
-        name: leadData.caller_name,
-        phone: leadData.phone_number,
-        email: leadData.email,
-        is_primary: true,
-        notes: `Primary contact for ${values.service_type} project`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      const { data: contact, error: contactError } = await supabase
-        .from('contacts')
-        .insert(contactData)
-        .select()
-        .single()
-
-      if (contactError) throw contactError
-
-      // Step 4: Create Job Record
+      // Step 3: Create Job Record (linking to contact only - accounts and contacts are interchangeable)
       const estimateDateTime = new Date(`${values.estimate_date}T${values.estimate_time}:00`)
       const jobData = {
         tenant_id: userProfile.tenant_id,
-        account_id: account.id,
         contact_id: contact.id,
         lead_id: leadId,
         job_number: `JOB-${Date.now()}`,
@@ -252,6 +272,25 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
         .single()
 
       if (jobError) throw jobError
+
+      // Log job creation activity
+      try {
+        await jobActivityService.logActivity({
+          jobId: job.id,
+          tenantId: userProfile.tenant_id,
+          userId: userProfile.id,
+          activityType: 'job_created',
+          activityCategory: 'user',
+          title: 'Job Created from Lead',
+          description: `Job created from lead promotion for ${leadData.caller_name}`,
+          referenceId: leadId,
+          referenceType: 'lead',
+          isVisibleToCustomer: true,
+          isMilestone: true
+        })
+      } catch (logError) {
+        console.error('Failed to log job creation activity:', logError)
+      }
 
       // Step 5: Update Lead with converted status and job reference
       await supabase

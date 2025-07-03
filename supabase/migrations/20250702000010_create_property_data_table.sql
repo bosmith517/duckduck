@@ -38,12 +38,16 @@ CREATE TABLE IF NOT EXISTS public.property_data (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_property_data_tenant_id ON public.property_data(tenant_id);
-CREATE INDEX idx_property_data_address ON public.property_data(normalized_address);
-CREATE INDEX idx_property_data_scraped_at ON public.property_data(scraped_at);
+CREATE INDEX IF NOT EXISTS idx_property_data_tenant_id ON public.property_data(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_property_data_address ON public.property_data(normalized_address);
+CREATE INDEX IF NOT EXISTS idx_property_data_scraped_at ON public.property_data(scraped_at);
 
 -- Enable RLS
 ALTER TABLE public.property_data ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can manage property data for their tenant" ON public.property_data;
+DROP POLICY IF EXISTS "service_role_property_access" ON public.property_data;
 
 -- RLS policies
 CREATE POLICY "Users can manage property data for their tenant" ON public.property_data
@@ -81,6 +85,8 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS property_data_updated_at ON public.property_data;
 
 CREATE TRIGGER property_data_updated_at
     BEFORE UPDATE ON public.property_data

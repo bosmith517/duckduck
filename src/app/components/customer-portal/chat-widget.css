@@ -1,0 +1,37 @@
+/* Chat Widget Styles - Ensure visibility */
+.chat-widget-container {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  z-index: 999999 !important;
+}
+
+.chat-widget-button {
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 50% !important;
+  background-color: #007bff !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3) !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+}
+
+.chat-widget-button:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4) !important;
+}
+
+/* Ensure chat window is above everything */
+.chat-widget-window {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  z-index: 999999 !important;
+}
+
+/* Override any conflicting styles */
+.min-vh-100 {
+  position: relative;
+  overflow-x: hidden;
+}

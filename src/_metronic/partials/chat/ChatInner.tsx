@@ -172,8 +172,15 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
         if (status === 'SUBSCRIBED') {
           console.log('Successfully subscribed!');
         }
-        if (status === 'CHANNEL_ERROR' || err) {
-          console.error('Subscription Error:', err);
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('Chat subscription error (non-critical):', err);
+          // Don't spam errors for chat subscription issues
+        }
+        if (status === 'TIMED_OUT') {
+          console.warn('Chat subscription timed out, will retry automatically');
+        }
+        if (status === 'CLOSED') {
+          console.log('Chat subscription closed');
         }
       });
 

@@ -266,7 +266,6 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
       {children}
       
       {/* Local OnboardingModal controlled by welcome popup */}
-      {console.log('OnboardingGuard: Rendering OnboardingModal with isOpen:', showLocalOnboardingModal)}
       <OnboardingModal 
         isOpen={showLocalOnboardingModal}
         onClose={handleCloseOnboardingModal}

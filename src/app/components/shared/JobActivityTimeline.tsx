@@ -29,7 +29,9 @@ export const JobActivityTimeline: React.FC<JobActivityTimelineProps> = ({
   const loadActivities = async () => {
     try {
       setLoading(true)
+      console.log('🔍 Loading activities for job:', jobId, 'showInternal:', showInternalActivities)
       const data = await jobActivityService.getJobActivities(jobId, showInternalActivities)
+      console.log('📊 Activities loaded:', data.length, 'activities', data)
       setActivities(data)
     } catch (error) {
       console.error('Error loading activities:', error)

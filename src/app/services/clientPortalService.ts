@@ -1,5 +1,6 @@
 import { supabase } from '../../supabaseClient'
 import { v4 as uuidv4 } from 'uuid'
+import { attomDataService } from './attomDataService'
 
 interface PortalToken {
   id: string
@@ -44,7 +45,6 @@ export class ClientPortalService {
         .insert({
           job_id: jobId,
           customer_id: customerId,
-          contact_id: customerId, // Also set contact_id for backward compatibility
           tenant_id: tenantId,
           token: token,
           expires_at: expiresAt.toISOString(),
@@ -85,7 +85,7 @@ export class ClientPortalService {
         return false
       }
 
-      // Determine customer ID (contact or account)
+      // Determine customer ID and details (prefer contact over account)
       const customerId = job.contact_id || job.account_id
       const customerName = job.contacts?.first_name 
         ? `${job.contacts.first_name} ${job.contacts.last_name || ''}`.trim()
@@ -100,12 +100,16 @@ export class ClientPortalService {
       }
 
       // Check if portal token already exists for this job
-      const { data: existingToken } = await supabase
+      const { data: existingToken, error: existingError } = await supabase
         .from('client_portal_tokens')
         .select('id, token')
         .eq('job_id', jobId)
         .eq('is_active', true)
-        .single()
+        .maybeSingle()
+      
+      if (existingError) {
+        console.warn('Error checking existing tokens:', existingError)
+      }
 
       let portalToken = existingToken
 
@@ -119,6 +123,29 @@ export class ClientPortalService {
       const baseUrl = window.location.origin
       const portalUrl = `${baseUrl}/portal/${portalToken?.token}`
       const companyName = job.accounts?.name || 'TradeWorks Pro'
+
+      // 🏠 AUTOMATICALLY FETCH PROPERTY DATA when portal is created
+      if (job.location_address && job.tenant_id) {
+        try {
+          console.log('🏠 Auto-fetching property data for portal creation:', job.location_address)
+          
+          // Fetch property data in the background (don't wait for it to complete)
+          attomDataService.getPropertyDataWithCache(
+            job.location_address,
+            job.location_city,
+            job.location_state,
+            job.tenant_id
+          ).then(() => {
+            console.log('✅ Property data fetched and cached for job:', jobId)
+          }).catch((error) => {
+            console.warn('⚠️ Property data fetch failed (non-critical):', error.message)
+          })
+        } catch (error) {
+          console.warn('⚠️ Failed to initiate property data fetch:', error)
+        }
+      } else {
+        console.log('ℹ️ No property address available for Attom data fetch')
+      }
 
       // Send welcome SMS with portal link
       const smsMessage = `Hi ${customerName}! Here is your private portal for your ${job.service_type || 'service'} with ${companyName}: ${portalUrl}. Track progress, view invoices, and communicate with us securely. Questions? Call (312) 680-5945 or visit tradeworkspro.com`

@@ -30,9 +30,10 @@ export const LiveJobLog: React.FC<LiveJobLogProps> = ({
 
   // Mock real-time updates for demonstration
   useEffect(() => {
-    if (!isActive) return
-
-    // Simulate initial updates
+    // Always show some activity for demo purposes
+    console.log('📊 LiveJobLog mounted - isActive:', isActive, 'jobId:', jobId)
+    
+    // Simulate initial updates even if not active (for testing)
     const initialUpdates: JobUpdate[] = [
       {
         id: '1',

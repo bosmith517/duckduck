@@ -10,9 +10,12 @@ import { showToast } from '../../utils/toast'
 import JobCostingDashboard from '../../components/billing/JobCostingDashboard'
 import JobPhotoGallery from '../../components/shared/JobPhotoGallery'
 import JobActivityTimeline from '../../components/shared/JobActivityTimeline'
+import JobDocuments from '../../components/shared/JobDocuments'
+import PropertyDetails from '../../components/shared/PropertyDetails'
 import { jobActivityService } from '../../services/jobActivityService'
 import { JobForm } from './components/JobForm'
 import ClientPortalService from '../../services/clientPortalService'
+import { createTestActivities } from '../../utils/activityLogger'
 
 interface JobWithRelations {
   id: string
@@ -166,6 +169,26 @@ const JobDetailsPage: React.FC = () => {
         return
       }
 
+      // Log status change if status was updated
+      if (jobData.status && jobData.status !== job.status && userProfile?.id && userProfile?.tenant_id) {
+        try {
+          await jobActivityService.logActivity({
+            jobId: job.id,
+            tenantId: userProfile.tenant_id,
+            userId: userProfile.id,
+            activityType: 'status_changed',
+            activityCategory: 'system',
+            title: `Status updated to ${jobData.status}`,
+            description: `Job status changed from ${job.status} to ${jobData.status}`,
+            isVisibleToCustomer: true,
+            isMilestone: ['completed', 'in_progress'].includes(jobData.status.toLowerCase()),
+            metadata: { oldStatus: job.status, newStatus: jobData.status }
+          })
+        } catch (logError) {
+          console.error('Failed to log status change activity:', logError)
+        }
+      }
+
       setJob(data)
       setShowEditForm(false)
       showToast.success('Job updated successfully')
@@ -291,7 +314,7 @@ const JobDetailsPage: React.FC = () => {
   }
 
   const checkExistingPortal = async () => {
-    if (!id) return
+    if (!id || !userProfile?.tenant_id) return
 
     try {
       const { data: token, error } = await supabase
@@ -299,15 +322,20 @@ const JobDetailsPage: React.FC = () => {
         .select('token')
         .eq('job_id', id)
         .eq('is_active', true)
-        .single()
+        .maybeSingle() // Use maybeSingle instead of single to avoid errors when no records found
 
-      if (token && !error) {
+      if (error) {
+        console.warn('Error checking for existing portal token:', error)
+        return
+      }
+
+      if (token) {
         const existingPortalUrl = `${window.location.origin}/portal/${token.token}`
         setPortalUrl(existingPortalUrl)
         console.log('Existing portal found:', existingPortalUrl)
       }
     } catch (error) {
-      console.log('No existing portal found for this job')
+      console.warn('Failed to check existing portal (non-critical):', error)
     }
   }
 
@@ -327,7 +355,7 @@ const JobDetailsPage: React.FC = () => {
         .select('token')
         .eq('job_id', job.id)
         .eq('is_active', true)
-        .single()
+        .maybeSingle() // Use maybeSingle instead of single
 
       if (token && !tokenError) {
         const portalUrl = `${window.location.origin}/portal/${token.token}`
@@ -495,6 +523,18 @@ const JobDetailsPage: React.FC = () => {
                 </li>
                 <li className='nav-item'>
                   <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'documents' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('documents')
+                    }}
+                  >
+                    Documents
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
                     className={`nav-link text-active-primary pb-4 ${activeTab === 'activity' ? 'active' : ''}`}
                     href='#'
                     onClick={(e) => {
@@ -503,6 +543,22 @@ const JobDetailsPage: React.FC = () => {
                     }}
                   >
                     Activity
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'property' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('property')
+                    }}
+                  >
+                    <i className='ki-duotone ki-home fs-6 me-1'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    Property Data
                   </a>
                 </li>
               </ul>
@@ -736,12 +792,60 @@ const JobDetailsPage: React.FC = () => {
             </div>
           )}
 
+          {activeTab === 'documents' && (
+            <div className="card">
+              <div className="card-body">
+                <JobDocuments 
+                  jobId={job.id} 
+                  showTitle={false}
+                  allowUpload={true}
+                />
+              </div>
+            </div>
+          )}
+
           {activeTab === 'activity' && (
-            <JobActivityTimeline 
-              jobId={job.id} 
-              showCustomerView={false}
-              showAddNoteButton={true}
-              onAddNote={handleAddNote}
+            <div>
+              <JobActivityTimeline 
+                jobId={job.id} 
+                showCustomerView={false}
+                showAddNoteButton={true}
+                onAddNote={handleAddNote}
+              />
+              
+              {/* Test button for development */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="text-center mt-4">
+                  <button
+                    className="btn btn-light-warning btn-sm"
+                    onClick={async () => {
+                      showToast.loading('Creating test activities...')
+                      await createTestActivities(job.id)
+                      showToast.success('Test activities created! Refresh to see them.')
+                      // Trigger refresh of activities
+                      window.location.reload()
+                    }}
+                  >
+                    <i className="ki-duotone ki-flask fs-5 me-2">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                    Generate Test Activities
+                  </button>
+                  <p className="text-muted fs-7 mt-2">
+                    This button creates sample activities for testing purposes
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'property' && (
+            <PropertyDetails 
+              address={job.location_address}
+              city={job.location_city}
+              state={job.location_state}
+              zip={job.location_zip}
             />
           )}
         </div>

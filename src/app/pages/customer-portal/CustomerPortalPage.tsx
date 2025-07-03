@@ -5,6 +5,7 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import ClientPortalService from '../../services/clientPortalService'
 import { propertyService } from '../../services/propertyService'
+import { attomDataService } from '../../services/attomDataService'
 import SmartDashboard from '../../components/customer-portal/SmartDashboard'
 import JobHistoryTimeline from '../../components/customer-portal/JobHistoryTimeline'
 import ChatWidget from '../../components/customer-portal/ChatWidget'
@@ -15,6 +16,8 @@ import MaintenanceHub from '../../components/customer-portal/MaintenanceHub'
 import QuotesAndPlans from '../../components/customer-portal/QuotesAndPlans'
 import ServiceSchedulingModal from '../../components/customer-portal/ServiceSchedulingModal'
 import ContactTechnicianModal from '../../components/customer-portal/ContactTechnicianModal'
+import JobPhotosTab from '../../components/customer-portal/JobPhotosTab'
+import DocumentsTab from '../../components/customer-portal/DocumentsTab'
 
 // Mapbox configuration
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || 'pk.your_mapbox_token_here'
@@ -29,6 +32,7 @@ interface CustomerData {
   city: string
   state: string
   zip_code: string
+  tenant_id: string
   profile_image_url?: string
   home_image_url?: string
   address_line1?: string
@@ -47,9 +51,34 @@ interface PropertyData {
   bedrooms?: number
   bathrooms?: number
   propertyType?: string
-  lastSoldDate?: string
   lastSoldPrice?: number
+  lastSoldDate?: string
   taxAssessment?: number
+  stories?: number
+  garageSpaces?: number
+  pool?: boolean
+  centralAir?: boolean
+  constructionQuality?: string
+  roofMaterial?: string
+  // Additional Attom fields
+  totalRooms?: number
+  exteriorWalls?: string
+  heatingType?: string
+  coolingType?: string
+  fireplace?: boolean
+  parcelNumber?: string
+  attomId?: string
+  taxYear?: number
+  annualTaxAmount?: number
+  ownerName?: string
+  ownerOccupied?: boolean
+  zoning?: string
+  subdivision?: string
+  county?: string
+  marketValueDate?: string
+  pricePerSqFt?: number
+  comparableSales?: any[]
+  priceHistory?: any[]
 }
 
 interface JobData {
@@ -59,6 +88,7 @@ interface JobData {
   scheduled_date: string
   estimated_duration: number
   status: string
+  tenant_id: string
   technician_name?: string
   technician_phone?: string
   service_type: string
@@ -97,7 +127,7 @@ const CustomerPortalPage: React.FC = () => {
   const [showTracking, setShowTracking] = useState(false)
   const [showSchedulingModal, setShowSchedulingModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes'>('dashboard')
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents'>('dashboard')
   
   // Mock technician data for demonstration
   const mockTechnician = {
@@ -202,6 +232,7 @@ const CustomerPortalPage: React.FC = () => {
           scheduled_date: job.start_date || '',
           estimated_duration: 2, // Default 2 hours
           status: job.status || 'Scheduled',
+          tenant_id: job.tenant_id || customerData.tenant_id,
           technician_name: 'TBD',
           technician_phone: undefined,
           service_type: job.title || 'Service',
@@ -209,19 +240,71 @@ const CustomerPortalPage: React.FC = () => {
         })
       }
 
-      // Get real property data from Redfin
-      if (transformedCustomer.address) {
+      // Get property data from Attom API
+      if (transformedCustomer.address && job.tenant_id) {
         const fullAddress = `${transformedCustomer.address}, ${transformedCustomer.city}, ${transformedCustomer.state} ${transformedCustomer.zip_code}`
         
         try {
-          console.log('🏠 Loading property data for customer portal:', fullAddress)
-          // Clear cache first to test the function
-          propertyService.clearCache(fullAddress)
-          const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, customerData.tenant_id)
-          console.log('🏠 Property data loaded:', propertyData)
-          setPropertyData(propertyData)
+          console.log('🏠 Loading Attom property data for customer portal:', transformedCustomer.address)
+          
+          // Get property data from Attom
+          const attomData = await attomDataService.getPropertyDataWithCache(
+            transformedCustomer.address,
+            transformedCustomer.city,
+            transformedCustomer.state,
+            job.tenant_id
+          )
+          
+          console.log('🏠 Attom property data loaded:', attomData)
+          
+          // Transform Attom data to match portal PropertyData interface
+          // Extract additional data from raw Attom response
+          const rawData = attomData?.attom_raw_data
+          const details = rawData?.details
+          const valuation = rawData?.valuation
+          
+          setPropertyData({
+            address: fullAddress,
+            streetViewUrl: `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${encodeURIComponent(fullAddress)}&key=${import.meta.env.VITE_GOOGLE_PLACES_API_KEY}`,
+            zestimate: attomData?.market_value_estimate || undefined,
+            yearBuilt: attomData?.year_built || undefined,
+            squareFootage: attomData?.square_footage || undefined,
+            lotSize: attomData?.lot_size || undefined,
+            bedrooms: attomData?.bedrooms || undefined,
+            bathrooms: attomData?.bathrooms || undefined,
+            propertyType: attomData?.property_type || 'Residential Property',
+            lastSoldPrice: attomData?.last_sold_price || undefined,
+            lastSoldDate: attomData?.last_sold_date || undefined,
+            taxAssessment: attomData?.tax_assessment || undefined,
+            // Additional Attom data
+            stories: attomData?.stories || undefined,
+            garageSpaces: attomData?.garage_spaces || undefined,
+            pool: attomData?.pool || false,
+            centralAir: attomData?.central_air || false,
+            constructionQuality: attomData?.construction_quality || undefined,
+            roofMaterial: attomData?.roof_material || undefined,
+            // New fields from raw Attom data
+            totalRooms: attomData?.total_rooms || undefined,
+            exteriorWalls: attomData?.exterior_walls || undefined,
+            heatingType: attomData?.heating_type || undefined,
+            coolingType: attomData?.cooling_type || undefined,
+            fireplace: attomData?.fireplace || false,
+            parcelNumber: attomData?.parcel_number || undefined,
+            attomId: attomData?.attom_id?.toString() || undefined,
+            taxYear: attomData?.tax_year || undefined,
+            annualTaxAmount: details?.assessment?.tax?.taxAmt || undefined,
+            ownerName: details?.assessment?.owner?.owner1?.fullName || undefined,
+            ownerOccupied: details?.summary?.absenteeInd === 'OWNER OCCUPIED',
+            zoning: details?.lot?.zoningType || undefined,
+            subdivision: details?.area?.subdName || undefined,
+            county: details?.area?.munName || undefined,
+            marketValueDate: attomData?.market_value_date || undefined,
+            pricePerSqFt: details?.sale?.calculation?.pricePerSizeUnit || undefined,
+            comparableSales: attomData?.comparable_sales || [],
+            priceHistory: attomData?.price_history || []
+          })
         } catch (error) {
-          console.error('❌ Error loading property data:', error)
+          console.error('❌ Error loading Attom property data:', error)
           // Fallback to basic data
           setPropertyData({
             address: fullAddress,
@@ -286,6 +369,7 @@ const CustomerPortalPage: React.FC = () => {
           propertyService.clearCache(fullAddress)
           const propertyData = await propertyService.getPropertyDataWithCache(fullAddress, customerData.tenant_id)
           console.log('🏠 Property data loaded:', propertyData)
+          console.log('🔑 Google API Key present:', !!import.meta.env.VITE_GOOGLE_PLACES_API_KEY)
           setPropertyData(propertyData)
         } catch (error) {
           console.error('❌ Error loading property data:', error)
@@ -310,6 +394,7 @@ const CustomerPortalPage: React.FC = () => {
       if (!jobError && jobData && jobData.length > 0) {
         setCurrentJob({
           ...jobData[0],
+          tenant_id: jobData[0].tenant_id || customerData.tenant_id,
           technician_name: 'TBD', // Will be updated when technician is assigned
           technician_phone: null
         })
@@ -506,7 +591,16 @@ const CustomerPortalPage: React.FC = () => {
   }, [])
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    if (!dateString) {
+      return 'Date to be determined'
+    }
+    
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      return 'Date to be determined'
+    }
+    
+    return date.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -515,7 +609,16 @@ const CustomerPortalPage: React.FC = () => {
   }
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
+    if (!dateString) {
+      return ''
+    }
+    
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      return ''
+    }
+    
+    return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -663,6 +766,36 @@ const CustomerPortalPage: React.FC = () => {
                 Service Plans
               </a>
             </li>
+            {currentJob && (
+              <>
+                <li className="nav-item">
+                  <a 
+                    className={`nav-link ${activeSection === 'photos' ? 'active' : 'text-muted'}`}
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); setActiveSection('photos') }}
+                  >
+                    <i className="ki-duotone ki-picture fs-4 me-2">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                    Photos
+                  </a>
+                </li>
+                <li className="nav-item">
+                  <a 
+                    className={`nav-link ${activeSection === 'documents' ? 'active' : 'text-muted'}`}
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); setActiveSection('documents') }}
+                  >
+                    <i className="ki-duotone ki-folder fs-4 me-2">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                    Documents
+                  </a>
+                </li>
+              </>
+            )}
           </ul>
         </div>
 
@@ -710,10 +843,34 @@ const CustomerPortalPage: React.FC = () => {
                     {/* Street View Image */}
                     <div className="position-relative">
                       {propertyData ? (
-                        <div
-                          className="w-100 rounded-top bg-light d-flex align-items-center justify-content-center"
-                          style={{ height: '300px', backgroundImage: `url('${propertyData.streetViewUrl}')`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                        >
+                        <div className="w-100 rounded-top bg-light position-relative" style={{ height: '300px' }}>
+                          {/* Try to load Street View image */}
+                          {propertyData.streetViewUrl ? (
+                            <img
+                              src={propertyData.streetViewUrl}
+                              alt="Property Street View"
+                              className="w-100 h-100"
+                              style={{ objectFit: 'cover' }}
+                              onError={(e) => {
+                                // Hide image on error and show fallback
+                                (e.target as HTMLImageElement).style.display = 'none'
+                                const fallback = (e.target as HTMLImageElement).nextElementSibling
+                                if (fallback) fallback.classList.remove('d-none')
+                              }}
+                            />
+                          ) : null}
+                          
+                          {/* Fallback when no Street View or on error */}
+                          <div className={`w-100 h-100 d-flex align-items-center justify-content-center ${propertyData.streetViewUrl ? 'd-none' : ''}`}>
+                            <div className="text-center">
+                              <i className="ki-duotone ki-home fs-5x text-primary mb-3">
+                                <span className="path1"></span>
+                                <span className="path2"></span>
+                              </i>
+                              <p className="text-muted">Property View</p>
+                            </div>
+                          </div>
+                          
                           <div className="position-absolute bottom-0 start-0 end-0 bg-gradient-dark p-3">
                             <h4 className="text-white fw-bold mb-1">{propertyData.address}</h4>
                             <div className="text-light fs-6">
@@ -721,7 +878,7 @@ const CustomerPortalPage: React.FC = () => {
                                 <span className="path1"></span>
                                 <span className="path2"></span>
                               </i>
-                              {propertyData.propertyType} • Built {propertyData.yearBuilt}
+                              {propertyData.propertyType} • {propertyData.yearBuilt ? `Built ${propertyData.yearBuilt}` : 'Residential Property'}
                             </div>
                           </div>
                         </div>
@@ -822,10 +979,310 @@ const CustomerPortalPage: React.FC = () => {
                               <span className="fw-semibold">{propertyData.taxAssessment ? `$${propertyData.taxAssessment.toLocaleString()}` : 'Not available'}</span>
                             </div>
                             <div className="d-flex justify-content-between mb-3">
-                              <span className="text-muted">Data Source:</span>
-                              <span className="fw-semibold text-primary">Redfin API</span>
+                              <span className="text-muted">Stories:</span>
+                              <span className="fw-semibold">{propertyData.stories || 'Not available'}</span>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Amenities Section - Only show if we have any amenity data */}
+                        {(propertyData.pool !== undefined || propertyData.centralAir !== undefined || propertyData.garageSpaces || propertyData.roofMaterial) && (
+                          <>
+                            <div className="separator my-4"></div>
+                            <h6 className="fw-bold text-gray-800 mb-3">Property Features</h6>
+                            <div className="row g-3">
+                              {propertyData.garageSpaces !== undefined && (
+                                <div className="col-6 col-md-3">
+                                  <div className="d-flex align-items-center">
+                                    <i className="ki-duotone ki-car fs-2 text-primary me-2">
+                                      <span className="path1"></span>
+                                      <span className="path2"></span>
+                                      <span className="path3"></span>
+                                      <span className="path4"></span>
+                                      <span className="path5"></span>
+                                    </i>
+                                    <div>
+                                      <div className="fw-semibold">{propertyData.garageSpaces}</div>
+                                      <div className="text-muted fs-8">Garage Spaces</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.pool !== undefined && (
+                                <div className="col-6 col-md-3">
+                                  <div className="d-flex align-items-center">
+                                    <i className={`ki-duotone ki-swimming-pool fs-2 ${propertyData.pool ? 'text-info' : 'text-gray-400'} me-2`}>
+                                      <span className="path1"></span>
+                                      <span className="path2"></span>
+                                    </i>
+                                    <div>
+                                      <div className="fw-semibold">{propertyData.pool ? 'Yes' : 'No'}</div>
+                                      <div className="text-muted fs-8">Pool</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.centralAir !== undefined && (
+                                <div className="col-6 col-md-3">
+                                  <div className="d-flex align-items-center">
+                                    <i className={`ki-duotone ki-wind fs-2 ${propertyData.centralAir ? 'text-success' : 'text-gray-400'} me-2`}>
+                                      <span className="path1"></span>
+                                      <span className="path2"></span>
+                                    </i>
+                                    <div>
+                                      <div className="fw-semibold">{propertyData.centralAir ? 'Yes' : 'No'}</div>
+                                      <div className="text-muted fs-8">Central Air</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.roofMaterial && (
+                                <div className="col-6 col-md-3">
+                                  <div className="d-flex align-items-center">
+                                    <i className="ki-duotone ki-home-2 fs-2 text-warning me-2">
+                                      <span className="path1"></span>
+                                      <span className="path2"></span>
+                                    </i>
+                                    <div>
+                                      <div className="fw-semibold text-capitalize">{propertyData.roofMaterial.toLowerCase()}</div>
+                                      <div className="text-muted fs-8">Roof Type</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Tax & Financial Information */}
+                        {(propertyData.annualTaxAmount || propertyData.taxYear || propertyData.pricePerSqFt) && (
+                          <>
+                            <div className="separator my-4"></div>
+                            <h6 className="fw-bold text-gray-800 mb-3">Tax & Financial Details</h6>
+                            <div className="row g-3">
+                              {propertyData.annualTaxAmount && (
+                                <div className="col-md-4">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Annual Tax:</span>
+                                    <span className="fw-semibold text-danger">${propertyData.annualTaxAmount.toLocaleString()}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.taxYear && (
+                                <div className="col-md-4">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Tax Year:</span>
+                                    <span className="fw-semibold">{propertyData.taxYear}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.pricePerSqFt && (
+                                <div className="col-md-4">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Price/Sq Ft:</span>
+                                    <span className="fw-semibold">${propertyData.pricePerSqFt}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Property Details */}
+                        {(propertyData.parcelNumber || propertyData.zoning || propertyData.subdivision || propertyData.county) && (
+                          <>
+                            <div className="separator my-4"></div>
+                            <h6 className="fw-bold text-gray-800 mb-3">Property Details</h6>
+                            <div className="row g-3">
+                              {propertyData.parcelNumber && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Parcel Number:</span>
+                                    <span className="fw-semibold">{propertyData.parcelNumber}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.attomId && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Property ID:</span>
+                                    <span className="fw-semibold">{propertyData.attomId}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.zoning && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Zoning:</span>
+                                    <span className="fw-semibold">{propertyData.zoning}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.subdivision && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Subdivision:</span>
+                                    <span className="fw-semibold text-truncate" style={{maxWidth: '200px'}}>{propertyData.subdivision}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.county && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">County:</span>
+                                    <span className="fw-semibold">{propertyData.county}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Building & Construction */}
+                        {(propertyData.exteriorWalls || propertyData.heatingType || propertyData.coolingType || propertyData.totalRooms) && (
+                          <>
+                            <div className="separator my-4"></div>
+                            <h6 className="fw-bold text-gray-800 mb-3">Building & Construction</h6>
+                            <div className="row g-3">
+                              {propertyData.exteriorWalls && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Exterior Walls:</span>
+                                    <span className="fw-semibold">{propertyData.exteriorWalls}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.totalRooms && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Total Rooms:</span>
+                                    <span className="fw-semibold">{propertyData.totalRooms}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.heatingType && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Heating Type:</span>
+                                    <span className="fw-semibold">{propertyData.heatingType}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.coolingType && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Cooling Type:</span>
+                                    <span className="fw-semibold">{propertyData.coolingType}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.fireplace !== undefined && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Fireplace:</span>
+                                    <span className="fw-semibold">{propertyData.fireplace ? 'Yes' : 'No'}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Ownership Information */}
+                        {(propertyData.ownerName || propertyData.ownerOccupied !== undefined) && (
+                          <>
+                            <div className="separator my-4"></div>
+                            <h6 className="fw-bold text-gray-800 mb-3">Ownership Information</h6>
+                            <div className="row g-3">
+                              {propertyData.ownerName && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Owner:</span>
+                                    <span className="fw-semibold">{propertyData.ownerName}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {propertyData.ownerOccupied !== undefined && (
+                                <div className="col-md-6">
+                                  <div className="d-flex justify-content-between">
+                                    <span className="text-muted">Owner Occupied:</span>
+                                    <span className={`fw-semibold ${propertyData.ownerOccupied ? 'text-success' : 'text-warning'}`}>
+                                      {propertyData.ownerOccupied ? 'Yes' : 'No'}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Price History */}
+                        {propertyData.priceHistory && propertyData.priceHistory.length > 0 && (
+                          <>
+                            <div className="separator my-4"></div>
+                            <h6 className="fw-bold text-gray-800 mb-3">Price History</h6>
+                            <div className="table-responsive">
+                              <table className="table table-sm">
+                                <thead>
+                                  <tr>
+                                    <th>Date</th>
+                                    <th>Price</th>
+                                    <th>Price/Sq Ft</th>
+                                    <th>Type</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {propertyData.priceHistory.slice(0, 5).map((history, index) => (
+                                    <tr key={index}>
+                                      <td>{history.sale_date ? new Date(history.sale_date).toLocaleDateString() : 'N/A'}</td>
+                                      <td className="fw-semibold">${history.sale_price?.toLocaleString() || 'N/A'}</td>
+                                      <td>${history.price_per_sqft || 'N/A'}</td>
+                                      <td><span className="badge badge-light-primary">{history.transaction_type || 'Sale'}</span></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Comparable Sales */}
+                        {propertyData.comparableSales && propertyData.comparableSales.length > 0 && (
+                          <>
+                            <div className="separator my-4"></div>
+                            <h6 className="fw-bold text-gray-800 mb-3">Recent Comparable Sales</h6>
+                            <div className="row g-3">
+                              {propertyData.comparableSales.slice(0, 3).map((comp, index) => (
+                                <div key={index} className="col-12">
+                                  <div className="card card-flush bg-light">
+                                    <div className="card-body py-3">
+                                      <div className="d-flex justify-content-between align-items-center">
+                                        <div>
+                                          <div className="fw-semibold">{comp.address || 'Address N/A'}</div>
+                                          <div className="text-muted fs-7">
+                                            {comp.bedrooms}bd/{comp.bathrooms}ba • {comp.sqft?.toLocaleString()} sq ft • Built {comp.year_built}
+                                          </div>
+                                        </div>
+                                        <div className="text-end">
+                                          <div className="fw-bold text-success">${comp.sale_price?.toLocaleString()}</div>
+                                          <div className="text-muted fs-7">
+                                            {comp.sale_date ? new Date(comp.sale_date).toLocaleDateString() : 'N/A'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        <div className="text-center mt-4">
+                          <div className="text-muted fs-8">Property data powered by ATTOM Data Solutions</div>
+                          {propertyData.marketValueDate && (
+                            <div className="text-muted fs-8">Market value as of {new Date(propertyData.marketValueDate).toLocaleDateString()}</div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1046,7 +1503,7 @@ const CustomerPortalPage: React.FC = () => {
                 <div className="col-lg-6">
                   <LiveJobLog 
                     jobId={currentJob.id}
-                    isActive={currentJob.status === 'In Progress' || currentJob.status === 'On The Way'}
+                    isActive={currentJob.status === 'in_progress' || currentJob.status === 'on_the_way' || currentJob.status === 'In Progress' || currentJob.status === 'On The Way'}
                   />
                 </div>
               </div>
@@ -1085,10 +1542,46 @@ const CustomerPortalPage: React.FC = () => {
             <QuotesAndPlans customerId={customerId || ''} />
           </div>
         )}
+
+        {activeSection === 'photos' && currentJob && (
+          <div className="mt-6">
+            <div className="card">
+              <div className="card-body">
+                <JobPhotosTab 
+                  jobId={currentJob.id}
+                  tenantId={currentJob.tenant_id}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'documents' && currentJob && (
+          <div className="mt-6">
+            <div className="card">
+              <div className="card-body">
+                <DocumentsTab 
+                  jobId={currentJob.id}
+                  tenantId={currentJob.tenant_id}
+                  contactId={customer?.id}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Chat Widget */}
+      {/* Chat Widget - Always visible */}
       <ChatWidget />
+      
+      {/* Debug info for troubleshooting */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ position: 'fixed', bottom: '100px', left: '20px', background: 'rgba(0,0,0,0.8)', color: 'white', padding: '10px', fontSize: '12px', zIndex: 10000 }}>
+          <div>Current Job: {currentJob ? currentJob.id : 'None'}</div>
+          <div>Job Status: {currentJob?.status || 'N/A'}</div>
+          <div>Active Section: {activeSection}</div>
+        </div>
+      )}
 
       {/* Service Scheduling Modal */}
       <ServiceSchedulingModal

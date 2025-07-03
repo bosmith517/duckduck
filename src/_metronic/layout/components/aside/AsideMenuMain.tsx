@@ -160,11 +160,11 @@ export function AsideMenuMain() {
       </AsideMenuItemWithSub>
       
       <AsideMenuItemWithSub to='/profile' title='My Profile' icon='profile-circle' fontIcon='bi-person'>
-        <AsideMenuItem to='/profile/overview' title='Overview' hasBullet={true} />
-        <AsideMenuItem to='/profile/projects' title='Projects' hasBullet={true} />
-        <AsideMenuItem to='/profile/campaigns' title='Campaigns' hasBullet={true} />
+        <AsideMenuItem to='/profile/account' title='Account Settings' hasBullet={true} />
+        <AsideMenuItem to='/profile/company' title='Company Information' hasBullet={true} />
+        <AsideMenuItem to='/profile/notifications' title='Notifications' hasBullet={true} />
+        <AsideMenuItem to='/profile/security' title='Security' hasBullet={true} />
         <AsideMenuItem to='/profile/documents' title='Documents' hasBullet={true} />
-        <AsideMenuItem to='/profile/connections' title='Connections' hasBullet={true} />
       </AsideMenuItemWithSub>
     </>
   )

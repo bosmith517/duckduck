@@ -1,16 +1,16 @@
 import {Navigate, Outlet, Route, Routes} from 'react-router-dom'
 import {PageLink, PageTitle} from '../../../_metronic/layout/core'
-import {Overview} from './components/Overview'
-import {Projects} from './components/Projects'
-import {Campaigns} from './components/Campaigns'
+import {AccountSettings} from './components/AccountSettings'
+import {CompanyInformation} from './components/CompanyInformation'
+import {NotificationSettings} from './components/NotificationSettings'
+import {SecuritySettings} from './components/SecuritySettings'
 import {Documents} from './components/Documents'
-import {Connections} from './components/Connections'
 import {ProfileHeader} from './ProfileHeader'
 
 const profileBreadCrumbs: Array<PageLink> = [
   {
     title: 'Profile',
-    path: '/profile/overview',
+    path: '/profile/account',
     isSeparator: false,
     isActive: false,
   },
@@ -33,29 +33,38 @@ const ProfilePage = () => (
       }
     >
       <Route
-        path='overview'
+        path='account'
         element={
           <>
-            <PageTitle breadcrumbs={profileBreadCrumbs}>Overview</PageTitle>
-            <Overview />
+            <PageTitle breadcrumbs={profileBreadCrumbs}>Account Settings</PageTitle>
+            <AccountSettings />
           </>
         }
       />
       <Route
-        path='projects'
+        path='company'
         element={
           <>
-            <PageTitle breadcrumbs={profileBreadCrumbs}>Jobs</PageTitle>
-            <Projects />
+            <PageTitle breadcrumbs={profileBreadCrumbs}>Company Information</PageTitle>
+            <CompanyInformation />
           </>
         }
       />
       <Route
-        path='campaigns'
+        path='notifications'
         element={
           <>
-            <PageTitle breadcrumbs={profileBreadCrumbs}>Campaigns</PageTitle>
-            <Campaigns />
+            <PageTitle breadcrumbs={profileBreadCrumbs}>Notifications</PageTitle>
+            <NotificationSettings />
+          </>
+        }
+      />
+      <Route
+        path='security'
+        element={
+          <>
+            <PageTitle breadcrumbs={profileBreadCrumbs}>Security</PageTitle>
+            <SecuritySettings />
           </>
         }
       />
@@ -68,16 +77,7 @@ const ProfilePage = () => (
           </>
         }
       />
-      <Route
-        path='connections'
-        element={
-          <>
-            <PageTitle breadcrumbs={profileBreadCrumbs}>Connections</PageTitle>
-            <Connections />
-          </>
-        }
-      />
-      <Route index element={<Navigate to='/profile/overview' />} />
+      <Route index element={<Navigate to='/profile/account' />} />
     </Route>
   </Routes>
 )

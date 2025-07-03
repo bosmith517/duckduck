@@ -6,6 +6,7 @@ import PhotoCapture from './PhotoCapture'
 import PhotoViewer from './PhotoViewer'
 import AIAnalysisButton from './AIAnalysisButton'
 import CreateEstimateModal from '../workflows/CreateEstimateModal'
+import { logPhotoUpload } from '../../utils/activityLogger'
 
 interface JobPhoto {
   id: string
@@ -43,6 +44,8 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
   const [showPhotoViewer, setShowPhotoViewer] = useState(false)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
   const [jobDetails, setJobDetails] = useState<any>(null)
+  const [activePhotoType, setActivePhotoType] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid')
 
   useEffect(() => {
     if (jobId && userProfile?.tenant_id) {
@@ -395,62 +398,174 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
               )}
             </div>
           ) : (
-            // Full gallery view with grouping
+            // Organized photo gallery
             <div>
-              {Object.entries(groupedPhotos).map(([photoType, typePhotos]) => (
-                <div key={photoType} className="mb-6">
-                  <h6 className="mb-3">
-                    <span className={`badge badge-light-${getPhotoTypeColor(photoType)} me-2`}>
-                      {getPhotoTypeLabel(photoType)}
-                    </span>
-                    {typePhotos.length} photo{typePhotos.length !== 1 ? 's' : ''}
-                  </h6>
-                  <div className="row g-3">
-                    {typePhotos.map((photo) => (
-                      <div key={photo.id} className="col-md-4 col-lg-3">
-                        <div className="card">
+              {/* Photo Type Filter Tabs */}
+              <div className="mb-4">
+                <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                  <div className="d-flex flex-wrap gap-2">
+                    <button
+                      className={`btn btn-sm ${activePhotoType === 'all' ? 'btn-primary' : 'btn-light'}`}
+                      onClick={() => setActivePhotoType('all')}
+                    >
+                      All Photos ({photos.length})
+                    </button>
+                    {Object.entries(groupedPhotos).map(([photoType, typePhotos]) => (
+                      <button
+                        key={photoType}
+                        className={`btn btn-sm ${activePhotoType === photoType ? 'btn-primary' : 'btn-light'}`}
+                        onClick={() => setActivePhotoType(photoType)}
+                      >
+                        <span className={`badge badge-${getPhotoTypeColor(photoType)} me-1 fs-8`}>
+                          {getPhotoTypeLabel(photoType)}
+                        </span>
+                        {typePhotos.length}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div className="d-flex gap-2">
+                    <button
+                      className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : 'btn-light'}`}
+                      onClick={() => setViewMode('grid')}
+                      title="Grid View"
+                    >
+                      <i className="ki-duotone ki-element-11 fs-5">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                        <span className="path3"></span>
+                        <span className="path4"></span>
+                      </i>
+                    </button>
+                    <button
+                      className={`btn btn-sm ${viewMode === 'timeline' ? 'btn-primary' : 'btn-light'}`}
+                      onClick={() => setViewMode('timeline')}
+                      title="Timeline View"
+                    >
+                      <i className="ki-duotone ki-time fs-5">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Photo Display */}
+              {(() => {
+                const filteredPhotos = activePhotoType === 'all' ? photos : (groupedPhotos[activePhotoType] || [])
+                
+                if (viewMode === 'timeline') {
+                  // Timeline view grouped by date
+                  const photosByDate = filteredPhotos.reduce((acc, photo) => {
+                    const dateKey = new Date(photo.taken_at).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })
+                    if (!acc[dateKey]) acc[dateKey] = []
+                    acc[dateKey].push(photo)
+                    return acc
+                  }, {} as Record<string, JobPhoto[]>)
+                  
+                  const sortedDates = Object.keys(photosByDate).sort((a, b) => 
+                    new Date(b).getTime() - new Date(a).getTime()
+                  )
+                  
+                  return (
+                    <div>
+                      {sortedDates.map((date) => (
+                        <div key={date} className="mb-5">
+                          <div className="d-flex align-items-center mb-3">
+                            <div className="bg-primary rounded-circle p-2 me-3">
+                              <i className="ki-duotone ki-calendar fs-6 text-white">
+                                <span className="path1"></span>
+                                <span className="path2"></span>
+                              </i>
+                            </div>
+                            <div>
+                              <h6 className="mb-0">{date}</h6>
+                              <span className="text-muted fs-7">{photosByDate[date].length} photos</span>
+                            </div>
+                          </div>
+                          <div className="row g-2 ms-5">
+                            {photosByDate[date].map((photo) => (
+                              <div key={photo.id} className="col-6 col-md-3 col-lg-2">
+                                <div className="position-relative">
+                                  <img
+                                    src={photo.file_url}
+                                    alt={photo.description}
+                                    className="img-fluid rounded cursor-pointer shadow-sm"
+                                    style={{ aspectRatio: '1', objectFit: 'cover' }}
+                                    onClick={() => handlePhotoClick(photo)}
+                                  />
+                                  <span className={`badge badge-${getPhotoTypeColor(photo.photo_type)} position-absolute top-0 end-0 m-1 fs-8`}>
+                                    {getPhotoTypeLabel(photo.photo_type)}
+                                  </span>
+                                  {(photo.latitude && photo.longitude) && (
+                                    <span className="badge badge-success position-absolute bottom-0 start-0 m-1 fs-8">
+                                      <i className="ki-duotone ki-geolocation fs-7">
+                                        <span className="path1"></span>
+                                        <span className="path2"></span>
+                                      </i>
+                                    </span>
+                                  )}
+                                </div>
+                                {photo.description && (
+                                  <p className="text-muted fs-8 mt-1 mb-0 text-truncate" title={photo.description}>
+                                    {photo.description}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                } else {
+                  // Grid view
+                  return (
+                    <div className="row g-3">
+                      {filteredPhotos.map((photo) => (
+                        <div key={photo.id} className="col-6 col-md-4 col-lg-3 col-xl-2">
                           <div className="position-relative">
                             <img
                               src={photo.file_url}
                               alt={photo.description}
-                              className="card-img-top cursor-pointer"
-                              style={{ height: '200px', objectFit: 'cover' }}
+                              className="img-fluid rounded cursor-pointer shadow-sm"
+                              style={{ aspectRatio: '1', objectFit: 'cover' }}
                               onClick={() => handlePhotoClick(photo)}
                             />
+                            <span className={`badge badge-${getPhotoTypeColor(photo.photo_type)} position-absolute top-0 end-0 m-2 fs-8`}>
+                              {getPhotoTypeLabel(photo.photo_type)}
+                            </span>
                             {(photo.latitude && photo.longitude) && (
-                              <span className="badge badge-success position-absolute top-0 start-0 m-2">
-                                <i className="ki-duotone ki-geolocation fs-7 me-1">
+                              <span className="badge badge-success position-absolute top-0 start-0 m-2 fs-8">
+                                <i className="ki-duotone ki-geolocation fs-7">
                                   <span className="path1"></span>
                                   <span className="path2"></span>
                                 </i>
-                                GPS
                               </span>
                             )}
-                          </div>
-                          <div className="card-body p-3">
-                            {photo.description && (
-                              <p className="card-text fs-7 mb-2">{photo.description}</p>
-                            )}
-                            {photo.cost_description && (
-                              <p className="card-text fs-8 text-muted mb-2">
-                                <i className="ki-duotone ki-bill fs-7 me-1">
-                                  <span className="path1"></span>
-                                  <span className="path2"></span>
-                                </i>
-                                {photo.cost_description}
-                              </p>
-                            )}
-                            <div className="d-flex justify-content-between align-items-center">
-                              <small className="text-muted">{formatDate(photo.taken_at)}</small>
-                              <small className="text-muted">{photo.taken_by_name}</small>
+                            <div className="position-absolute bottom-0 start-0 end-0 bg-gradient-dark rounded-bottom p-2">
+                              <div className="text-white fs-8">
+                                {formatDate(photo.taken_at)}
+                              </div>
+                              {photo.description && (
+                                <div className="text-light fs-9 text-truncate" title={photo.description}>
+                                  {photo.description}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                      ))}
+                    </div>
+                  )
+                }
+              })()}
             </div>
           )}
         </div>
@@ -460,9 +575,16 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
       <PhotoCapture
         isOpen={showPhotoCapture}
         onClose={() => setShowPhotoCapture(false)}
-        onPhotoSaved={(photoUrl, photoId) => {
+        onPhotoSaved={async (photoUrl, photoId) => {
           loadPhotos() // Refresh the gallery
           showToast.success('Photo saved successfully!')
+          
+          // Log photo upload activity
+          try {
+            await logPhotoUpload(jobId, 1)
+          } catch (error) {
+            console.error('Failed to log photo upload activity:', error)
+          }
         }}
         jobId={jobId}
         photoType={selectedPhotoType}

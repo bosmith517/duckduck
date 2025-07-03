@@ -156,3 +156,73 @@ export interface CallLog {
   notes?: string
   created_at: string
 }
+
+export interface PropertyData {
+  id: string
+  tenant_id: string
+  address: string
+  normalized_address: string
+  city?: string
+  state?: string
+  zip_code?: string
+  
+  // Property details
+  property_type?: string
+  year_built?: number
+  square_footage?: number
+  lot_size?: string
+  bedrooms?: number
+  bathrooms?: number
+  
+  // Enhanced Attom fields
+  attom_id?: string
+  attom_onboard?: string
+  attom_fips_code?: string
+  parcel_number?: string
+  stories?: number
+  total_rooms?: number
+  garage_spaces?: number
+  pool?: boolean
+  fireplace?: boolean
+  central_air?: boolean
+  heating_type?: string
+  cooling_type?: string
+  roof_material?: string
+  exterior_walls?: string
+  construction_quality?: string
+  condition_rating?: string
+  
+  // Financial data
+  estimated_value?: number
+  market_value_estimate?: number
+  market_value_date?: string
+  last_sold_price?: number
+  last_sold_date?: string
+  tax_assessment?: number
+  tax_year?: number
+  
+  // Enhanced data arrays
+  comparable_sales?: any[]
+  price_history?: any[]
+  tax_history?: any[]
+  rental_estimates?: any
+  demographic_data?: any
+  environmental_data?: any
+  attom_raw_data?: any
+  
+  // Sync metadata
+  data_source: 'redfin' | 'attom' | 'manual' | 'zillow' | 'mls' | 'public_records'
+  last_attom_sync?: string
+  attom_sync_status?: 'pending' | 'syncing' | 'success' | 'error' | 'not_found'
+  attom_error_message?: string
+  
+  // Images and URLs
+  street_view_url?: string
+  property_image_url?: string
+  redfin_url?: string
+  
+  // Timestamps
+  scraped_at?: string
+  created_at: string
+  updated_at: string
+}

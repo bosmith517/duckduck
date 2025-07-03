@@ -5,6 +5,7 @@ import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { JobForm } from './components/JobForm'
 import { JobsList } from './components/JobsList'
 import { JobsKanban } from './components/JobsKanban'
+import { jobActivityService } from '../../services/jobActivityService'
 
 const JobsPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
@@ -127,6 +128,23 @@ const JobsPage: React.FC = () => {
         console.error('Error creating job:', error)
         alert(`Failed to create job: ${error.message}`)
         return
+      }
+
+      // Log job creation activity
+      try {
+        await jobActivityService.logActivity({
+          jobId: data.id,
+          tenantId: userProfile.tenant_id,
+          userId: userProfile.id,
+          activityType: 'job_created',
+          activityCategory: 'user',
+          title: 'Job Created',
+          description: `New job "${data.title}" was created`,
+          isVisibleToCustomer: true,
+          isMilestone: true
+        })
+      } catch (logError) {
+        console.error('Failed to log job creation activity:', logError)
       }
 
       setJobs(prev => [data, ...prev])

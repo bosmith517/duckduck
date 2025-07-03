@@ -2,6 +2,12 @@ import React, { useState } from 'react'
 
 export const ChatWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false)
+  
+  // Log component mount for debugging
+  React.useEffect(() => {
+    console.log('💬 ChatWidget mounted')
+    return () => console.log('💬 ChatWidget unmounted')
+  }, [])
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -48,14 +54,25 @@ export const ChatWidget: React.FC = () => {
     <>
       {/* Chat Widget Button */}
       <div 
-        className="position-fixed bottom-0 end-0 m-6"
-        style={{ zIndex: 1050 }}
+        className="position-fixed"
+        style={{ 
+          bottom: '20px',
+          right: '20px',
+          zIndex: 9999
+        }}
       >
         {!isOpen && (
           <button
-            className="btn btn-primary rounded-circle shadow-lg"
-            style={{ width: '60px', height: '60px' }}
+            className="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center"
+            style={{ 
+              width: '60px', 
+              height: '60px',
+              background: '#007bff',
+              border: 'none',
+              boxShadow: '0 4px 12px rgba(0,123,255,0.3)'
+            }}
             onClick={() => setIsOpen(true)}
+            title="Chat with support"
           >
             <i className="ki-duotone ki-message-text-2 fs-2">
               <span className="path1"></span>
@@ -173,8 +190,12 @@ export const ChatWidget: React.FC = () => {
       {/* Quick Contact Options */}
       {isOpen && (
         <div 
-          className="position-fixed bottom-0 end-0 mb-4 me-4"
-          style={{ zIndex: 1040, marginRight: '380px' }}
+          className="position-fixed"
+          style={{ 
+            bottom: '20px',
+            right: '390px',
+            zIndex: 9998
+          }}
         >
           <div className="card bg-white shadow-sm">
             <div className="card-body p-3">
