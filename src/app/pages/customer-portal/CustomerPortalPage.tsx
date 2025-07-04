@@ -863,7 +863,7 @@ const CustomerPortalPage: React.FC = () => {
                         <span className="path1"></span>
                         <span className="path2"></span>
                       </i>
-                      Your Property
+                      Your Property at {customerData?.address_line1 || customerData?.address || 'this Address'}
                     </>
                   )}
                 </h5>
