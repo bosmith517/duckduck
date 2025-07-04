@@ -142,7 +142,7 @@ class EmailService {
     content: { html?: string; text?: string } | { template_id: string; template_variables?: Record<string, any> },
     scheduledAt: Date,
     options?: { priority?: number; tags?: Record<string, any> }
-  ): Promise<{ success: boolean; queue_id: string }> {
+  ): Promise<{ success: boolean; message_id?: string; queue_id?: string; status: string }> {
     const emailRequest: SendEmailRequest = {
       to,
       subject,

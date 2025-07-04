@@ -83,7 +83,7 @@ const EmailComposer: React.FC<EmailComposerProps> = ({ className = '' }) => {
         scheduled_at: emailData.scheduled_at || undefined
       })
 
-      setSuccess(`Email sent successfully! ID: ${result.id}`)
+      setSuccess(`Email sent successfully! ID: ${result.message_id || 'N/A'}`)
       
       // Reset form
       setEmailData({
@@ -281,7 +281,7 @@ const EmailComposer: React.FC<EmailComposerProps> = ({ className = '' }) => {
                 onChange={(e) => setEmailData(prev => ({ ...prev, html: e.target.value }))}
               />
               <div className="form-text">
-                You can use HTML tags for formatting. Variables like {{name}} will be replaced if using templates.
+                You can use HTML tags for formatting. Variables like {`{{name}}`} will be replaced if using templates.
               </div>
             </div>
           </div>

@@ -48,11 +48,13 @@ const EmailTemplateManager: React.FC<EmailTemplateManagerProps> = ({ className =
     try {
       await emailService.createTemplate({
         template_name: formData.template_name,
+        version: 1,
         subject_template: formData.subject_template,
         html_template: formData.html_template,
         text_template: formData.text_template,
         description: formData.description,
-        variables: formData.variables
+        variables: formData.variables,
+        is_active: true
       })
 
       await loadTemplates()
