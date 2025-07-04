@@ -16,6 +16,10 @@ import { jobActivityService } from '../../services/jobActivityService'
 import { JobForm } from './components/JobForm'
 import ClientPortalService from '../../services/clientPortalService'
 import { createTestActivities } from '../../utils/activityLogger'
+import { InspectionManager } from '../../components/jobs/InspectionManager'
+import { MilestoneManager } from '../../components/jobs/MilestoneManager'
+import { TeamAssignmentManager } from '../../components/jobs/TeamAssignmentManager'
+import { MaterialOrderManager } from '../../components/jobs/MaterialOrderManager'
 
 interface JobWithRelations {
   id: string
@@ -77,6 +81,18 @@ const JobDetailsPage: React.FC = () => {
       checkExistingPortal()
     }
   }, [id, userProfile?.tenant_id])
+
+  // Listen for tab switching from PaymentSchedule component
+  useEffect(() => {
+    const handleSwitchToMilestones = () => {
+      setActiveTab('milestones')
+    }
+
+    window.addEventListener('switchToMilestonesTab', handleSwitchToMilestones)
+    return () => {
+      window.removeEventListener('switchToMilestonesTab', handleSwitchToMilestones)
+    }
+  }, [])
 
   const fetchJob = async () => {
     if (!id || !userProfile?.tenant_id) return
@@ -547,6 +563,57 @@ const JobDetailsPage: React.FC = () => {
                 </li>
                 <li className='nav-item'>
                   <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'inspections' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('inspections')
+                    }}
+                  >
+                    <i className='ki-duotone ki-verify fs-6 me-1'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    Inspections
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'milestones' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('milestones')
+                    }}
+                  >
+                    <i className='ki-duotone ki-chart-line-up fs-6 me-1'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    Milestones
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'team-materials' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('team-materials')
+                    }}
+                  >
+                    <i className='ki-duotone ki-people fs-6 me-1'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                      <span className='path3'></span>
+                      <span className='path4'></span>
+                      <span className='path5'></span>
+                    </i>
+                    Team & Materials
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
                     className={`nav-link text-active-primary pb-4 ${activeTab === 'property' ? 'active' : ''}`}
                     href='#'
                     onClick={(e) => {
@@ -837,6 +904,54 @@ const JobDetailsPage: React.FC = () => {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'inspections' && (
+            <InspectionManager 
+              jobId={job.id}
+              jobType={job.description?.toLowerCase().includes('electrical') ? 'electrical' : 
+                      job.description?.toLowerCase().includes('plumbing') ? 'plumbing' :
+                      job.description?.toLowerCase().includes('hvac') ? 'hvac' : 'general_construction'}
+              onInspectionUpdate={() => {
+                // Refresh job data if needed
+                fetchJob()
+              }}
+            />
+          )}
+
+          {activeTab === 'milestones' && (
+            <MilestoneManager 
+              jobId={job.id}
+              jobValue={job.estimated_cost}
+              startDate={job.start_date}
+              onMilestoneUpdate={() => {
+                // Refresh job data if needed
+                fetchJob()
+              }}
+            />
+          )}
+
+          {activeTab === 'team-materials' && (
+            <div className='row g-5'>
+              <div className='col-xl-6'>
+                <TeamAssignmentManager 
+                  jobId={job.id}
+                  onTeamUpdate={() => {
+                    // Refresh job data if needed
+                    fetchJob()
+                  }}
+                />
+              </div>
+              <div className='col-xl-6'>
+                <MaterialOrderManager 
+                  jobId={job.id}
+                  onOrderUpdate={() => {
+                    // Refresh job data if needed
+                    fetchJob()
+                  }}
+                />
+              </div>
             </div>
           )}
 

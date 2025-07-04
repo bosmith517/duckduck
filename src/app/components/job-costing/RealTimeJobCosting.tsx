@@ -209,6 +209,9 @@ const RealTimeJobCosting: React.FC = () => {
 
       if (error) throw error
 
+      // Auto-update job totals after adding cost
+      await updateJobActualCosts(newCost.job_id)
+
       // Reset form
       setNewCost({
         job_id: '',
@@ -229,6 +232,96 @@ const RealTimeJobCosting: React.FC = () => {
       alert('Failed to add cost')
     } finally {
       setAddingCost(false)
+    }
+  }
+
+  const updateJobActualCosts = async (jobId: string) => {
+    try {
+      // Calculate total actual costs from cost entries
+      const { data: costs } = await supabase
+        .from('job_costs')
+        .select('cost_type, total_cost, amount')
+        .eq('job_id', jobId)
+
+      if (!costs) return
+
+      const laborCost = costs
+        .filter(c => c.cost_type === 'labor')
+        .reduce((sum, c) => sum + (c.total_cost || c.amount || 0), 0)
+      
+      const materialCost = costs
+        .filter(c => c.cost_type === 'material')
+        .reduce((sum, c) => sum + (c.total_cost || c.amount || 0), 0)
+
+      const equipmentCost = costs
+        .filter(c => c.cost_type === 'equipment')
+        .reduce((sum, c) => sum + (c.total_cost || c.amount || 0), 0)
+
+      const subcontractorCost = costs
+        .filter(c => c.cost_type === 'subcontractor')
+        .reduce((sum, c) => sum + (c.total_cost || c.amount || 0), 0)
+
+      const overheadCost = costs
+        .filter(c => c.cost_type === 'overhead')
+        .reduce((sum, c) => sum + (c.total_cost || c.amount || 0), 0)
+      
+      const totalActualCost = costs.reduce((sum, c) => sum + (c.total_cost || c.amount || 0), 0)
+
+      // Update the job with calculated totals
+      const { error: updateError } = await supabase
+        .from('jobs')
+        .update({
+          actual_cost: totalActualCost,
+          material_cost_actual: materialCost,
+          labor_cost_actual: laborCost,
+          equipment_cost_actual: equipmentCost,
+          subcontractor_cost_actual: subcontractorCost,
+          overhead_cost_actual: overheadCost,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+
+      if (updateError) {
+        console.error('Error updating job totals:', updateError)
+      } else {
+        console.log('✅ Job totals updated automatically:', {
+          jobId,
+          totalActualCost,
+          materialCost,
+          laborCost,
+          equipmentCost,
+          subcontractorCost,
+          overheadCost
+        })
+      }
+
+    } catch (error) {
+      console.error('Error calculating job costs:', error)
+    }
+  }
+
+  const deleteCostEntry = async (costId: string, jobId: string) => {
+    if (!confirm('Are you sure you want to delete this cost entry?')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('job_costs')
+        .delete()
+        .eq('id', costId)
+
+      if (error) throw error
+
+      // Recalculate job totals after deletion
+      await updateJobActualCosts(jobId)
+
+      alert('✅ Cost entry deleted successfully!')
+      fetchData()
+
+    } catch (error) {
+      console.error('Error deleting cost entry:', error)
+      alert('Failed to delete cost entry')
     }
   }
 
@@ -603,6 +696,7 @@ const RealTimeJobCosting: React.FC = () => {
                         <th>Description</th>
                         <th>Amount</th>
                         <th>Vendor</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -642,6 +736,15 @@ const RealTimeJobCosting: React.FC = () => {
                               </td>
                               <td>
                                 <div className="text-muted fs-7">{cost.vendor_name || '—'}</div>
+                              </td>
+                              <td>
+                                <button 
+                                  className="btn btn-sm btn-light-danger"
+                                  onClick={() => deleteCostEntry(cost.id, cost.job_id)}
+                                  title="Delete cost entry"
+                                >
+                                  <KTIcon iconName="trash" className="fs-6" />
+                                </button>
                               </td>
                             </tr>
                           )

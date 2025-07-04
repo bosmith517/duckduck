@@ -116,15 +116,57 @@ const EstimatesPage: React.FC = () => {
     }
   }
 
+  const handleStatusChange = async (estimateId: string, newStatus: string) => {
+    try {
+      await estimatesService.updateEstimateStatus(estimateId, newStatus)
+      loadEstimates()
+      alert(`✅ Estimate status updated to ${newStatus}`)
+    } catch (error) {
+      console.error('Error updating estimate status:', error)
+      alert('Failed to update estimate status')
+    }
+  }
+
+
+  const handleCreateRevision = async (estimate: EstimateWithAccount) => {
+    try {
+      const fullEstimate = await estimatesService.getEstimateById(estimate.id)
+      if (fullEstimate) {
+        const revisionData = {
+          ...fullEstimate,
+          id: undefined,
+          estimate_number: undefined,
+          status: 'draft' as const,
+          version: (fullEstimate.version || 1) + 1,
+          parent_estimate_id: estimate.id,
+          created_at: undefined,
+          updated_at: undefined
+        }
+        
+        const revision = await estimatesService.createEstimate(revisionData)
+        await handleStatusChange(estimate.id, 'revised')
+        setEditingEstimate(revision as EstimateWithAccount)
+        setShowEstimateForm(true)
+        alert(`✅ Revision created: ${revision.estimate_number}`)
+      }
+    } catch (error) {
+      console.error('Error creating revision:', error)
+      alert('Failed to create revision')
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const statusClasses = {
       'draft': 'badge-light-secondary',
       'sent': 'badge-light-info',
+      'pending_review': 'badge-light-primary',
+      'under_negotiation': 'badge-light-warning',
+      'revised': 'badge-light-primary',
       'approved': 'badge-light-success',
       'rejected': 'badge-light-danger',
       'expired': 'badge-light-warning'
     }
-    return `badge ${statusClasses[status as keyof typeof statusClasses]}`
+    return `badge ${statusClasses[status as keyof typeof statusClasses] || 'badge-light-secondary'}`
   }
 
   const isExpiringSoon = (validUntil: string) => {
@@ -194,6 +236,9 @@ const EstimatesPage: React.FC = () => {
                     <option value='all'>All Statuses</option>
                     <option value='draft'>Draft</option>
                     <option value='sent'>Sent</option>
+                    <option value='pending_review'>Pending Review</option>
+                    <option value='under_negotiation'>Under Negotiation</option>
+                    <option value='revised'>Revised</option>
                     <option value='approved'>Approved</option>
                     <option value='rejected'>Rejected</option>
                     <option value='expired'>Expired</option>
@@ -279,14 +324,14 @@ const EstimatesPage: React.FC = () => {
                           </td>
                           <td>
                             <div className='d-flex justify-content-end flex-shrink-0'>
+                              {/* Always show edit button */}
                               <a
                                 href='#'
                                 className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
-                                title='View/Edit'
+                                title='Edit Estimate'
                                 onClick={async (e) => {
                                   e.preventDefault()
                                   try {
-                                    // Load full estimate with line items
                                     const fullEstimate = await estimatesService.getEstimateById(estimate.id)
                                     if (fullEstimate) {
                                       setEditingEstimate(fullEstimate as EstimateWithAccount)
@@ -302,25 +347,81 @@ const EstimatesPage: React.FC = () => {
                                   <span className='path2'></span>
                                 </i>
                               </a>
-                              <a
-                                href='#'
-                                className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
-                                title='Send Estimate'
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  alert('Send estimate functionality will be implemented in a future update.')
-                                }}
-                              >
-                                <i className='ki-duotone ki-send fs-3'>
-                                  <span className='path1'></span>
-                                  <span className='path2'></span>
-                                </i>
-                              </a>
+
+                              {/* Workflow-specific actions */}
+                              {estimate.status === 'draft' && (
+                                <a
+                                  href='#'
+                                  className='btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1'
+                                  title='Send to Client'
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    handleStatusChange(estimate.id, 'sent')
+                                  }}
+                                >
+                                  <i className='ki-duotone ki-send fs-3'>
+                                    <span className='path1'></span>
+                                    <span className='path2'></span>
+                                  </i>
+                                </a>
+                              )}
+
+                              {(estimate.status === 'sent' || estimate.status === 'pending_review') && (
+                                <a
+                                  href='#'
+                                  className='btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1'
+                                  title='Mark Approved'
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    handleStatusChange(estimate.id, 'approved')
+                                  }}
+                                >
+                                  <i className='ki-duotone ki-check fs-3'>
+                                    <span className='path1'></span>
+                                    <span className='path2'></span>
+                                  </i>
+                                </a>
+                              )}
+
+
+                              {estimate.status === 'under_negotiation' && (
+                                <>
+                                  <a
+                                    href='#'
+                                    className='btn btn-icon btn-bg-light btn-active-color-warning btn-sm me-1'
+                                    title='Create Revision'
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      handleCreateRevision(estimate)
+                                    }}
+                                  >
+                                    <i className='ki-duotone ki-document fs-3'>
+                                      <span className='path1'></span>
+                                      <span className='path2'></span>
+                                    </i>
+                                  </a>
+                                  <a
+                                    href='#'
+                                    className='btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1'
+                                    title='Mark Approved'
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      handleStatusChange(estimate.id, 'approved')
+                                    }}
+                                  >
+                                    <i className='ki-duotone ki-check fs-3'>
+                                      <span className='path1'></span>
+                                      <span className='path2'></span>
+                                    </i>
+                                  </a>
+                                </>
+                              )}
+
                               {estimate.status === 'approved' && (
                                 <a
                                   href='#'
                                   className='btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1'
-                                  title='Convert to Job'
+                                  title='Convert to Job & Schedule'
                                   onClick={(e) => {
                                     e.preventDefault()
                                     setSelectedEstimate(estimate)
@@ -333,9 +434,11 @@ const EstimatesPage: React.FC = () => {
                                   </i>
                                 </a>
                               )}
+
+                              {/* Delete button - always available */}
                               <a
                                 href='#'
-                                className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm'
+                                className='btn btn-icon btn-bg-light btn-active-color-danger btn-sm'
                                 title='Delete'
                                 onClick={(e) => {
                                   e.preventDefault()

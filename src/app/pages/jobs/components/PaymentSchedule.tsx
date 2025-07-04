@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { paymentScheduleService, PaymentScheduleWithInvoice } from '../../../services/paymentScheduleService'
-import { invoicesService } from '../../../services/invoicesService'
-import { AddMilestoneModal } from './AddMilestoneModal'
+import { MilestoneService, JobMilestone } from '../../../services/milestoneService'
 import { showToast } from '../../../utils/toast'
 
 interface PaymentScheduleProps {
@@ -9,151 +7,117 @@ interface PaymentScheduleProps {
 }
 
 export const PaymentSchedule: React.FC<PaymentScheduleProps> = ({ jobId }) => {
-  const [schedules, setSchedules] = useState<PaymentScheduleWithInvoice[]>([])
+  const [milestones, setMilestones] = useState<JobMilestone[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAddModal, setShowAddModal] = useState(false)
 
   useEffect(() => {
-    loadPaymentSchedules()
+    loadPaymentMilestones()
   }, [jobId])
 
-  const loadPaymentSchedules = async () => {
+  const loadPaymentMilestones = async () => {
     try {
       setLoading(true)
-      const data = await paymentScheduleService.getPaymentSchedulesByJobId(jobId)
-      setSchedules(data)
+      const data = await MilestoneService.getMilestonesForJob(jobId)
+      // Filter to only show payment milestones
+      const paymentMilestones = data.filter(m => m.milestone_type === 'payment')
+      setMilestones(paymentMilestones)
     } catch (error) {
-      console.error('Error loading payment schedules:', error)
+      console.error('Error loading payment milestones:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleAddMilestone = async (milestoneData: any) => {
-    const loadingToast = showToast.loading('Adding milestone...')
+  const handleMarkMilestoneComplete = async (milestoneId: string) => {
+    const loadingToast = showToast.loading('Updating milestone...')
     
     try {
-      await paymentScheduleService.createPaymentSchedule(milestoneData)
-      setShowAddModal(false)
-      loadPaymentSchedules()
+      await MilestoneService.updateMilestoneStatus(
+        milestoneId, 
+        'completed', 
+        'Payment milestone completed'
+      )
+      loadPaymentMilestones()
       showToast.dismiss(loadingToast)
-      showToast.success('Payment milestone added successfully!')
+      showToast.success('Payment milestone marked as completed!')
     } catch (error) {
-      console.error('Error adding milestone:', error)
+      console.error('Error updating milestone:', error)
       showToast.dismiss(loadingToast)
-      showToast.error('Failed to add milestone. Please try again.')
-    }
-  }
-
-  const handleGenerateInvoice = async (scheduleId: string) => {
-    const loadingToast = showToast.loading('Generating invoice...')
-    
-    try {
-      const invoice = await invoicesService.generateInvoiceFromMilestone(scheduleId)
-      
-      // Reload payment schedules to reflect the updated status
-      await loadPaymentSchedules()
-      
-      showToast.dismiss(loadingToast)
-      showToast.success(`Invoice ${invoice.invoice_number} generated successfully!`)
-    } catch (error) {
-      console.error('Error generating invoice:', error)
-      showToast.dismiss(loadingToast)
-      showToast.error('Failed to generate invoice. Please try again.')
-    }
-  }
-
-  const handleDeleteMilestone = async (scheduleId: string) => {
-    if (!confirm('Are you sure you want to delete this milestone?')) return
-    
-    // Optimistic UI update - remove milestone immediately
-    const originalSchedules = [...schedules]
-    setSchedules(prev => prev.filter(schedule => schedule.id !== scheduleId))
-    
-    const loadingToast = showToast.loading('Deleting milestone...')
-    
-    try {
-      await paymentScheduleService.deletePaymentSchedule(scheduleId)
-      showToast.dismiss(loadingToast)
-      showToast.warning('Payment milestone deleted')
-    } catch (error) {
-      console.error('Error deleting milestone:', error)
-      // Revert optimistic update on error
-      setSchedules(originalSchedules)
-      showToast.dismiss(loadingToast)
-      showToast.error('Failed to delete milestone. Please try again.')
+      showToast.error('Failed to update milestone. Please try again.')
     }
   }
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
-      'Pending': 'badge-light-secondary',
-      'Ready to Invoice': 'badge-light-info',
-      'Invoiced': 'badge-light-success',
-      'Paid': 'badge-light-primary'
+      'pending': 'badge-light-warning',
+      'in_progress': 'badge-light-info',
+      'completed': 'badge-light-success',
+      'skipped': 'badge-light-secondary'
     }
     return `badge ${statusClasses[status as keyof typeof statusClasses] || 'badge-light-secondary'}`
   }
 
   const getTotalAmount = () => {
-    return schedules.reduce((total, schedule) => total + schedule.amount_due, 0)
+    return milestones.reduce((total, milestone) => total + (milestone.amount || 0), 0)
   }
 
   const getPaidAmount = () => {
-    return schedules
-      .filter(schedule => schedule.status === 'Paid')
-      .reduce((total, schedule) => total + schedule.amount_due, 0)
+    return milestones
+      .filter(milestone => milestone.status === 'completed')
+      .reduce((total, milestone) => total + (milestone.amount || 0), 0)
   }
 
-  const getInvoicedAmount = () => {
-    return schedules
-      .filter(schedule => schedule.status === 'Invoiced' || schedule.status === 'Paid')
-      .reduce((total, schedule) => total + schedule.amount_due, 0)
+  const getPendingAmount = () => {
+    return milestones
+      .filter(milestone => milestone.status === 'pending' || milestone.status === 'in_progress')
+      .reduce((total, milestone) => total + (milestone.amount || 0), 0)
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount)
   }
 
   return (
     <div className='card card-bordered'>
       <div className='card-header'>
-        <h3 className='card-title'>Payment Schedule</h3>
+        <h3 className='card-title'>Payment Milestones</h3>
         <div className='card-toolbar'>
-          <button
-            className='btn btn-sm btn-primary'
-            onClick={() => setShowAddModal(true)}
-          >
-            <i className='ki-duotone ki-plus fs-2'></i>
-            Add Milestone
-          </button>
+          <div className='text-muted fs-7'>
+            {milestones.length === 0 ? 
+              'No payment milestones. Go to Milestones tab to create them.' :
+              `${milestones.length} payment milestone${milestones.length === 1 ? '' : 's'}`
+            }
+          </div>
         </div>
       </div>
 
       <div className='card-body'>
         {/* Payment Summary */}
-        <div className='row mb-7'>
-          <div className='col-md-3'>
-            <div className='d-flex flex-column'>
-              <span className='text-muted fw-semibold fs-7'>Total Amount</span>
-              <span className='text-dark fw-bold fs-3'>${getTotalAmount().toLocaleString()}</span>
+        {milestones.length > 0 && (
+          <div className='row mb-7'>
+            <div className='col-md-4'>
+              <div className='d-flex flex-column'>
+                <span className='text-muted fw-semibold fs-7'>Total Payment Amount</span>
+                <span className='text-dark fw-bold fs-3'>{formatCurrency(getTotalAmount())}</span>
+              </div>
+            </div>
+            <div className='col-md-4'>
+              <div className='d-flex flex-column'>
+                <span className='text-muted fw-semibold fs-7'>Completed</span>
+                <span className='text-success fw-bold fs-3'>{formatCurrency(getPaidAmount())}</span>
+              </div>
+            </div>
+            <div className='col-md-4'>
+              <div className='d-flex flex-column'>
+                <span className='text-muted fw-semibold fs-7'>Pending</span>
+                <span className='text-warning fw-bold fs-3'>{formatCurrency(getPendingAmount())}</span>
+              </div>
             </div>
           </div>
-          <div className='col-md-3'>
-            <div className='d-flex flex-column'>
-              <span className='text-muted fw-semibold fs-7'>Invoiced</span>
-              <span className='text-info fw-bold fs-3'>${getInvoicedAmount().toLocaleString()}</span>
-            </div>
-          </div>
-          <div className='col-md-3'>
-            <div className='d-flex flex-column'>
-              <span className='text-muted fw-semibold fs-7'>Paid</span>
-              <span className='text-success fw-bold fs-3'>${getPaidAmount().toLocaleString()}</span>
-            </div>
-          </div>
-          <div className='col-md-3'>
-            <div className='d-flex flex-column'>
-              <span className='text-muted fw-semibold fs-7'>Remaining</span>
-              <span className='text-warning fw-bold fs-3'>${(getTotalAmount() - getPaidAmount()).toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
+        )}
 
         {loading ? (
           <div className='text-center py-10'>
@@ -161,16 +125,19 @@ export const PaymentSchedule: React.FC<PaymentScheduleProps> = ({ jobId }) => {
               <span className='visually-hidden'>Loading...</span>
             </div>
           </div>
-        ) : schedules.length === 0 ? (
+        ) : milestones.length === 0 ? (
           <div className='text-center py-10'>
             <div className='text-muted mb-3'>
-              <i className='ki-duotone ki-calendar fs-3x text-muted mb-3'>
+              <i className='ki-duotone ki-dollar fs-3x text-muted mb-3'>
                 <span className='path1'></span>
                 <span className='path2'></span>
               </i>
             </div>
-            <div className='text-muted'>
-              No payment milestones defined yet. Add your first milestone to start tracking payments for this job.
+            <div className='text-muted mb-3'>
+              No payment milestones defined yet.
+            </div>
+            <div className='text-muted fs-7'>
+              Go to the <strong>Milestones</strong> tab to create a milestone schedule with payment milestones.
             </div>
           </div>
         ) : (
@@ -178,90 +145,102 @@ export const PaymentSchedule: React.FC<PaymentScheduleProps> = ({ jobId }) => {
             <table className='table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4'>
               <thead>
                 <tr className='fw-bold text-muted'>
-                  <th className='min-w-200px'>Milestone</th>
+                  <th className='min-w-200px'>Payment Milestone</th>
                   <th className='min-w-120px'>Amount</th>
-                  <th className='min-w-120px'>Due Date</th>
+                  <th className='min-w-120px'>Target Date</th>
                   <th className='min-w-120px'>Status</th>
-                  <th className='min-w-120px'>Invoice</th>
+                  <th className='min-w-120px'>Completed</th>
                   <th className='min-w-100px text-end'>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {schedules.map((schedule) => (
-                  <tr key={schedule.id}>
+                {milestones.map((milestone) => (
+                  <tr key={milestone.id}>
                     <td>
                       <div className='d-flex flex-column'>
-                        <span className='text-dark fw-bold fs-6'>{schedule.milestone_name}</span>
-                        <span className='text-muted fw-semibold fs-7'>
-                          Created {new Date(schedule.created_at).toLocaleDateString()}
-                        </span>
+                        <span className='text-dark fw-bold fs-6'>{milestone.milestone_name}</span>
+                        {milestone.percentage_of_total && (
+                          <span className='text-muted fw-semibold fs-7'>
+                            {milestone.percentage_of_total}% of total job value
+                          </span>
+                        )}
+                        {milestone.requirements && (
+                          <span className='text-muted fs-8'>
+                            {milestone.requirements}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>
-                      <span className='text-dark fw-bold fs-6'>
-                        ${schedule.amount_due.toLocaleString()}
+                      <span className='text-success fw-bold fs-6'>
+                        {formatCurrency(milestone.amount || 0)}
                       </span>
                     </td>
                     <td>
                       <span className='text-dark fw-bold fs-6'>
-                        {new Date(schedule.due_date).toLocaleDateString()}
+                        {milestone.target_date ? 
+                          new Date(milestone.target_date).toLocaleDateString() : 
+                          'TBD'
+                        }
                       </span>
                     </td>
                     <td>
-                      <span className={getStatusBadge(schedule.status)}>
-                        {schedule.status}
+                      <span className={getStatusBadge(milestone.status)}>
+                        {milestone.status.replace('_', ' ').toUpperCase()}
                       </span>
                     </td>
                     <td>
-                      {schedule.invoices ? (
-                        <a href='#' className='text-primary fw-bold text-hover-primary fs-6'>
-                          INV-{schedule.invoices.id.slice(-6)}
-                        </a>
+                      {milestone.completed_at ? (
+                        <span className='text-success fw-bold fs-7'>
+                          {new Date(milestone.completed_at).toLocaleDateString()}
+                        </span>
                       ) : (
                         <span className='text-muted'>-</span>
                       )}
                     </td>
                     <td>
                       <div className='d-flex justify-content-end flex-shrink-0'>
-                        {(schedule.status === 'Pending' || schedule.status === 'Ready to Invoice') && !schedule.invoice_id && (
+                        {milestone.status === 'pending' && (
                           <button
-                            className='btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1'
-                            title='Generate Invoice'
-                            onClick={() => handleGenerateInvoice(schedule.id)}
+                            className='btn btn-icon btn-bg-light btn-active-color-info btn-sm me-1'
+                            title='Mark In Progress'
+                            onClick={() => handleMarkMilestoneComplete(milestone.id)}
                           >
-                            <i className='ki-duotone ki-dollar fs-3'>
+                            <i className='ki-duotone ki-play fs-3'>
                               <span className='path1'></span>
                               <span className='path2'></span>
-                              <span className='path3'></span>
                             </i>
                           </button>
                         )}
-                        <button
-                          className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
-                          title='Edit Milestone'
-                          onClick={() => {
-                            // TODO: Implement edit functionality
-                            alert('Edit milestone functionality will be added in a future update.')
+                        {milestone.status === 'in_progress' && (
+                          <button
+                            className='btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1'
+                            title='Mark Complete'
+                            onClick={() => handleMarkMilestoneComplete(milestone.id)}
+                          >
+                            <i className='ki-duotone ki-check fs-3'>
+                              <span className='path1'></span>
+                              <span className='path2'></span>
+                            </i>
+                          </button>
+                        )}
+                        <a
+                          href='#'
+                          className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm'
+                          title='View in Milestones Tab'
+                          onClick={(e) => {
+                            e.preventDefault()
+                            // Switch to milestones tab
+                            const event = new CustomEvent('switchToMilestonesTab')
+                            window.dispatchEvent(event)
                           }}
                         >
-                          <i className='ki-duotone ki-pencil fs-3'>
-                            <span className='path1'></span>
-                            <span className='path2'></span>
-                          </i>
-                        </button>
-                        <button
-                          className='btn btn-icon btn-bg-light btn-active-color-danger btn-sm'
-                          title='Delete Milestone'
-                          onClick={() => handleDeleteMilestone(schedule.id)}
-                        >
-                          <i className='ki-duotone ki-trash fs-3'>
+                          <i className='ki-duotone ki-eye fs-3'>
                             <span className='path1'></span>
                             <span className='path2'></span>
                             <span className='path3'></span>
-                            <span className='path4'></span>
-                            <span className='path5'></span>
                           </i>
-                        </button>
+                        </a>
                       </div>
                     </td>
                   </tr>
@@ -271,15 +250,6 @@ export const PaymentSchedule: React.FC<PaymentScheduleProps> = ({ jobId }) => {
           </div>
         )}
       </div>
-
-      {/* Add Milestone Modal */}
-      {showAddModal && (
-        <AddMilestoneModal
-          jobId={jobId}
-          onSave={handleAddMilestone}
-          onCancel={() => setShowAddModal(false)}
-        />
-      )}
     </div>
   )
 }

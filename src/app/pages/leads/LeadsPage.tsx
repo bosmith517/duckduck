@@ -5,6 +5,7 @@ import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { NewInquiryButton } from '../../components/workflows/WorkflowLauncher'
 import { PromoteToJobModal } from '../../components/workflows/PromoteToJobModal'
 import { EditLeadModal } from '../../components/workflows/EditLeadModal'
+import { SiteVisitModal } from '../../components/workflows/SiteVisitModal'
 
 interface Lead {
   id: string
@@ -15,7 +16,7 @@ interface Lead {
   email?: string
   lead_source: string
   initial_request: string
-  status: 'new' | 'qualified' | 'unqualified' | 'converted'
+  status: 'new' | 'site_visit_scheduled' | 'site_visit_completed' | 'estimate_ready' | 'qualified' | 'unqualified' | 'converted'
   urgency: 'low' | 'medium' | 'high' | 'emergency'
   estimated_value?: number
   follow_up_date?: string
@@ -34,6 +35,7 @@ const LeadsPage: React.FC = () => {
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all')
   const [showPromoteModal, setShowPromoteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showSiteVisitModal, setShowSiteVisitModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
   useEffect(() => {
@@ -76,6 +78,11 @@ const LeadsPage: React.FC = () => {
     setShowEditModal(true)
   }
 
+  const handleScheduleSiteVisit = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowSiteVisitModal(true)
+  }
+
   const handleJobCreated = (jobId: string) => {
     setShowPromoteModal(false)
     setSelectedLead(null)
@@ -89,6 +96,13 @@ const LeadsPage: React.FC = () => {
     setShowEditModal(false)
     setSelectedLead(null)
     // Refresh leads to show updated information
+    fetchLeads()
+  }
+
+  const handleSiteVisitScheduled = () => {
+    setShowSiteVisitModal(false)
+    setSelectedLead(null)
+    // Refresh leads to show updated status
     fetchLeads()
   }
 
@@ -129,6 +143,12 @@ const LeadsPage: React.FC = () => {
     switch (status) {
       case 'new':
         return 'badge-primary'
+      case 'site_visit_scheduled':
+        return 'badge-info'
+      case 'site_visit_completed':
+        return 'badge-warning'
+      case 'estimate_ready':
+        return 'badge-warning'
       case 'qualified':
         return 'badge-warning'
       case 'converted':
@@ -185,6 +205,9 @@ const LeadsPage: React.FC = () => {
               >
                 <option value='all'>All Status</option>
                 <option value='new'>New</option>
+                <option value='site_visit_scheduled'>Site Visit Scheduled</option>
+                <option value='site_visit_completed'>Site Visit Completed</option>
+                <option value='estimate_ready'>Estimate Ready</option>
                 <option value='qualified'>Qualified</option>
                 <option value='converted'>Converted</option>
                 <option value='unqualified'>Unqualified</option>
@@ -303,18 +326,30 @@ const LeadsPage: React.FC = () => {
                             </i>
                           </button>
 
+                          {/* Status-specific actions */}
                           {lead.status === 'new' && (
                             <>
                               <button
+                                className='btn btn-sm btn-info'
+                                onClick={() => handleScheduleSiteVisit(lead)}
+                                title='Schedule Site Visit'
+                              >
+                                <i className='ki-duotone ki-calendar-add fs-4'>
+                                  <span className='path1'></span>
+                                  <span className='path2'></span>
+                                </i>
+                                Site Visit
+                              </button>
+                              <button
                                 className='btn btn-sm btn-success'
                                 onClick={() => handlePromoteToJob(lead)}
-                                title='Promote to Job'
+                                title='Skip to Job (Emergency/Simple)'
                               >
                                 <i className='ki-duotone ki-arrow-up-right fs-4'>
                                   <span className='path1'></span>
                                   <span className='path2'></span>
                                 </i>
-                                Promote
+                                Skip to Job
                               </button>
                               <button
                                 className='btn btn-sm btn-light-danger'
@@ -327,6 +362,49 @@ const LeadsPage: React.FC = () => {
                                 </i>
                               </button>
                             </>
+                          )}
+                          
+                          {lead.status === 'site_visit_scheduled' && (
+                            <button
+                              className='btn btn-sm btn-warning'
+                              onClick={async () => {
+                                try {
+                                  await supabase
+                                    .from('leads')
+                                    .update({ 
+                                      status: 'site_visit_completed',
+                                      updated_at: new Date().toISOString()
+                                    })
+                                    .eq('id', lead.id)
+                                  fetchLeads()
+                                  alert('✅ Site visit marked as completed!')
+                                } catch (error) {
+                                  console.error('Error updating lead:', error)
+                                  alert('Error updating lead status')
+                                }
+                              }}
+                              title='Mark Site Visit Complete'
+                            >
+                              <i className='ki-duotone ki-check-circle fs-4'>
+                                <span className='path1'></span>
+                                <span className='path2'></span>
+                              </i>
+                              Complete Visit
+                            </button>
+                          )}
+                          
+                          {lead.status === 'site_visit_completed' && (
+                            <a
+                              href='/estimates'
+                              className='btn btn-sm btn-primary'
+                              title='Create Estimate from Site Visit'
+                            >
+                              <i className='ki-duotone ki-document fs-4'>
+                                <span className='path1'></span>
+                                <span className='path2'></span>
+                              </i>
+                              Create Estimate
+                            </a>
                           )}
                           {lead.status === 'converted' && lead.converted_to_job_id && (
                             <a
@@ -376,6 +454,20 @@ const LeadsPage: React.FC = () => {
           }}
           leadId={selectedLead.id}
           onSuccess={handleLeadUpdated}
+        />
+      )}
+
+      {/* Site Visit Modal */}
+      {showSiteVisitModal && selectedLead && (
+        <SiteVisitModal
+          isOpen={showSiteVisitModal}
+          onClose={() => {
+            setShowSiteVisitModal(false)
+            setSelectedLead(null)
+          }}
+          leadId={selectedLead.id}
+          leadData={selectedLead}
+          onSuccess={handleSiteVisitScheduled}
         />
       )}
     </>

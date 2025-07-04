@@ -91,6 +91,14 @@ const PrivateRoutes = () => {
   const HomeownerSignupPage = lazy(() => import('../pages/marketing/HomeownerSignupPage'))
   const CustomerPortalLandingPage = lazy(() => import('../pages/marketing/CustomerPortalLandingPage'))
   const SignupPage = lazy(() => import('../pages/marketing/SignupPage'))
+  const InspectionsPage = lazy(() => import('../pages/inspections/InspectionsPage'))
+  const MilestonesPage = lazy(() => import('../pages/milestones/MilestonesPage'))
+  const TeamMaterialsPage = lazy(() => import('../pages/team-materials/TeamMaterialsPage'))
+  const VendorsPage = lazy(() => import('../pages/vendors/VendorsPage'))
+  const SubcontractorsPage = lazy(() => import('../pages/subcontractors/SubcontractorsPage'))
+  const SubcontractorSignupPage = lazy(() => import('../pages/subcontractor-signup/SubcontractorSignupPage'))
+  const WorkflowAutomationPage = lazy(() => import('../pages/settings/WorkflowAutomationPage'))
+  const EmailPage = lazy(() => import('../pages/email/EmailPage'))
 
   // Note: Onboarding is now handled via modal in MasterLayout
 
@@ -152,6 +160,54 @@ const PrivateRoutes = () => {
             element={
               <SuspensedView>
                 <LeadsPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='inspections'
+            element={
+              <SuspensedView>
+                <InspectionsPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='milestones'
+            element={
+              <SuspensedView>
+                <MilestonesPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='team-materials'
+            element={
+              <SuspensedView>
+                <TeamMaterialsPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='vendors'
+            element={
+              <SuspensedView>
+                <VendorsPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='subcontractors'
+            element={
+              <SuspensedView>
+                <SubcontractorsPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='subcontractor-signup/:token'
+            element={
+              <SuspensedView>
+                <SubcontractorSignupPage />
               </SuspensedView>
             }
           />
@@ -257,6 +313,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <CallCenterPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='communications/email'
+          element={
+            <SuspensedView>
+              <EmailPage />
             </SuspensedView>
           }
         />
@@ -510,6 +574,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <BuilderPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='settings/workflow-automation'
+          element={
+            <SuspensedView>
+              <WorkflowAutomationPage />
             </SuspensedView>
           }
         />

@@ -206,12 +206,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- Add computed column for property score
-ALTER TABLE public.property_data 
-ADD COLUMN IF NOT EXISTS property_score integer GENERATED ALWAYS AS (calculate_property_score(public.property_data.*)) STORED;
-
--- Create index on property score for sorting/filtering
-CREATE INDEX IF NOT EXISTS idx_property_data_property_score ON public.property_data(property_score);
+-- Note: property_score column removed as it conflicts with PostgreSQL generated column restrictions
+-- The calculate_property_score function is available for manual calculation when needed
 
 -- Update comments
 COMMENT ON TABLE public.property_data IS 'Enhanced property data with Attom Data API integration for comprehensive property intelligence';
@@ -224,4 +220,4 @@ COMMENT ON COLUMN public.property_data.rental_estimates IS 'Rental price estimat
 COMMENT ON COLUMN public.property_data.demographic_data IS 'Neighborhood demographic information';
 COMMENT ON COLUMN public.property_data.environmental_data IS 'Environmental risk and quality data';
 COMMENT ON COLUMN public.property_data.attom_raw_data IS 'Complete raw response from Attom API for debugging';
-COMMENT ON COLUMN public.property_data.property_score IS 'Computed property quality score (0-100) based on various factors';
+-- property_score column commented out due to PostgreSQL limitations with generated columns

@@ -47,7 +47,9 @@ BEGIN
   ) THEN
     CREATE POLICY "Enable update for users based on tenant_id job-photos" ON storage.objects
     FOR UPDATE TO authenticated
-    USING (bucket_id = 'job-photos' AND (storage.foldername(name))[1] = auth.jwt()->>'tenant_id');
+    USING (bucket_id = 'job-photos' AND (storage.foldername(name))[1] IN (
+      SELECT tenant_id::text FROM user_profiles WHERE id = auth.uid()
+    ));
   END IF;
 
   -- Check and create delete policy
@@ -59,7 +61,9 @@ BEGIN
   ) THEN
     CREATE POLICY "Enable delete for users based on tenant_id job-photos" ON storage.objects
     FOR DELETE TO authenticated
-    USING (bucket_id = 'job-photos' AND (storage.foldername(name))[1] = auth.jwt()->>'tenant_id');
+    USING (bucket_id = 'job-photos' AND (storage.foldername(name))[1] IN (
+      SELECT tenant_id::text FROM user_profiles WHERE id = auth.uid()
+    ));
   END IF;
 END $$;
 

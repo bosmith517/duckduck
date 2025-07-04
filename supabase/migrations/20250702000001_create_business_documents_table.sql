@@ -1,7 +1,7 @@
 -- Create business_documents table for storing company documents
 CREATE TABLE IF NOT EXISTS business_documents (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    tenant_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     uploaded_by UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
     file_name TEXT NOT NULL,
     file_path TEXT NOT NULL,

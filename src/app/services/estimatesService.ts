@@ -15,7 +15,7 @@ export interface Estimate {
   tenant_id: string
   account_id?: string | null // Nullable for individual customers
   contact_id?: string | null // For individual customers
-  status: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
+  status: 'draft' | 'sent' | 'pending_review' | 'awaiting_site_visit' | 'site_visit_scheduled' | 'under_negotiation' | 'revised' | 'approved' | 'rejected' | 'expired'
   total_amount: number
   created_at: string
   updated_at: string
@@ -28,6 +28,8 @@ export interface Estimate {
   labor_cost?: number
   material_cost?: number
   notes?: string
+  version?: number
+  parent_estimate_id?: string
   lineItems?: LineItem[]
 }
 
@@ -178,6 +180,26 @@ class EstimatesService {
       }
     } catch (error) {
       console.error('Error in deleteEstimate:', error)
+      throw error
+    }
+  }
+
+  async updateEstimateStatus(id: string, status: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('estimates')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+
+      if (error) {
+        console.error('Error updating estimate status:', error)
+        throw error
+      }
+    } catch (error) {
+      console.error('Error in updateEstimateStatus:', error)
       throw error
     }
   }

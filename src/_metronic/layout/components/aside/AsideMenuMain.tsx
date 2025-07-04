@@ -55,12 +55,15 @@ export function AsideMenuMain() {
       <AsideMenuItemWithSub to='/jobs' title='Jobs & Projects' icon='briefcase' fontIcon='bi-briefcase'>
         <AsideMenuItem to='/jobs' title='All Jobs' hasBullet={true} />
         <AsideMenuItem to='/jobs/costing' title='Real-Time Job Costing' hasBullet={true} />
+        <AsideMenuItem to='/inspections' title='Inspections' hasBullet={true} />
+        <AsideMenuItem to='/milestones' title='Payment Milestones' hasBullet={true} />
+        <AsideMenuItem to='/team-materials' title='Team & Materials' hasBullet={true} />
         <AsideMenuItem to='/reports' title='Job Analytics' hasBullet={true} />
         <AsideMenuItem to='/estimates/templates' title='Job Templates' hasBullet={true} />
       </AsideMenuItemWithSub>
       
       <AsideMenuItemWithSub to='/customers' title='Customers' icon='profile-circle' fontIcon='bi-people'>
-        <AsideMenuItem to='/leads' title='Leads & Inquiries' hasBullet={true} />
+        <AsideMenuItem to='/leads' title='Lead to Job Workflow' hasBullet={true} />
         <AsideMenuItem to='/customers/accounts' title='Accounts' hasBullet={true} />
         <AsideMenuItem to='/customers/contacts' title='Contacts' hasBullet={true} />
         <AsideMenuItem to='/homeowner-portal' title='Homeowner Portal' hasBullet={true} />
@@ -81,6 +84,8 @@ export function AsideMenuMain() {
       <AsideMenuItemWithSub to='/services' title='Services & Inventory' icon='package' fontIcon='bi-box'>
         <AsideMenuItem to='/services/inventory' title='Inventory' hasBullet={true} />
         <AsideMenuItem to='/services/catalog' title='Service Catalog' hasBullet={true} />
+        <AsideMenuItem to='/vendors' title='Vendor Management' hasBullet={true} />
+        <AsideMenuItem to='/subcontractors' title='Subcontractor Network' hasBullet={true} />
         <AsideMenuItem to='/mobile/tracking' title='Equipment Tracking' hasBullet={true} />
         <AsideMenuItem to='/reports' title='Service Analytics' hasBullet={true} />
       </AsideMenuItemWithSub>
@@ -94,7 +99,7 @@ export function AsideMenuMain() {
       
       <AsideMenuItemWithSub to='/billing' title='Billing & Payments' icon='bill' fontIcon='bi-credit-card'>
         <AsideMenuItem to='/billing/invoices' title='Invoices' hasBullet={true} />
-        <AsideMenuItem to='/billing/estimates' title='Estimates & Quotes' hasBullet={true} />
+        <AsideMenuItem to='/estimates' title='Estimates & Quotes' hasBullet={true} />
         <AsideMenuItem to='/estimates/templates' title='Template-Driven Estimates' hasBullet={true} />
         <AsideMenuItem to='/billing' title='Payment Processing' hasBullet={true} />
         <AsideMenuItem to='/reports/financial' title='Financial Reports' hasBullet={true} />
@@ -118,6 +123,7 @@ export function AsideMenuMain() {
         <AsideMenuItem to='/communications/call-center' title='Call Center' hasBullet={true} />
         <AsideMenuItem to='/communications/voicemail' title='Voicemail Center' hasBullet={true} />
         <AsideMenuItem to='/communications/sms' title='SMS Messages' hasBullet={true} />
+        <AsideMenuItem to='/communications/email' title='Email System' hasBullet={true} />
         <AsideMenuItem to='/communications/team-chat' title='Team Chat' hasBullet={true} />
         <AsideMenuItem to='/communications/video' title='Video Meetings' hasBullet={true} />
         <AsideMenuItem to='/communications/numbers' title='Phone Numbers' hasBullet={true} />
@@ -135,6 +141,7 @@ export function AsideMenuMain() {
       <AsideMenuItemWithSub to='/team' title='Team & Resources' icon='people' fontIcon='bi-people'>
         <AsideMenuItem to='/team/members' title='Team Members' hasBullet={true} />
         <AsideMenuItem to='/team/profiles' title='Technician Profiles' hasBullet={true} />
+        <AsideMenuItem to='/team-materials' title='Team & Materials Hub' hasBullet={true} />
         <AsideMenuItem to='/team/users' title='User Management' hasBullet={true} />
         <AsideMenuItem to='/team/performance' title='Performance' hasBullet={true} />
         <AsideMenuItem to='/team/training' title='Training' hasBullet={true} />
@@ -155,6 +162,7 @@ export function AsideMenuMain() {
         <AsideMenuItem to='/settings/communications' title='Communication Settings' hasBullet={true} />
         <AsideMenuItem to='/settings/users' title='User & Permissions' hasBullet={true} />
         <AsideMenuItem to='/settings/notifications' title='Notifications' hasBullet={true} />
+        <AsideMenuItem to='/settings/workflow-automation' title='Workflow Automation' hasBullet={true} />
         <AsideMenuItem to='/settings/security' title='Security' hasBullet={true} />
         <AsideMenuItem to='/settings/integrations' title='Integrations' hasBullet={true} />
       </AsideMenuItemWithSub>

@@ -101,6 +101,32 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
     }
   }, [userProfile?.tenant_id, jobId])
 
+  // Subscribe to real-time cost updates
+  useEffect(() => {
+    if (!jobId || !userProfile?.tenant_id) return
+
+    const subscription = supabase
+      .channel('job_costs_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'job_costs',
+          filter: `job_id=eq.${jobId}`
+        }, 
+        (payload) => {
+          console.log('🔄 Cost change detected, refreshing data...', payload)
+          loadCostEntries(jobId)
+          loadSingleJob(jobId) // Refresh job totals
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [jobId, userProfile?.tenant_id])
+
   const loadJobsWithCosts = async () => {
     setLoading(true)
     try {
@@ -324,6 +350,34 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
       receipt_url: ''
     })
     setEditingCost(null)
+  }
+
+  const deleteCostEntry = async (costId: string) => {
+    if (!window.confirm('Are you sure you want to delete this cost entry?')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('job_costs')
+        .delete()
+        .eq('id', costId)
+
+      if (error) throw error
+
+      // Update job actual costs after deletion
+      if (selectedJob) {
+        await updateJobActualCosts(selectedJob.id)
+        loadCostEntries(selectedJob.id)
+        loadSingleJob(selectedJob.id) // Refresh job data
+      }
+      
+      showToast.success('Cost entry deleted successfully')
+
+    } catch (error) {
+      console.error('Error deleting cost entry:', error)
+      showToast.error('Failed to delete cost entry')
+    }
   }
 
   const formatCurrency = (amount: number) => {
@@ -703,6 +757,19 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                                     <i className="ki-duotone ki-camera fs-6">
                                       <span className="path1"></span>
                                       <span className="path2"></span>
+                                    </i>
+                                  </button>
+                                  <button
+                                    className="btn btn-sm btn-icon btn-light-danger"
+                                    onClick={() => deleteCostEntry(cost.id)}
+                                    title="Delete cost entry"
+                                  >
+                                    <i className="ki-duotone ki-trash fs-6">
+                                      <span className="path1"></span>
+                                      <span className="path2"></span>
+                                      <span className="path3"></span>
+                                      <span className="path4"></span>
+                                      <span className="path5"></span>
                                     </i>
                                   </button>
                                 </div>

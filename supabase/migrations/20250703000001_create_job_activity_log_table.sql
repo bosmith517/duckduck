@@ -27,26 +27,9 @@ CREATE INDEX IF NOT EXISTS idx_job_activity_log_activity_type ON job_activity_lo
 -- Enable RLS
 ALTER TABLE job_activity_log ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
-CREATE POLICY "Users can view activities for their tenant" ON job_activity_log
-  FOR SELECT
-  USING (tenant_id IN (
-    SELECT tenant_id FROM user_profiles WHERE id = auth.uid()
-  ));
 
-CREATE POLICY "Users can create activities for their tenant" ON job_activity_log
-  FOR INSERT
-  WITH CHECK (tenant_id IN (
-    SELECT tenant_id FROM user_profiles WHERE id = auth.uid()
-  ));
 
-CREATE POLICY "Users can update activities for their tenant" ON job_activity_log
-  FOR UPDATE
-  USING (tenant_id IN (
-    SELECT tenant_id FROM user_profiles WHERE id = auth.uid()
-  ));
-
--- Create function to automatically update updated_at
+-- Create function to automatically update updated_at (if it doesn't exist)
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN

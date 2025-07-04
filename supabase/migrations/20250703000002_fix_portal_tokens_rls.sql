@@ -4,6 +4,11 @@
 DROP POLICY IF EXISTS "Users can view portal tokens for their tenant" ON client_portal_tokens;
 DROP POLICY IF EXISTS "Users can create portal tokens for their tenant" ON client_portal_tokens;
 DROP POLICY IF EXISTS "Users can update portal tokens for their tenant" ON client_portal_tokens;
+DROP POLICY IF EXISTS "authenticated_users_can_manage_tokens" ON client_portal_tokens;
+DROP POLICY IF EXISTS "anonymous_can_read_active_tokens" ON client_portal_tokens;
+DROP POLICY IF EXISTS "service_role_full_access" ON client_portal_tokens;
+DROP POLICY IF EXISTS "Users can manage portal tokens for their tenant" ON client_portal_tokens;
+DROP POLICY IF EXISTS "client_portal_tokens_policy" ON client_portal_tokens;
 
 -- Ensure RLS is enabled
 ALTER TABLE client_portal_tokens ENABLE ROW LEVEL SECURITY;

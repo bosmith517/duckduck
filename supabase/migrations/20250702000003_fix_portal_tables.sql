@@ -96,6 +96,9 @@ CREATE INDEX IF NOT EXISTS idx_portal_activity_log_portal_token_id ON public.por
 
 -- Update RLS policies to work with both old and new structure
 DROP POLICY IF EXISTS "Users can manage activity logs for their tenant" ON public.portal_activity_log;
+DROP POLICY IF EXISTS "authenticated_users_can_manage_activity" ON public.portal_activity_log;
+DROP POLICY IF EXISTS "anonymous_can_log_activity" ON public.portal_activity_log;
+DROP POLICY IF EXISTS "service_role_activity_access" ON public.portal_activity_log;
 
 CREATE POLICY "Users can manage activity logs for their tenant" ON public.portal_activity_log
     FOR ALL USING (

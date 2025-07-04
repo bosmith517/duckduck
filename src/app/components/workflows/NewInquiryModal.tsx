@@ -25,6 +25,16 @@ interface Lead {
   estimated_value?: number
   follow_up_date?: string
   notes?: string
+  // Address fields
+  street_address?: string
+  city?: string
+  state?: string
+  zip_code?: string
+  property_type?: 'residential' | 'commercial' | 'industrial' | 'other'
+  property_size?: string
+  lot_size?: string
+  year_built?: number
+  additional_property_info?: Record<string, any>
   created_at: string
   updated_at: string
 }
@@ -75,7 +85,16 @@ const inquirySchema = Yup.object().shape({
   urgency: Yup.string().required('Please specify urgency level'),
   estimated_value: Yup.number().min(0, 'Value must be positive').nullable(),
   follow_up_date: Yup.date().nullable(),
-  notes: Yup.string().max(1000, 'Maximum 1000 characters')
+  notes: Yup.string().max(1000, 'Maximum 1000 characters'),
+  // Address validation
+  street_address: Yup.string().max(200, 'Maximum 200 characters'),
+  city: Yup.string().max(100, 'Maximum 100 characters'),
+  state: Yup.string().max(50, 'Maximum 50 characters'),
+  zip_code: Yup.string().max(20, 'Maximum 20 characters'),
+  property_type: Yup.string().oneOf(['residential', 'commercial', 'industrial', 'other']),
+  property_size: Yup.string().max(100, 'Maximum 100 characters'),
+  lot_size: Yup.string().max(100, 'Maximum 100 characters'),
+  year_built: Yup.number().min(1800, 'Year must be after 1800').max(new Date().getFullYear() + 5, 'Year cannot be too far in future').nullable()
 })
 
 export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({ 
@@ -110,7 +129,16 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
       urgency: 'medium',
       estimated_value: '',
       follow_up_date: '',
-      notes: ''
+      notes: '',
+      // Address fields
+      street_address: '',
+      city: '',
+      state: '',
+      zip_code: '',
+      property_type: 'residential',
+      property_size: '',
+      lot_size: '',
+      year_built: ''
     },
     validationSchema: inquirySchema,
     onSubmit: async (values) => {
@@ -140,6 +168,16 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
         estimated_value: values.estimated_value ? parseFloat(values.estimated_value) : null,
         follow_up_date: values.follow_up_date || null,
         notes: values.notes || null,
+        // Address fields
+        street_address: values.street_address || null,
+        city: values.city || null,
+        state: values.state || null,
+        zip_code: values.zip_code || null,
+        property_type: values.property_type || null,
+        property_size: values.property_size || null,
+        lot_size: values.lot_size || null,
+        year_built: values.year_built ? parseInt(values.year_built) : null,
+        additional_property_info: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -448,6 +486,149 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
                     placeholder="Additional notes about the call..."
                     {...formik.getFieldProps('notes')}
                   />
+                </div>
+
+                {/* Property Address Information */}
+                <div className="col-12 mb-5 mt-5">
+                  <h6 className="text-gray-700 fw-bold mb-3">
+                    <i className="ki-duotone ki-geolocation fs-2 text-success me-2">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                    Property Address
+                  </h6>
+                  <div className="form-text mb-3">
+                    Where is the work needed? This helps us schedule site visits and provide accurate estimates.
+                  </div>
+                </div>
+
+                <div className="col-12 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">Street Address</label>
+                  <input
+                    type="text"
+                    className={clsx('form-control form-control-solid', {
+                      'is-invalid': formik.touched.street_address && formik.errors.street_address
+                    })}
+                    placeholder="123 Main Street"
+                    {...formik.getFieldProps('street_address')}
+                  />
+                  {formik.touched.street_address && formik.errors.street_address && (
+                    <div className="fv-plugins-message-container">
+                      <span role="alert">{formik.errors.street_address}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-md-4 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">City</label>
+                  <input
+                    type="text"
+                    className={clsx('form-control form-control-solid', {
+                      'is-invalid': formik.touched.city && formik.errors.city
+                    })}
+                    placeholder="City"
+                    {...formik.getFieldProps('city')}
+                  />
+                  {formik.touched.city && formik.errors.city && (
+                    <div className="fv-plugins-message-container">
+                      <span role="alert">{formik.errors.city}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-md-4 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">State</label>
+                  <input
+                    type="text"
+                    className={clsx('form-control form-control-solid', {
+                      'is-invalid': formik.touched.state && formik.errors.state
+                    })}
+                    placeholder="State"
+                    {...formik.getFieldProps('state')}
+                  />
+                  {formik.touched.state && formik.errors.state && (
+                    <div className="fv-plugins-message-container">
+                      <span role="alert">{formik.errors.state}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-md-4 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">ZIP Code</label>
+                  <input
+                    type="text"
+                    className={clsx('form-control form-control-solid', {
+                      'is-invalid': formik.touched.zip_code && formik.errors.zip_code
+                    })}
+                    placeholder="12345"
+                    {...formik.getFieldProps('zip_code')}
+                  />
+                  {formik.touched.zip_code && formik.errors.zip_code && (
+                    <div className="fv-plugins-message-container">
+                      <span role="alert">{formik.errors.zip_code}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-md-6 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">Property Type</label>
+                  <select
+                    className={clsx('form-select form-select-solid', {
+                      'is-invalid': formik.touched.property_type && formik.errors.property_type
+                    })}
+                    {...formik.getFieldProps('property_type')}
+                  >
+                    <option value="residential">Residential</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="industrial">Industrial</option>
+                    <option value="other">Other</option>
+                  </select>
+                  {formik.touched.property_type && formik.errors.property_type && (
+                    <div className="fv-plugins-message-container">
+                      <span role="alert">{formik.errors.property_type}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-md-6 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">Year Built (Optional)</label>
+                  <input
+                    type="number"
+                    className={clsx('form-control form-control-solid', {
+                      'is-invalid': formik.touched.year_built && formik.errors.year_built
+                    })}
+                    placeholder="2020"
+                    min="1800"
+                    max={new Date().getFullYear() + 5}
+                    {...formik.getFieldProps('year_built')}
+                  />
+                  {formik.touched.year_built && formik.errors.year_built && (
+                    <div className="fv-plugins-message-container">
+                      <span role="alert">{formik.errors.year_built}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-md-6 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">Property Size (Optional)</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-solid"
+                    placeholder="e.g., 2,500 sq ft, 3 bed/2 bath"
+                    {...formik.getFieldProps('property_size')}
+                  />
+                  <div className="form-text">Square footage, rooms, or other size details</div>
+                </div>
+
+                <div className="col-md-6 mb-7">
+                  <label className="fw-semibold fs-6 mb-2">Lot Size (Optional)</label>
+                  <input
+                    type="text"
+                    className="form-control form-control-solid"
+                    placeholder="e.g., 0.25 acres, 50x100 ft"
+                    {...formik.getFieldProps('lot_size')}
+                  />
+                  <div className="form-text">Lot dimensions or acreage</div>
                 </div>
               </div>
             </div>

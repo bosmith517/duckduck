@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS "public"."job_activity_log" (
             'customer'::character varying,
             'technician'::character varying,
             'admin'::character varying
-        ]::text[])
+        ]::text[]))
     )
 );
 

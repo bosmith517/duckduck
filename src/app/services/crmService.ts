@@ -16,6 +16,17 @@ export interface Lead {
   notes?: string
   converted_contact_id?: string
   converted_to_job_id?: string
+  // Address fields for property location
+  street_address?: string
+  city?: string
+  state?: string
+  zip_code?: string
+  full_address?: string // Auto-generated from individual fields
+  property_type?: 'residential' | 'commercial' | 'industrial' | 'other'
+  property_size?: string
+  lot_size?: string
+  year_built?: number
+  additional_property_info?: Record<string, any>
   created_at: string
   updated_at: string
 }
