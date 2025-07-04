@@ -25,16 +25,13 @@ const SendGridConfiguration: React.FC<SendGridConfigurationProps> = ({ className
   const loadSendGridConfig = async () => {
     setLoading(true)
     try {
-      // Check if SendGrid is configured by testing email health
-      const health = await emailService.getSystemHealth()
-      const usage = await emailService.getCurrentMonthUsage()
-      
+      // Simple config without calling missing database functions
       setConfig({
-        is_configured: health.length > 0,
-        domains_count: 0, // Would be set by domain count
-        last_email_sent: usage?.month_year,
-        total_emails_sent: usage?.emails_sent || 0,
-        status: health.length > 0 ? 'active' : 'inactive'
+        is_configured: false, // Will be set to true if test connection works
+        domains_count: 0,
+        last_email_sent: undefined,
+        total_emails_sent: 0,
+        status: 'inactive'
       })
       setError(null)
     } catch (err) {

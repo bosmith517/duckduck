@@ -88,7 +88,8 @@ serve(async (req) => {
       .single()
 
     // Use default sender if no domain configured (for testing)
-    const fromEmail = domain?.default_from_email || 'noreply@yourdomain.com'
+    // IMPORTANT: This email must be verified in SendGrid first!
+    const fromEmail = domain?.default_from_email || Deno.env.get('SENDGRID_FROM_EMAIL') || 'noreply@yourdomain.com'
     const fromName = domain?.default_from_name || 'TaurusTech System'
     const replyToEmail = domain?.reply_to_email
 

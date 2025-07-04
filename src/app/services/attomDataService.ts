@@ -413,6 +413,35 @@ class AttomDataService {
       throw error
     }
   }
+
+  /**
+   * Get property photos from Attom API
+   * https://cloud-help.attomdata.com/article/518-photos
+   */
+  async getPropertyPhotos(address: string, city: string, state: string): Promise<string[]> {
+    try {
+      // Call Edge Function to get photos via Attom API
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Authentication required')
+
+      const { data, error } = await supabase.functions.invoke('get-attom-property-photos', {
+        body: { address, city, state }
+      })
+
+      if (error) throw error
+
+      if (data?.success && data?.photos) {
+        console.log(`📸 Found ${data.photos.length} photos for property`)
+        return data.photos
+      }
+
+      console.log('📸 No photos found for property')
+      return []
+    } catch (error) {
+      console.error('Error getting property photos:', error)
+      return []
+    }
+  }
 }
 
 export const attomDataService = new AttomDataService()
