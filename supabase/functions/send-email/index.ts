@@ -224,7 +224,12 @@ serve(async (req) => {
               reply_to: domain.reply_to_email || undefined,
               tags: emailRequest.tags
             },
-            supabaseClient
+            supabaseClient,
+            {
+              tenantId,
+              userId: user.id,
+              templateId: emailRequest.template_id
+            }
           )
         } catch (sendError) {
           console.error('Error sending email immediately:', sendError)
@@ -266,7 +271,12 @@ serve(async (req) => {
 async function sendEmailViaResend(
   queueId: string,
   emailData: ResendEmailRequest,
-  supabaseClient: any
+  supabaseClient: any,
+  metadata?: {
+    tenantId?: string
+    userId?: string
+    templateId?: string
+  }
 ): Promise<void> {
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
   if (!resendApiKey) {
@@ -320,11 +330,15 @@ async function sendEmailViaResend(
       })
       .eq('id', queueId)
 
+    // Get tenant_id from queue record or metadata
+    const tenantId = metadata?.tenantId || 
+      (await supabaseClient.from('email_queue').select('tenant_id').eq('id', queueId).single()).data?.tenant_id
+
     // Record event for tracking
     await supabaseClient
       .from('email_events')
       .insert({
-        tenant_id: (await supabaseClient.from('email_queue').select('tenant_id').eq('id', queueId).single()).data?.tenant_id,
+        tenant_id: tenantId,
         resend_email_id: resendResponse.id,
         message_id: resendResponse.id,
         event_type: 'sent',
@@ -337,6 +351,39 @@ async function sendEmailViaResend(
         },
         event_timestamp: new Date().toISOString()
       })
+
+    // Store email in email_messages table for history
+    if (tenantId) {
+      try {
+        await supabaseClient
+          .from('email_messages')
+          .insert({
+            tenant_id: tenantId,
+            to_email: emailData.to,
+            from_email: emailData.from,
+            from_name: emailData.from.split('<')[0].trim(),
+            reply_to: emailData.reply_to,
+            subject: emailData.subject,
+            html_body: emailData.html,
+            text_body: emailData.text,
+            direction: 'outbound',
+            status: 'sent',
+            resend_email_id: resendResponse.id,
+            message_id: resendResponse.id,
+            created_by: metadata?.userId || null,
+            template_id: metadata?.templateId || null,
+            sent_at: new Date().toISOString(),
+            tags: emailData.tags ? { resend_tags: emailData.tags } : {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+        
+        console.log('Email stored in email_messages table')
+      } catch (error) {
+        console.error('Error storing email in email_messages:', error)
+        // Don't throw - email was sent successfully, this is just for history
+      }
+    }
 
     console.log('Email sent successfully:', resendResponse.id)
 

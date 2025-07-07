@@ -264,11 +264,27 @@ export class TeamAssignmentService {
 
   static async getAvailableTeamMembers(tenantId: string): Promise<any[]> {
     try {
+      // If no tenantId provided, get current user's tenant
+      let actualTenantId = tenantId
+      if (!actualTenantId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+        
+        const { data: userProfile } = await supabase
+          .from('user_profiles')
+          .select('tenant_id')
+          .eq('id', user.id)
+          .single()
+          
+        if (!userProfile?.tenant_id) throw new Error('No tenant found')
+        actualTenantId = userProfile.tenant_id
+      }
+
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, first_name, last_name, email, role_name')
-        .eq('tenant_id', tenantId)
-        .in('role_name', ['technician', 'admin', 'owner'])
+        .select('id, first_name, last_name, email, role')
+        .eq('tenant_id', actualTenantId)
+        .in('role', ['agent', 'admin'])  // Using the correct role values
         .order('first_name', { ascending: true })
 
       if (error) throw error

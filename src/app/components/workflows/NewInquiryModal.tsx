@@ -209,30 +209,162 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
         throw leadError
       }
 
-      // 2. Create Call Log Record
-      const callLogData = {
+      // 2. Create Contact or Account based on caller type
+      let contactId = null
+      let accountId = null
+
+      if (values.caller_type === 'individual') {
+        // Create Contact for residential customers
+        const contactData = {
+          tenant_id: userProfile.tenant_id,
+          first_name: values.caller_name.split(' ')[0] || values.caller_name,
+          last_name: values.caller_name.split(' ').slice(1).join(' ') || '',
+          email: values.email || null,
+          phone: values.phone_number,
+          lead_id: lead.id, // Link to lead
+          contact_type: 'individual',
+          address: values.street_address || null,
+          city: values.city || null,
+          state: values.state || null,
+          zip: values.zip_code || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        const { data: contact, error: contactError } = await supabase
+          .from('contacts')
+          .insert(contactData)
+          .select()
+          .single()
+
+        if (contactError) {
+          console.error('Error creating contact:', contactError)
+          throw new Error('Failed to create contact record')
+        }
+
+        contactId = contact.id
+
+        // Update lead with contact reference
+        await supabase
+          .from('leads')
+          .update({ converted_contact_id: contactId })
+          .eq('id', lead.id)
+
+      } else {
+        // Create Account for business clients
+        const accountData = {
+          tenant_id: userProfile.tenant_id,
+          name: values.caller_name,
+          account_type: 'customer',
+          email: values.email || null,
+          phone: values.phone_number,
+          billing_address: values.street_address || null,
+          billing_city: values.city || null,
+          billing_state: values.state || null,
+          billing_zip: values.zip_code || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .insert(accountData)
+          .select()
+          .single()
+
+        if (accountError) {
+          console.error('Error creating account:', accountError)
+          throw new Error('Failed to create account record')
+        }
+
+        accountId = account.id
+
+        // Update lead with account reference
+        await supabase
+          .from('leads')
+          .update({ converted_account_id: accountId })
+          .eq('id', lead.id)
+
+        // Also create a primary contact for the business
+        const primaryContactData = {
+          tenant_id: userProfile.tenant_id,
+          account_id: accountId,
+          first_name: values.caller_name.split(' ')[0] || values.caller_name,
+          last_name: values.caller_name.split(' ').slice(1).join(' ') || '',
+          email: values.email || null,
+          phone: values.phone_number,
+          is_primary: true,
+          contact_type: 'business',
+          lead_id: lead.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        const { data: primaryContact, error: primaryContactError } = await supabase
+          .from('contacts')
+          .insert(primaryContactData)
+          .select()
+          .single()
+
+        if (primaryContactError) {
+          console.error('Error creating primary contact:', primaryContactError)
+          // Don't throw - primary contact is helpful but not critical
+        } else {
+          contactId = primaryContact.id
+        }
+      }
+
+      // 3. Create Call Record
+      const callData = {
         tenant_id: userProfile.tenant_id,
-        lead_id: lead.id,
-        caller_name: values.caller_name,
-        caller_phone: values.phone_number,
-        call_type: 'inbound',
-        call_direction: 'inbound',
-        duration: 300, // Default 5 minutes
+        contact_id: contactId,
+        from_number: values.phone_number,
+        to_number: 'Main Line', // or get from tenant settings
+        direction: 'inbound',
         status: 'completed',
-        notes: `Initial inquiry: ${values.initial_request.substring(0, 200)}${values.initial_request.length > 200 ? '...' : ''}`,
-        created_at: new Date().toISOString()
+        duration: 300, // Default 5 minutes
+        user_id: userProfile.id,
+        created_at: new Date().toISOString(),
+        answered_at: new Date().toISOString(),
+        ended_at: new Date(Date.now() + 300000).toISOString() // 5 minutes later
       }
 
       const { error: callError } = await supabase
-        .from('call_logs')
-        .insert(callLogData)
+        .from('calls')
+        .insert(callData)
 
       if (callError) {
-        console.error('Error creating call log:', callError)
-        // Don't throw - call log is supplementary
+        console.error('Error creating call record:', callError)
+        // Don't throw - call record is supplementary
       }
 
-      // 3. Schedule Follow-up if specified
+      // 4. Create Activity Log Entry
+      const activityData = {
+        tenant_id: userProfile.tenant_id,
+        entity_type: 'lead',
+        entity_id: lead.id,
+        activity_type: 'lead_created',
+        description: `New ${values.caller_type === 'business' ? 'business' : 'residential'} lead created: ${values.caller_name}`,
+        metadata: {
+          lead_source: values.lead_source,
+          urgency: values.urgency,
+          contact_id: contactId,
+          account_id: accountId
+        },
+        user_id: userProfile.id,
+        created_at: new Date().toISOString()
+      }
+
+      const { error: activityError } = await supabase
+        .from('activity_logs')
+        .insert(activityData)
+
+      if (activityError) {
+        console.error('Error creating activity log:', activityError)
+        // Don't throw - activity log is supplementary
+      }
+
+      // 5. Schedule Follow-up if specified
       if (values.follow_up_date) {
         const reminderData = {
           tenant_id: userProfile.tenant_id,

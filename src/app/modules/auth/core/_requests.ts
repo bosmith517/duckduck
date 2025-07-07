@@ -33,11 +33,19 @@ export function register(
   });
 }
 
-// Server should return object => { result: boolean } (Is Email in DB)
-export function requestPassword(email: string) {
-  return axios.post<{ result: boolean }>(REQUEST_PASSWORD_URL, {
-    email,
+// Use Supabase Auth for password reset
+export async function requestPassword(email: string) {
+  const { supabase } = await import('../../../../supabaseClient');
+  
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/callback`,
   });
+  
+  if (error) {
+    throw error;
+  }
+  
+  return { result: true };
 }
 
 export function getUserByToken(token: string) {

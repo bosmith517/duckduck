@@ -295,6 +295,93 @@ class EmailService {
     return data || null
   }
 
+  // Email history methods
+  async getEmailHistory(filters?: {
+    contact_id?: string
+    account_id?: string
+    lead_id?: string
+    job_id?: string
+    status?: string
+    direction?: string
+    limit?: number
+    offset?: number
+  }): Promise<{ emails: any[], total: number }> {
+    let query = supabase
+      .from('email_messages')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+
+    if (filters?.contact_id) {
+      query = query.eq('contact_id', filters.contact_id)
+    }
+    if (filters?.account_id) {
+      query = query.eq('account_id', filters.account_id)
+    }
+    if (filters?.lead_id) {
+      query = query.eq('lead_id', filters.lead_id)
+    }
+    if (filters?.job_id) {
+      query = query.eq('job_id', filters.job_id)
+    }
+    if (filters?.status) {
+      query = query.eq('status', filters.status)
+    }
+    if (filters?.direction) {
+      query = query.eq('direction', filters.direction)
+    }
+
+    const limit = filters?.limit || 50
+    const offset = filters?.offset || 0
+    
+    query = query.range(offset, offset + limit - 1)
+
+    const { data, error, count } = await query
+
+    if (error) {
+      throw new Error(`Failed to fetch email history: ${error.message}`)
+    }
+
+    return { emails: data || [], total: count || 0 }
+  }
+
+  async getContactEmails(contactId: string, limit: number = 50): Promise<any[]> {
+    const { data, error } = await supabase
+      .rpc('get_contact_emails', {
+        p_contact_id: contactId,
+        p_tenant_id: (await supabase.auth.getUser()).data.user?.id,
+        p_limit: limit
+      })
+
+    if (error) {
+      throw new Error(`Failed to fetch contact emails: ${error.message}`)
+    }
+
+    return data || []
+  }
+
+  async getEmailThread(threadId: string): Promise<any[]> {
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('tenant_id')
+      .single()
+
+    if (!userProfile?.tenant_id) {
+      throw new Error('User tenant not found')
+    }
+
+    const { data, error } = await supabase
+      .rpc('get_email_thread', {
+        p_thread_id: threadId,
+        p_tenant_id: userProfile.tenant_id
+      })
+
+    if (error) {
+      throw new Error(`Failed to fetch email thread: ${error.message}`)
+    }
+
+    return data || []
+  }
+
   async getSystemHealth(): Promise<EmailSystemHealth[]> {
     const { data, error } = await supabase
       .rpc('get_email_system_health')

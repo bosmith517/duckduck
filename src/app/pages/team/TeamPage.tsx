@@ -1,9 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import ModernTeamChat from '../../components/communications/ModernTeamChat'
 import InstantChatPopup from '../../components/communications/InstantChatPopup'
 import RoleAssignmentModal from '../../components/team/RoleAssignmentModal'
+import FixOrphanedUsers from '../../components/team/FixOrphanedUsers'
+import { AdminPasswordReset, BulkPasswordResetModal } from '../../components/team/AdminPasswordReset'
+import { teamMemberService, TeamMember as TeamMemberType, TeamMemberInvite } from '../../services/teamMemberService'
 
 interface TeamMember {
   id: string
@@ -22,6 +25,8 @@ interface TeamMember {
 }
 
 const TeamPage: React.FC = () => {
+  console.log('TeamPage: Component rendering')
+  
   const [activeTab, setActiveTab] = useState<'directory' | 'chat'>('directory')
   const [activeChatMember, setActiveChatMember] = useState<TeamMember | null>(null)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
@@ -30,73 +35,37 @@ const TeamPage: React.FC = () => {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showRoleAssignmentModal, setShowRoleAssignmentModal] = useState(false)
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
-  const [teamMembers] = useState<TeamMember[]>([
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john.doe@tradeworkspro.com',
-      phone: '(555) 123-4567',
-      role: 'Project Manager',
-      department: 'Operations',
-      status: 'active',
-      hireDate: '2022-03-15',
-      skills: ['Project Management', 'Client Relations', 'Scheduling'],
-      currentJobs: 3,
-      completedJobs: 25
-    },
-    {
-      id: '2',
-      name: 'Mike Wilson',
-      email: 'mike.wilson@tradeworkspro.com',
-      phone: '(555) 987-6543',
-      role: 'Lead Carpenter',
-      department: 'Construction',
-      status: 'active',
-      hireDate: '2021-08-20',
-      skills: ['Carpentry', 'Framing', 'Finish Work'],
-      currentJobs: 2,
-      completedJobs: 45
-    },
-    {
-      id: '3',
-      name: 'Sarah Johnson',
-      email: 'sarah.johnson@tradeworkspro.com',
-      phone: '(555) 456-7890',
-      role: 'Estimator',
-      department: 'Sales',
-      status: 'active',
-      hireDate: '2023-01-10',
-      skills: ['Cost Estimation', 'Blueprint Reading', 'Client Consultation'],
-      currentJobs: 1,
-      completedJobs: 18
-    },
-    {
-      id: '4',
-      name: 'Tom Rodriguez',
-      email: 'tom.rodriguez@tradeworkspro.com',
-      phone: '(555) 321-0987',
-      role: 'Electrician',
-      department: 'Construction',
-      status: 'on-leave',
-      hireDate: '2020-11-05',
-      skills: ['Electrical Work', 'Wiring', 'Panel Installation'],
-      currentJobs: 0,
-      completedJobs: 38
-    },
-    {
-      id: '5',
-      name: 'Lisa Chen',
-      email: 'lisa.chen@tradeworkspro.com',
-      phone: '(555) 654-3210',
-      role: 'Office Manager',
-      department: 'Administration',
-      status: 'active',
-      hireDate: '2022-06-01',
-      skills: ['Administration', 'Scheduling', 'Customer Service'],
-      currentJobs: 0,
-      completedJobs: 0
-    }
-  ])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [showBulkPasswordReset, setShowBulkPasswordReset] = useState(false)
+  const [selectedMembers, setSelectedMembers] = useState<TeamMember[]>([])
+  
+  // Add Member Form State
+  const [addMemberForm, setAddMemberForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    role: '',
+    department: '',
+    skills: '',
+    hireDate: ''
+  })
+  
+  // Edit Member Form State
+  const [editMemberForm, setEditMemberForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
+    department: '',
+    status: '',
+    skills: ''
+  })
+  
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true)
 
   const getStatusBadge = (status: string) => {
     const statusClasses = {
@@ -117,9 +86,161 @@ const TeamPage: React.FC = () => {
     return colors[department as keyof typeof colors] || 'secondary'
   }
 
+  // Load team members on component mount
+  useEffect(() => {
+    loadTeamMembers()
+  }, [])
+
+  // Load team members from database
+  const loadTeamMembers = async () => {
+    console.log('Starting loadTeamMembers...')
+    setIsLoadingMembers(true)
+    try {
+      const { data, error } = await teamMemberService.getTeamMembers()
+      console.log('Team members response:', { data, error })
+      
+      if (error) {
+        console.error('Error loading team members:', error)
+        setError('Failed to load team members')
+      } else if (data && data.length > 0) {
+        // Convert database format to component format
+        const formattedMembers: TeamMember[] = data.map(member => {
+          // Handle both full_name and first_name/last_name formats
+          let displayName = '';
+          if (member.full_name) {
+            displayName = member.full_name;
+          } else if (member.first_name || member.last_name) {
+            displayName = `${member.first_name || ''} ${member.last_name || ''}`.trim();
+          } else {
+            displayName = member.email || '';
+          }
+
+          // Get display role from view or map from database role
+          const displayRole = (member as any).display_role || member.role || '';
+
+          return {
+            id: member.id || '',
+            name: displayName,
+            email: member.email || '',
+            phone: member.phone || '',
+            role: displayRole,
+            department: member.department || 'Operations',
+            status: member.is_active ? 'active' : 'inactive',
+            hireDate: (member as any).hire_date || member.created_at || new Date().toISOString(),
+            skills: (member as any).skills || [],
+            currentJobs: (member as any).current_jobs || 0,
+            completedJobs: (member as any).completed_jobs || 0,
+            avatar: member.avatar_url
+          };
+        })
+        setTeamMembers(formattedMembers)
+      } else {
+        // No team members found
+        console.log('No team members found')
+        setTeamMembers([])
+      }
+    } catch (err) {
+      console.error('Error in loadTeamMembers:', err)
+      setError('Failed to load team members')
+    } finally {
+      setIsLoadingMembers(false)
+    }
+  }
+
   // Handler functions
   const handleAddMember = () => {
+    console.log('handleAddMember called - opening modal')
     setShowAddMemberModal(true)
+    setError(null)
+    setSuccess(null)
+    console.log('showAddMemberModal set to:', true)
+  }
+
+  const handleSaveMember = async () => {
+    console.log('handleSaveMember called')
+    console.log('Form data:', addMemberForm)
+    
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      // Validate form
+      if (!addMemberForm.firstName || !addMemberForm.lastName || !addMemberForm.email || !addMemberForm.role) {
+        console.log('Validation failed - missing required fields')
+        setError('Please fill in all required fields')
+        setIsLoading(false)
+        return
+      }
+
+      // Map display role to database role
+      const roleMapping: { [key: string]: string } = {
+        'Administrator': 'admin',
+        'Project Manager': 'manager',
+        'Site Supervisor': 'supervisor',
+        'Lead Carpenter': 'technician',
+        'Carpenter': 'field_worker',
+        'Electrician': 'technician',
+        'Plumber': 'technician',
+        'HVAC Technician': 'technician',
+        'Estimator': 'estimator',
+        'Office Manager': 'manager',
+        'Dispatcher': 'dispatcher',
+        'Customer Service': 'customer_service',
+        'Sales Representative': 'sales',
+        'Accounting': 'accounting',
+        'Field Worker': 'field_worker',
+        'Subcontractor': 'subcontractor'
+      }
+
+      // Get the database role or default to 'agent'
+      const dbRole = roleMapping[addMemberForm.role] || 'agent'
+
+      // Create team member
+      const memberData: TeamMemberInvite = {
+        full_name: `${addMemberForm.firstName} ${addMemberForm.lastName}`.trim(),
+        email: addMemberForm.email,
+        phone: addMemberForm.phone,
+        role: dbRole as any,
+        department: addMemberForm.department
+      }
+
+      console.log('Creating team member with data:', memberData)
+      const { data, error } = await teamMemberService.createTeamMember(memberData)
+      console.log('Create team member result:', { data, error })
+
+      if (error) {
+        console.error('Create team member error:', error)
+        setError(error.message || 'Failed to add team member')
+      } else {
+        setSuccess('Team member added successfully! They will receive an invitation email.')
+        
+        // Reset form
+        setAddMemberForm({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          role: '',
+          department: '',
+          skills: '',
+          hireDate: ''
+        })
+        
+        // Reload team members
+        await loadTeamMembers()
+        
+        // Close modal after a short delay
+        setTimeout(() => {
+          setShowAddMemberModal(false)
+          setSuccess(null)
+        }, 2000)
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+      console.error('Error adding team member:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleExportTeam = () => {
@@ -158,7 +279,75 @@ const TeamPage: React.FC = () => {
 
   const handleEditMember = (member: TeamMember) => {
     setSelectedMember(member)
+    setEditMemberForm({
+      name: member.name,
+      email: member.email,
+      phone: member.phone,
+      role: member.role,
+      department: member.department,
+      status: member.status,
+      skills: member.skills.join(', ')
+    })
     setShowEditMemberModal(true)
+    setError(null)
+    setSuccess(null)
+  }
+
+  const handleUpdateMember = async () => {
+    if (!selectedMember) return
+    
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      // Validate form
+      if (!editMemberForm.name || !editMemberForm.email || !editMemberForm.role) {
+        setError('Please fill in all required fields')
+        setIsLoading(false)
+        return
+      }
+
+      // Map role to correct format
+      let dbRole: 'admin' | 'agent' | 'viewer' = 'viewer'
+      if (editMemberForm.role.toLowerCase().includes('admin')) {
+        dbRole = 'admin'
+      } else if (editMemberForm.role.toLowerCase().includes('manager') || 
+                 editMemberForm.role.toLowerCase().includes('lead')) {
+        dbRole = 'agent'
+      }
+
+      // Update team member
+      const updateData: Partial<TeamMemberType> = {
+        full_name: editMemberForm.name,
+        email: editMemberForm.email,
+        phone: editMemberForm.phone,
+        role: dbRole,
+        department: editMemberForm.department,
+        is_active: editMemberForm.status === 'active'
+      }
+
+      const { data, error } = await teamMemberService.updateTeamMember(selectedMember.id, updateData)
+
+      if (error) {
+        setError(error.message || 'Failed to update team member')
+      } else {
+        setSuccess('Team member updated successfully!')
+        
+        // Reload team members
+        await loadTeamMembers()
+        
+        // Close modal after a short delay
+        setTimeout(() => {
+          setShowEditMemberModal(false)
+          setSuccess(null)
+        }, 2000)
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+      console.error('Error updating team member:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleAssignJob = (member: TeamMember) => {
@@ -220,10 +409,15 @@ const TeamPage: React.FC = () => {
       {activeTab === 'directory' && (
         <div className='row g-5 g-xl-8'>
           <div className='col-xl-12'>
+            {/* Fix Orphaned Users Component */}
+            <div className='mb-5'>
+              <FixOrphanedUsers />
+            </div>
+            
             <KTCard>
             <div className='card-header border-0 pt-5'>
               <h3 className='card-title align-items-start flex-column'>
-                <span className='card-label fw-bold fs-3 mb-1'>Team Directory</span>
+                <span className='card-label fw-bold fs-3 mb-1'>Team Directory - LIVE UPDATE TEST</span>
                 <span className='text-muted mt-1 fw-semibold fs-7'>Manage your workforce</span>
               </h3>
               <div className='card-toolbar'>
@@ -234,6 +428,15 @@ const TeamPage: React.FC = () => {
                   <i className='ki-duotone ki-exit-down fs-2'></i>
                   Export
                 </button>
+                {selectedMembers.length > 0 && (
+                  <button 
+                    className='btn btn-sm btn-light-warning me-3'
+                    onClick={() => setShowBulkPasswordReset(true)}
+                  >
+                    <i className='ki-duotone ki-key fs-2'></i>
+                    Reset Passwords ({selectedMembers.length})
+                  </button>
+                )}
                 <button 
                   className='btn btn-sm btn-primary'
                   onClick={handleAddMember}
@@ -248,6 +451,22 @@ const TeamPage: React.FC = () => {
                 <table className='table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4'>
                   <thead>
                     <tr className='fw-bold text-muted'>
+                      <th className='w-10px pe-2'>
+                        <div className='form-check form-check-sm form-check-custom form-check-solid me-3'>
+                          <input
+                            className='form-check-input'
+                            type='checkbox'
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedMembers(teamMembers)
+                              } else {
+                                setSelectedMembers([])
+                              }
+                            }}
+                            checked={selectedMembers.length === teamMembers.length && teamMembers.length > 0}
+                          />
+                        </div>
+                      </th>
                       <th className='min-w-200px'>Team Member</th>
                       <th className='min-w-150px'>Contact</th>
                       <th className='min-w-120px'>Role</th>
@@ -262,6 +481,22 @@ const TeamPage: React.FC = () => {
                   <tbody>
                     {teamMembers.map((member) => (
                       <tr key={member.id}>
+                        <td>
+                          <div className='form-check form-check-sm form-check-custom form-check-solid'>
+                            <input
+                              className='form-check-input'
+                              type='checkbox'
+                              checked={selectedMembers.some(m => m.id === member.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedMembers([...selectedMembers, member])
+                                } else {
+                                  setSelectedMembers(selectedMembers.filter(m => m.id !== member.id))
+                                }
+                              }}
+                            />
+                          </div>
+                        </td>
                         <td>
                           <div className='d-flex align-items-center'>
                             <div className='symbol symbol-45px me-5'>
@@ -370,7 +605,7 @@ const TeamPage: React.FC = () => {
                               </i>
                             </button>
                             <button
-                              className='btn btn-icon btn-bg-light btn-active-color-warning btn-sm'
+                              className='btn btn-icon btn-bg-light btn-active-color-warning btn-sm me-1'
                               title='Assign Role & Permissions'
                               onClick={() => handleAssignRole(member)}
                             >
@@ -379,6 +614,30 @@ const TeamPage: React.FC = () => {
                                 <span className='path2'></span>
                               </i>
                             </button>
+                            <div className='btn-group'>
+                              <button
+                                className='btn btn-icon btn-bg-light btn-active-color-warning btn-sm'
+                                type='button'
+                                data-bs-toggle='dropdown'
+                                aria-expanded='false'
+                                title='More Actions'
+                              >
+                                <i className='ki-duotone ki-dots-vertical fs-3'>
+                                  <span className='path1'></span>
+                                  <span className='path2'></span>
+                                  <span className='path3'></span>
+                                </i>
+                              </button>
+                              <ul className='dropdown-menu dropdown-menu-end'>
+                                <li>
+                                  <AdminPasswordReset 
+                                    userEmail={member.email}
+                                    userName={member.name}
+                                    userId={member.id}
+                                  />
+                                </li>
+                              </ul>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -415,7 +674,9 @@ const TeamPage: React.FC = () => {
       )}
 
       {/* Add Member Modal */}
+      {console.log('showAddMemberModal value:', showAddMemberModal)}
       {showAddMemberModal && (
+        console.log('Rendering Add Member Modal'),
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content">
@@ -432,45 +693,95 @@ const TeamPage: React.FC = () => {
                 </button>
               </div>
               <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger mb-4">
+                    <div className="alert-text">{error}</div>
+                  </div>
+                )}
+                {success && (
+                  <div className="alert alert-success mb-4">
+                    <div className="alert-text">{success}</div>
+                  </div>
+                )}
                 <form>
                   <div className="row mb-4">
                     <div className="col-md-6">
                       <label className="form-label required">First Name</label>
-                      <input type="text" className="form-control" placeholder="Enter first name" />
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="Enter first name"
+                        value={addMemberForm.firstName}
+                        onChange={(e) => setAddMemberForm({...addMemberForm, firstName: e.target.value})}
+                      />
                     </div>
                     <div className="col-md-6">
                       <label className="form-label required">Last Name</label>
-                      <input type="text" className="form-control" placeholder="Enter last name" />
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        placeholder="Enter last name"
+                        value={addMemberForm.lastName}
+                        onChange={(e) => setAddMemberForm({...addMemberForm, lastName: e.target.value})}
+                      />
                     </div>
                   </div>
                   <div className="row mb-4">
                     <div className="col-md-6">
                       <label className="form-label required">Email</label>
-                      <input type="email" className="form-control" placeholder="Enter email address" />
+                      <input 
+                        type="email" 
+                        className="form-control" 
+                        placeholder="Enter email address"
+                        value={addMemberForm.email}
+                        onChange={(e) => setAddMemberForm({...addMemberForm, email: e.target.value})}
+                      />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label required">Phone</label>
-                      <input type="tel" className="form-control" placeholder="Enter phone number" />
+                      <label className="form-label">Phone</label>
+                      <input 
+                        type="tel" 
+                        className="form-control" 
+                        placeholder="Enter phone number"
+                        value={addMemberForm.phone}
+                        onChange={(e) => setAddMemberForm({...addMemberForm, phone: e.target.value})}
+                      />
                     </div>
                   </div>
                   <div className="row mb-4">
                     <div className="col-md-6">
                       <label className="form-label required">Role</label>
-                      <select className="form-select">
+                      <select 
+                        className="form-select"
+                        value={addMemberForm.role}
+                        onChange={(e) => setAddMemberForm({...addMemberForm, role: e.target.value})}
+                      >
                         <option value="">Select role</option>
+                        <option value="Administrator">Administrator</option>
                         <option value="Project Manager">Project Manager</option>
+                        <option value="Site Supervisor">Site Supervisor</option>
                         <option value="Lead Carpenter">Lead Carpenter</option>
                         <option value="Carpenter">Carpenter</option>
                         <option value="Electrician">Electrician</option>
                         <option value="Plumber">Plumber</option>
+                        <option value="HVAC Technician">HVAC Technician</option>
                         <option value="Estimator">Estimator</option>
                         <option value="Office Manager">Office Manager</option>
-                        <option value="Administrator">Administrator</option>
+                        <option value="Dispatcher">Dispatcher</option>
+                        <option value="Customer Service">Customer Service</option>
+                        <option value="Sales Representative">Sales Representative</option>
+                        <option value="Accounting">Accounting</option>
+                        <option value="Field Worker">Field Worker</option>
+                        <option value="Subcontractor">Subcontractor</option>
                       </select>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label required">Department</label>
-                      <select className="form-select">
+                      <label className="form-label">Department</label>
+                      <select 
+                        className="form-select"
+                        value={addMemberForm.department}
+                        onChange={(e) => setAddMemberForm({...addMemberForm, department: e.target.value})}
+                      >
                         <option value="">Select department</option>
                         <option value="Operations">Operations</option>
                         <option value="Construction">Construction</option>
@@ -481,20 +792,53 @@ const TeamPage: React.FC = () => {
                   </div>
                   <div className="mb-4">
                     <label className="form-label">Skills (comma separated)</label>
-                    <input type="text" className="form-control" placeholder="e.g., Carpentry, Project Management, Client Relations" />
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g., Carpentry, Project Management, Client Relations"
+                      value={addMemberForm.skills}
+                      onChange={(e) => setAddMemberForm({...addMemberForm, skills: e.target.value})}
+                    />
                   </div>
                   <div className="mb-4">
                     <label className="form-label">Hire Date</label>
-                    <input type="date" className="form-control" />
+                    <input 
+                      type="date" 
+                      className="form-control"
+                      value={addMemberForm.hireDate}
+                      onChange={(e) => setAddMemberForm({...addMemberForm, hireDate: e.target.value})}
+                    />
                   </div>
                 </form>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-light" onClick={() => setShowAddMemberModal(false)}>
+                <button 
+                  className="btn btn-light" 
+                  onClick={() => setShowAddMemberModal(false)}
+                  disabled={isLoading}
+                >
                   Cancel
                 </button>
-                <button className="btn btn-primary">
-                  Add Member
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => {
+                    console.log('Add Member button clicked!');
+                    handleSaveMember();
+                  }}
+                  disabled={isLoading}
+                  type="button"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-plus me-2"></i>
+                      Add Member
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -609,25 +953,54 @@ const TeamPage: React.FC = () => {
                 </button>
               </div>
               <div className="modal-body">
+                {error && (
+                  <div className="alert alert-danger mb-4">
+                    <div className="alert-text">{error}</div>
+                  </div>
+                )}
+                {success && (
+                  <div className="alert alert-success mb-4">
+                    <div className="alert-text">{success}</div>
+                  </div>
+                )}
                 <form>
                   <div className="row mb-4">
                     <div className="col-md-6">
                       <label className="form-label required">Name</label>
-                      <input type="text" className="form-control" defaultValue={selectedMember.name} />
+                      <input 
+                        type="text" 
+                        className="form-control" 
+                        value={editMemberForm.name}
+                        onChange={(e) => setEditMemberForm({...editMemberForm, name: e.target.value})}
+                      />
                     </div>
                     <div className="col-md-6">
                       <label className="form-label required">Email</label>
-                      <input type="email" className="form-control" defaultValue={selectedMember.email} />
+                      <input 
+                        type="email" 
+                        className="form-control" 
+                        value={editMemberForm.email}
+                        onChange={(e) => setEditMemberForm({...editMemberForm, email: e.target.value})}
+                      />
                     </div>
                   </div>
                   <div className="row mb-4">
                     <div className="col-md-6">
-                      <label className="form-label required">Phone</label>
-                      <input type="tel" className="form-control" defaultValue={selectedMember.phone} />
+                      <label className="form-label">Phone</label>
+                      <input 
+                        type="tel" 
+                        className="form-control" 
+                        value={editMemberForm.phone}
+                        onChange={(e) => setEditMemberForm({...editMemberForm, phone: e.target.value})}
+                      />
                     </div>
                     <div className="col-md-6">
                       <label className="form-label required">Role</label>
-                      <select className="form-select" defaultValue={selectedMember.role}>
+                      <select 
+                        className="form-select" 
+                        value={editMemberForm.role}
+                        onChange={(e) => setEditMemberForm({...editMemberForm, role: e.target.value})}
+                      >
                         <option value="Project Manager">Project Manager</option>
                         <option value="Lead Carpenter">Lead Carpenter</option>
                         <option value="Carpenter">Carpenter</option>
@@ -641,8 +1014,12 @@ const TeamPage: React.FC = () => {
                   </div>
                   <div className="row mb-4">
                     <div className="col-md-6">
-                      <label className="form-label required">Department</label>
-                      <select className="form-select" defaultValue={selectedMember.department}>
+                      <label className="form-label">Department</label>
+                      <select 
+                        className="form-select" 
+                        value={editMemberForm.department}
+                        onChange={(e) => setEditMemberForm({...editMemberForm, department: e.target.value})}
+                      >
                         <option value="Operations">Operations</option>
                         <option value="Construction">Construction</option>
                         <option value="Sales">Sales</option>
@@ -650,8 +1027,12 @@ const TeamPage: React.FC = () => {
                       </select>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label required">Status</label>
-                      <select className="form-select" defaultValue={selectedMember.status}>
+                      <label className="form-label">Status</label>
+                      <select 
+                        className="form-select" 
+                        value={editMemberForm.status}
+                        onChange={(e) => setEditMemberForm({...editMemberForm, status: e.target.value})}
+                      >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                         <option value="on-leave">On Leave</option>
@@ -660,16 +1041,39 @@ const TeamPage: React.FC = () => {
                   </div>
                   <div className="mb-4">
                     <label className="form-label">Skills (comma separated)</label>
-                    <input type="text" className="form-control" defaultValue={selectedMember.skills.join(', ')} />
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      value={editMemberForm.skills}
+                      onChange={(e) => setEditMemberForm({...editMemberForm, skills: e.target.value})}
+                    />
                   </div>
                 </form>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-light" onClick={() => setShowEditMemberModal(false)}>
+                <button 
+                  className="btn btn-light" 
+                  onClick={() => setShowEditMemberModal(false)}
+                  disabled={isLoading}
+                >
                   Cancel
                 </button>
-                <button className="btn btn-primary">
-                  Save Changes
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleUpdateMember}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-save me-2"></i>
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -753,6 +1157,19 @@ const TeamPage: React.FC = () => {
           permissions: selectedMember.permissions || []
         } : null}
         onSave={handleRoleSave}
+      />
+
+      {/* Bulk Password Reset Modal */}
+      <BulkPasswordResetModal
+        show={showBulkPasswordReset}
+        onClose={() => {
+          setShowBulkPasswordReset(false)
+          setSelectedMembers([])
+        }}
+        selectedUsers={selectedMembers.map(m => ({
+          email: m.email,
+          name: m.name
+        }))}
       />
     </>
   )

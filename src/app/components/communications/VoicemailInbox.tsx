@@ -194,7 +194,7 @@ export const VoicemailInbox: React.FC = () => {
     if (!voicemail.is_read) {
       try {
         const { error } = await supabase
-          .from('call_logs')
+          .from('calls')
           .update({ is_read: true })
           .eq('id', voicemail.id)
           

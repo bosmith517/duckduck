@@ -6,7 +6,12 @@
       "Bash(rg:*)",
       "Bash(curl:*)",
       "Bash(ls:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout 15s npm run dev)",
+      "Bash(timeout 10s npx vite --version)",
+      "Bash(sed:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": []
   }

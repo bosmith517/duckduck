@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../../supabaseClient'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
 import ClientPortalService from '../../services/clientPortalService'
 import { propertyService } from '../../services/propertyService'
 import { attomDataService } from '../../services/attomDataService'
@@ -11,16 +9,32 @@ import JobHistoryTimeline from '../../components/customer-portal/JobHistoryTimel
 import ChatWidget from '../../components/customer-portal/ChatWidget'
 import TechnicianProfile from '../../components/customer-portal/TechnicianProfile'
 import LiveJobLog from '../../components/customer-portal/LiveJobLog'
-import DigitalTwin from '../../components/customer-portal/DigitalTwin'
-import MaintenanceHub from '../../components/customer-portal/MaintenanceHub'
-import QuotesAndPlans from '../../components/customer-portal/QuotesAndPlans'
-import ServiceSchedulingModal from '../../components/customer-portal/ServiceSchedulingModal'
-import ContactTechnicianModal from '../../components/customer-portal/ContactTechnicianModal'
-import JobPhotosTab from '../../components/customer-portal/JobPhotosTab'
-import DocumentsTab from '../../components/customer-portal/DocumentsTab'
+import PropertyStatsCard from '../../components/customer-portal/PropertyStatsCard'
+import StickyNavigation from '../../components/customer-portal/StickyNavigation'
+import FloatingCTABar from '../../components/customer-portal/FloatingCTABar'
+import LoadingSpinner from '../../components/customer-portal/LoadingSpinner'
 
-// Mapbox configuration
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || 'pk.your_mapbox_token_here'
+// Lazy-loaded heavy components
+const DigitalTwin = React.lazy(() => import('../../components/customer-portal/DigitalTwin'))
+const MaintenanceHub = React.lazy(() => import('../../components/customer-portal/MaintenanceHub'))
+const QuotesAndPlans = React.lazy(() => import('../../components/customer-portal/QuotesAndPlans'))
+const ServiceSchedulingModal = React.lazy(() => import('../../components/customer-portal/ServiceSchedulingModal'))
+const ContactTechnicianModal = React.lazy(() => import('../../components/customer-portal/ContactTechnicianModal'))
+const JobPhotosTab = React.lazy(() => import('../../components/customer-portal/JobPhotosTab'))
+const DocumentsTab = React.lazy(() => import('../../components/customer-portal/DocumentsTab'))
+const ReferralDashboard = React.lazy(() => import('../../components/customer-portal/ReferralDashboard'))
+
+// Conditional Mapbox import - only load when needed
+let mapboxgl: any = null
+const loadMapbox = async () => {
+  if (!mapboxgl) {
+    const mapboxModule = await import('mapbox-gl')
+    await import('mapbox-gl/dist/mapbox-gl.css')
+    mapboxgl = mapboxModule.default
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || 'pk.your_mapbox_token_here'
+  }
+  return mapboxgl
+}
 
 // Street View utility function with Attom fallback
 const getStreetViewUrl = async (address: string, attomRawData?: any): Promise<string> => {
@@ -165,7 +179,9 @@ const CustomerPortalPage: React.FC = () => {
   const [showTracking, setShowTracking] = useState(false)
   const [showSchedulingModal, setShowSchedulingModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents'>('dashboard')
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals'>('dashboard')
+  const [tenantPhone, setTenantPhone] = useState<string | null>(null)
+  const [tenantInfo, setTenantInfo] = useState<any>(null)
   
   // Mock technician data for demonstration
   const mockTechnician = {
@@ -196,8 +212,8 @@ const CustomerPortalPage: React.FC = () => {
   
   // Map references
   const mapContainerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markerRef = useRef<mapboxgl.Marker | null>(null)
+  const mapRef = useRef<any>(null)
+  const markerRef = useRef<any>(null)
   const realtimeChannelRef = useRef<any>(null)
 
   // Load initial data based on access method
@@ -402,6 +418,22 @@ const CustomerPortalPage: React.FC = () => {
       if (customerError) throw customerError
       setCustomer(customerData)
 
+      // Load tenant information including phone, company name, logo, etc.
+      if (customerData?.tenant_id) {
+        const { data: tenantData, error: tenantError } = await supabase
+          .from('v_tenant_phone_overview')
+          .select('*')
+          .eq('tenant_id', customerData.tenant_id)
+          .single()
+
+        if (!tenantError && tenantData) {
+          setTenantInfo(tenantData)
+          // Set phone number from the view - prioritize signalwire_number, then business_contact_phone, then selected_phone_during_onboarding
+          const phoneNumber = tenantData.signalwire_number || tenantData.business_contact_phone || tenantData.selected_phone_during_onboarding
+          setTenantPhone(phoneNumber)
+        }
+      }
+
       // Get real property data based on customer address
       if (customerData) {
         const fullAddress = `${customerData.address_line1 || customerData.address}, ${customerData.city}, ${customerData.state} ${customerData.zip_code}`
@@ -520,11 +552,14 @@ const CustomerPortalPage: React.FC = () => {
     }
   }
 
-  const initializeMap = (initialLat: number, initialLng: number, actualLat: number, actualLng: number) => {
+  const initializeMap = async (initialLat: number, initialLng: number, actualLat: number, actualLng: number) => {
     if (!mapContainerRef.current || mapRef.current) return
 
+    // Load Mapbox only when needed for tracking
+    const mapbox = await loadMapbox()
+
     // Create map centered on general area
-    mapRef.current = new mapboxgl.Map({
+    mapRef.current = new mapbox.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [initialLng, initialLat],
@@ -532,22 +567,22 @@ const CustomerPortalPage: React.FC = () => {
     })
 
     // Add navigation controls
-    mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
+    mapRef.current.addControl(new mapbox.NavigationControl(), 'top-right')
 
     // Add customer location marker (destination)
     if (customer?.address) {
       // You would geocode the customer address here
       // For now, we'll use a placeholder
-      new mapboxgl.Marker({ color: 'red' })
+      new mapbox.Marker({ color: 'red' })
         .setLngLat([initialLng + 0.005, initialLat + 0.005])
-        .setPopup(new mapboxgl.Popup().setHTML('<h6>Your Location</h6><p>Service destination</p>'))
+        .setPopup(new mapbox.Popup().setHTML('<h6>Your Location</h6><p>Service destination</p>'))
         .addTo(mapRef.current)
     }
 
     // Add technician marker (starts from general area, moves to actual location)
-    markerRef.current = new mapboxgl.Marker({ color: 'blue' })
+    markerRef.current = new mapbox.Marker({ color: 'blue' })
       .setLngLat([initialLng, initialLat])
-      .setPopup(new mapboxgl.Popup().setHTML('<h6>Your Technician</h6><p>On the way!</p>'))
+      .setPopup(new mapbox.Popup().setHTML('<h6>Your Technician</h6><p>On the way!</p>'))
       .addTo(mapRef.current)
 
     // Gradually move marker to actual location over 30 seconds for smooth reveal
@@ -707,16 +742,18 @@ const CustomerPortalPage: React.FC = () => {
         <div className="container py-3">
           <div className="d-flex justify-content-between align-items-center">
             <div className="d-flex align-items-center">
-              <img src="/assets/media/logos/tradeworks-logo.png" alt="TradeWorks Pro" className="h-40px me-3" />
+              <img src="/assets/media/logos/tradeworks-logo.png" alt={tenantInfo?.company_name || 'Customer Portal'} className="h-40px me-3" />
               <div>
                 <h5 className="mb-0 text-dark">Customer Portal</h5>
-                <span className="text-muted fs-7">Powered by TradeWorks Pro</span>
+                <span className="text-muted fs-7">
+                  {tenantInfo?.company_name ? `Powered by ${tenantInfo.company_name}` : 'Customer Service Portal'}
+                </span>
               </div>
             </div>
             <div className="d-flex align-items-center gap-3">
               <button 
                 className="btn btn-sm btn-light-primary"
-                onClick={() => window.open('tel:+15551234567', '_self')}
+                onClick={() => tenantPhone && window.open(`tel:${tenantPhone}`, '_self')}
               >
                 <i className="ki-duotone ki-phone fs-5 me-1">
                   <span className="path1"></span>
@@ -739,7 +776,45 @@ const CustomerPortalPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="container py-6">
+      {/* Sticky Navigation */}
+      <StickyNavigation 
+        activeSection={activeSection}
+        onSectionChange={(section: string) => {
+          setActiveSection(section as 'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals')
+          // Collapse property details when switching sections
+          const propertyAccordion = document.getElementById('propertyCollapse')
+          if (propertyAccordion && section !== 'dashboard') {
+            propertyAccordion.classList.remove('show')
+            const accordionButton = document.querySelector('[data-bs-target="#propertyCollapse"]')
+            accordionButton?.classList.add('collapsed')
+            accordionButton?.setAttribute('aria-expanded', 'false')
+          }
+          // Scroll to top when changing sections
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
+        currentJob={currentJob}
+        jobHistory={jobHistory}
+        tenantPhone={tenantPhone}
+        onViewTeam={() => alert('View Team modal coming soon!')}
+      />
+
+      {/* Main Content with Navigation Offset */}
+      <div className="py-6" style={{ marginLeft: 'max(240px, 0px)' }}>
+        <style>{`
+          @media (max-width: 991.98px) {
+            .main-content { margin-left: 0 !important; padding-bottom: 100px !important; }
+          }
+          .main-content {
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 1rem;
+            padding-right: 1rem;
+          }
+        `}</style>
+        
+        <div className="main-content">
+        
         {/* Smart Dashboard - Always visible */}
         <SmartDashboard 
           customer={customer}
@@ -747,15 +822,14 @@ const CustomerPortalPage: React.FC = () => {
           jobHistory={jobHistory}
           currentTrackingData={trackingData}
           onContactTechnician={() => setShowContactModal(true)}
-          onRescheduleJob={() => alert('Please call us at (555) 123-4567 to reschedule your appointment.')}
+          onRescheduleJob={() => alert(`Please call us at ${tenantPhone || 'our main number'} to reschedule your appointment.`)}
           onPayInvoice={() => alert('Payment portal coming soon! Please call us to pay your invoice.')}
           onViewJobDetails={(jobId) => alert(`Job details for ${jobId} coming soon!`)}
           onScheduleService={() => setShowSchedulingModal(true)}
         />
 
-        {/* Navigation Pills */}
-        <div className="d-flex justify-content-center mb-6">
-          <ul className="nav nav-pills nav-line-tabs nav-line-tabs-2x border-transparent fs-6 fw-bold">
+        {/* Navigation is now handled by StickyNavigation component */}
+        {/* 
             <li className="nav-item">
               <a 
                 className={`nav-link ${activeSection === 'dashboard' ? 'active' : 'text-muted'}`}
@@ -842,48 +916,84 @@ const CustomerPortalPage: React.FC = () => {
             )}
           </ul>
         </div>
+        */}
 
-        <div className="row g-6">
-          {/* Main Content - Property Info or Tracking Map */}
-          <div className="col-lg-8">
-            <div className="card shadow-sm h-100">
-              <div className="card-header">
-                <h5 className="card-title mb-0">
-                  {showTracking ? (
-                    <>
-                      <i className="ki-duotone ki-geolocation fs-3 text-primary me-2">
-                        <span className="path1"></span>
-                        <span className="path2"></span>
-                      </i>
-                      Your Technician is On the Way
-                    </>
-                  ) : (
-                    <>
-                      <i className="ki-duotone ki-home fs-3 text-primary me-2">
-                        <span className="path1"></span>
-                        <span className="path2"></span>
-                      </i>
-                      Your Property at {customerData?.address_line1 || customerData?.address || 'this Address'}
-                    </>
-                  )}
-                </h5>
-                {trackingData && (
-                  <div className="text-muted fs-7">
-                    Last updated: {formatTime(trackingData.last_updated)}
-                  </div>
-                )}
-              </div>
-              <div className="card-body p-0">
-                {showTracking ? (
-                  /* Tracking Map */
-                  <div 
-                    ref={mapContainerRef}
-                    style={{ height: '500px', width: '100%' }}
-                    className="rounded-bottom"
-                  />
-                ) : (
-                  /* Property Information */
-                  <div>
+        {/* Show property row only on dashboard */}
+        {activeSection === 'dashboard' && (
+          <div className="row g-6">
+            {/* Main Content - Property Info or Tracking Map */}
+            <div className="col-lg-8">
+              {/* Property Details Accordion */}
+              <div className="accordion" id="propertyAccordion">
+              <div className="accordion-item">
+                <h2 className="accordion-header" id="propertyHeading">
+                  <button 
+                    className="accordion-button" 
+                    type="button" 
+                    data-bs-toggle="collapse" 
+                    data-bs-target="#propertyCollapse" 
+                    aria-expanded="true" 
+                    aria-controls="propertyCollapse"
+                  >
+                    <i className="ki-duotone ki-home fs-2 text-primary me-3">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                    <div>
+                      <div className="fw-bold text-gray-900">Property Details & Street View</div>
+                      <div className="text-muted fs-7">
+                        {showTracking ? 'Live tracking map view' : 'Property information and imagery'}
+                      </div>
+                    </div>
+                  </button>
+                </h2>
+                <div 
+                  id="propertyCollapse" 
+                  className="accordion-collapse collapse show" 
+                  aria-labelledby="propertyHeading" 
+                  data-bs-parent="#propertyAccordion"
+                >
+                  <div className="accordion-body p-0">
+                    {/* Sticky Street View Card */}
+                    <div className="sticky-top bg-white shadow-sm" style={{ zIndex: 10 }}>
+                      <div className="card border-0 rounded-0">
+                        <div className="card-header">
+                          <h5 className="card-title mb-0">
+                            {showTracking ? (
+                              <>
+                                <i className="ki-duotone ki-geolocation fs-3 text-primary me-2">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                Your Technician is On the Way
+                              </>
+                            ) : (
+                              <>
+                                <i className="ki-duotone ki-home fs-3 text-primary me-2">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                Your Property at {customer?.address_line1 || customer?.address || 'this Address'}
+                              </>
+                            )}
+                          </h5>
+                          {trackingData && (
+                            <div className="text-muted fs-7">
+                              Last updated: {formatTime(trackingData.last_updated)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="card-body p-0">
+                          {showTracking ? (
+                            /* Tracking Map - Mapbox loads dynamically */
+                            <div 
+                              ref={mapContainerRef}
+                              style={{ height: '500px', width: '100%' }}
+                              className="rounded-bottom"
+                            />
+                          ) : (
+                            /* Property Information */
+                            <div>
                     {/* Street View Image */}
                     <div className="position-relative">
                       {propertyData ? (
@@ -952,89 +1062,36 @@ const CustomerPortalPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Property Details */}
+                    {/* Property Value Overview - New Stats Card */}
                     {propertyData && (
                       <div className="p-5">
-                        <div className="row g-4">
-                          {/* Key Stats */}
-                          <div className="col-md-4">
-                            <div className="text-center p-3 bg-light-primary rounded">
-                              <i className="ki-duotone ki-dollar fs-2x text-primary mb-2">
-                                <span className="path1"></span>
-                                <span className="path2"></span>
-                                <span className="path3"></span>
-                              </i>
-                              <div className="fw-bold text-dark fs-4">{propertyData.zestimate ? `$${propertyData.zestimate.toLocaleString()}` : 'Not available'}</div>
-                              <div className="text-muted fs-7">Estimated Value</div>
-                            </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="text-center p-3 bg-light-success rounded">
-                              <i className="ki-duotone ki-home-3 fs-2x text-success mb-2">
-                                <span className="path1"></span>
-                                <span className="path2"></span>
-                              </i>
-                              <div className="fw-bold text-dark fs-4">{propertyData.squareFootage ? propertyData.squareFootage.toLocaleString() : 'Not available'}</div>
-                              <div className="text-muted fs-7">Square Feet</div>
-                            </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="text-center p-3 bg-light-info rounded">
-                              <i className="ki-duotone ki-abstract-35 fs-2x text-info mb-2">
-                                <span className="path1"></span>
-                                <span className="path2"></span>
-                              </i>
-                              <div className="fw-bold text-dark fs-4">{propertyData.bedrooms && propertyData.bathrooms ? `${propertyData.bedrooms}BD/${propertyData.bathrooms}BA` : 'Not available'}</div>
-                              <div className="text-muted fs-7">Bed/Bath</div>
-                            </div>
-                          </div>
-                        </div>
+                        <PropertyStatsCard propertyData={propertyData} />
+                      </div>
+                    )}
 
-                        <div className="separator my-4"></div>
+                    {/* Property Details Accordion */}
+                    {propertyData && (
+                      <div className="accordion accordion-flush" id="propertyDetailsAccordion">
 
-                        {/* Additional Details */}
-                        <div className="row g-4">
-                          <div className="col-md-6">
-                            <div className="d-flex justify-content-between mb-3">
-                              <span className="text-muted">Lot Size:</span>
-                              <span className="fw-semibold">{propertyData.lotSize || 'Not available'}</span>
-                            </div>
-                            <div className="d-flex justify-content-between mb-3">
-                              <span className="text-muted">Year Built:</span>
-                              <span className="fw-semibold">{propertyData.yearBuilt || 'Not available'}</span>
-                            </div>
-                            <div className="d-flex justify-content-between mb-3">
-                              <span className="text-muted">Property Type:</span>
-                              <span className="fw-semibold">{propertyData.propertyType || 'Residential Property'}</span>
-                            </div>
-                          </div>
-                          <div className="col-md-6">
-                            <div className="d-flex justify-content-between mb-3">
-                              <span className="text-muted">Last Sold:</span>
-                              <span className="fw-semibold">
-                                {propertyData.lastSoldPrice && propertyData.lastSoldDate ? 
-                                  `$${propertyData.lastSoldPrice.toLocaleString()} (${new Date(propertyData.lastSoldDate).getFullYear()})` : 
-                                  'Not available'
-                                }
-                              </span>
-                            </div>
-                            <div className="d-flex justify-content-between mb-3">
-                              <span className="text-muted">Tax Assessment:</span>
-                              <span className="fw-semibold">{propertyData.taxAssessment ? `$${propertyData.taxAssessment.toLocaleString()}` : 'Not available'}</span>
-                            </div>
-                            <div className="d-flex justify-content-between mb-3">
-                              <span className="text-muted">Stories:</span>
-                              <span className="fw-semibold">{propertyData.stories || 'Not available'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Amenities Section - Only show if we have any amenity data */}
+                        
+                        {/* Property Features Card */}
                         {(propertyData.pool !== undefined || propertyData.centralAir !== undefined || propertyData.garageSpaces || propertyData.roofMaterial) && (
-                          <>
-                            <div className="separator my-4"></div>
-                            <h6 className="fw-bold text-gray-800 mb-3">Property Features</h6>
-                            <div className="row g-3">
+                          <div className="accordion-item">
+                            <h2 className="accordion-header" id="featuresHeading">
+                              <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#featuresCollapse" aria-expanded="false" aria-controls="featuresCollapse">
+                                <i className="ki-duotone ki-home-2 fs-4 text-info me-3">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                <div>
+                                  <div className="fw-bold text-gray-900">Property Features</div>
+                                  <div className="text-muted fs-7">Amenities and special features</div>
+                                </div>
+                              </button>
+                            </h2>
+                            <div id="featuresCollapse" className="accordion-collapse collapse" aria-labelledby="featuresHeading" data-bs-parent="#propertyDetailsAccordion">
+                              <div className="accordion-body">
+                                <div className="row g-3">
                               {propertyData.garageSpaces !== undefined && (
                                 <div className="col-6 col-md-3">
                                   <div className="d-flex align-items-center">
@@ -1094,16 +1151,30 @@ const CustomerPortalPage: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        {/* Tax & Financial Information */}
+                        {/* Tax & Financial Details Card */}
                         {(propertyData.annualTaxAmount || propertyData.taxYear || propertyData.pricePerSqFt) && (
-                          <>
-                            <div className="separator my-4"></div>
-                            <h6 className="fw-bold text-gray-800 mb-3">Tax & Financial Details</h6>
-                            <div className="row g-3">
+                          <div className="accordion-item">
+                            <h2 className="accordion-header" id="taxHeading">
+                              <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#taxCollapse" aria-expanded="false" aria-controls="taxCollapse">
+                                <i className="ki-duotone ki-percentage fs-4 text-danger me-3">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                <div>
+                                  <div className="fw-bold text-gray-900">Tax & Financial Details</div>
+                                  <div className="text-muted fs-7">Tax assessment and financial information</div>
+                                </div>
+                              </button>
+                            </h2>
+                            <div id="taxCollapse" className="accordion-collapse collapse" aria-labelledby="taxHeading" data-bs-parent="#propertyDetailsAccordion">
+                              <div className="accordion-body">
+                                <div className="row g-3">
                               {propertyData.annualTaxAmount && (
                                 <div className="col-md-4">
                                   <div className="d-flex justify-content-between">
@@ -1128,16 +1199,30 @@ const CustomerPortalPage: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        {/* Property Details */}
+                        {/* Property Details Card */}
                         {(propertyData.parcelNumber || propertyData.zoning || propertyData.subdivision || propertyData.county) && (
-                          <>
-                            <div className="separator my-4"></div>
-                            <h6 className="fw-bold text-gray-800 mb-3">Property Details</h6>
-                            <div className="row g-3">
+                          <div className="accordion-item">
+                            <h2 className="accordion-header" id="detailsHeading">
+                              <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#detailsCollapse" aria-expanded="false" aria-controls="detailsCollapse">
+                                <i className="ki-duotone ki-document fs-4 text-primary me-3">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                <div>
+                                  <div className="fw-bold text-gray-900">Property Details</div>
+                                  <div className="text-muted fs-7">Parcel, zoning, and location details</div>
+                                </div>
+                              </button>
+                            </h2>
+                            <div id="detailsCollapse" className="accordion-collapse collapse" aria-labelledby="detailsHeading" data-bs-parent="#propertyDetailsAccordion">
+                              <div className="accordion-body">
+                                <div className="row g-3">
                               {propertyData.parcelNumber && (
                                 <div className="col-md-6">
                                   <div className="d-flex justify-content-between">
@@ -1178,16 +1263,30 @@ const CustomerPortalPage: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        {/* Building & Construction */}
+                        {/* Building & Construction Card */}
                         {(propertyData.exteriorWalls || propertyData.heatingType || propertyData.coolingType || propertyData.totalRooms) && (
-                          <>
-                            <div className="separator my-4"></div>
-                            <h6 className="fw-bold text-gray-800 mb-3">Building & Construction</h6>
-                            <div className="row g-3">
+                          <div className="accordion-item">
+                            <h2 className="accordion-header" id="buildingHeading">
+                              <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#buildingCollapse" aria-expanded="false" aria-controls="buildingCollapse">
+                                <i className="ki-duotone ki-wrench fs-4 text-warning me-3">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                <div>
+                                  <div className="fw-bold text-gray-900">Building & Construction</div>
+                                  <div className="text-muted fs-7">Construction details and systems</div>
+                                </div>
+                              </button>
+                            </h2>
+                            <div id="buildingCollapse" className="accordion-collapse collapse" aria-labelledby="buildingHeading" data-bs-parent="#propertyDetailsAccordion">
+                              <div className="accordion-body">
+                                <div className="row g-3">
                               {propertyData.exteriorWalls && (
                                 <div className="col-md-6">
                                   <div className="d-flex justify-content-between">
@@ -1228,16 +1327,31 @@ const CustomerPortalPage: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        {/* Ownership Information */}
+                        {/* Ownership Information Card */}
                         {(propertyData.ownerName || propertyData.ownerOccupied !== undefined) && (
-                          <>
-                            <div className="separator my-4"></div>
-                            <h6 className="fw-bold text-gray-800 mb-3">Ownership Information</h6>
-                            <div className="row g-3">
+                          <div className="accordion-item">
+                            <h2 className="accordion-header" id="ownershipHeading">
+                              <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ownershipCollapse" aria-expanded="false" aria-controls="ownershipCollapse">
+                                <i className="ki-duotone ki-profile-circle fs-4 text-success me-3">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                  <span className="path3"></span>
+                                </i>
+                                <div>
+                                  <div className="fw-bold text-gray-900">Ownership Information</div>
+                                  <div className="text-muted fs-7">Property ownership details</div>
+                                </div>
+                              </button>
+                            </h2>
+                            <div id="ownershipCollapse" className="accordion-collapse collapse" aria-labelledby="ownershipHeading" data-bs-parent="#propertyDetailsAccordion">
+                              <div className="accordion-body">
+                                <div className="row g-3">
                               {propertyData.ownerName && (
                                 <div className="col-md-6">
                                   <div className="d-flex justify-content-between">
@@ -1256,16 +1370,30 @@ const CustomerPortalPage: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        {/* Price History */}
+                        {/* Price History Card */}
                         {propertyData.priceHistory && propertyData.priceHistory.length > 0 && (
-                          <>
-                            <div className="separator my-4"></div>
-                            <h6 className="fw-bold text-gray-800 mb-3">Price History</h6>
-                            <div className="table-responsive">
+                          <div className="accordion-item">
+                            <h2 className="accordion-header" id="priceHistoryHeading">
+                              <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#priceHistoryCollapse" aria-expanded="false" aria-controls="priceHistoryCollapse">
+                                <i className="ki-duotone ki-chart-line fs-4 text-info me-3">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                <div>
+                                  <div className="fw-bold text-gray-900">Price History</div>
+                                  <div className="text-muted fs-7">Historical sales and pricing data</div>
+                                </div>
+                              </button>
+                            </h2>
+                            <div id="priceHistoryCollapse" className="accordion-collapse collapse" aria-labelledby="priceHistoryHeading" data-bs-parent="#propertyDetailsAccordion">
+                              <div className="accordion-body">
+                                <div className="table-responsive">
                               <table className="table table-sm">
                                 <thead>
                                   <tr>
@@ -1286,16 +1414,30 @@ const CustomerPortalPage: React.FC = () => {
                                   ))}
                                 </tbody>
                               </table>
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        {/* Comparable Sales */}
+                        {/* Comparable Sales Card */}
                         {propertyData.comparableSales && propertyData.comparableSales.length > 0 && (
-                          <>
-                            <div className="separator my-4"></div>
-                            <h6 className="fw-bold text-gray-800 mb-3">Recent Comparable Sales</h6>
-                            <div className="row g-3">
+                          <div className="accordion-item">
+                            <h2 className="accordion-header" id="comparablesHeading">
+                              <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#comparablesCollapse" aria-expanded="false" aria-controls="comparablesCollapse">
+                                <i className="ki-duotone ki-handshake fs-4 text-secondary me-3">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                                <div>
+                                  <div className="fw-bold text-gray-900">Recent Comparable Sales</div>
+                                  <div className="text-muted fs-7">Similar properties sold nearby</div>
+                                </div>
+                              </button>
+                            </h2>
+                            <div id="comparablesCollapse" className="accordion-collapse collapse" aria-labelledby="comparablesHeading" data-bs-parent="#propertyDetailsAccordion">
+                              <div className="accordion-body">
+                                <div className="row g-3">
                               {propertyData.comparableSales.slice(0, 3).map((comp, index) => (
                                 <div key={index} className="col-12">
                                   <div className="card card-flush bg-light">
@@ -1318,11 +1460,14 @@ const CustomerPortalPage: React.FC = () => {
                                   </div>
                                 </div>
                               ))}
+                                </div>
+                              </div>
                             </div>
-                          </>
+                          </div>
                         )}
 
-                        <div className="text-center mt-4">
+                        {/* Data Attribution Footer */}
+                        <div className="text-center p-4 bg-light">
                           <div className="text-muted fs-8">Property data powered by ATTOM Data Solutions</div>
                           {propertyData.marketValueDate && (
                             <div className="text-muted fs-8">Market value as of {new Date(propertyData.marketValueDate).toLocaleDateString()}</div>
@@ -1330,8 +1475,13 @@ const CustomerPortalPage: React.FC = () => {
                         </div>
                       </div>
                     )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
@@ -1443,7 +1593,7 @@ const CustomerPortalPage: React.FC = () => {
                   
                   <button 
                     className="btn btn-light-warning btn-sm"
-                    onClick={() => window.open('tel:+15551234567', '_self')}
+                    onClick={() => tenantPhone && window.open(`tel:${tenantPhone}`, '_self')}
                   >
                     <i className="ki-duotone ki-support fs-5 me-2">
                       <span className="path1"></span>
@@ -1462,9 +1612,13 @@ const CustomerPortalPage: React.FC = () => {
                   </i>
                   <div>
                     <div className="fw-bold text-dark fs-6">Need immediate help?</div>
-                    <a href="tel:+1234567890" className="text-success fw-bold">
-                      Call (123) 456-7890
-                    </a>
+                    {tenantPhone ? (
+                      <a href={`tel:${tenantPhone}`} className="text-success fw-bold">
+                        Call {tenantPhone}
+                      </a>
+                    ) : (
+                      <span className="text-muted">Phone number not available</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1528,6 +1682,7 @@ const CustomerPortalPage: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Content Sections based on active navigation */}
         {activeSection === 'dashboard' && (
@@ -1565,25 +1720,31 @@ const CustomerPortalPage: React.FC = () => {
 
         {activeSection === 'equipment' && (
           <div className="mt-6">
-            <DigitalTwin customerId={customerId || ''} />
+            <Suspense fallback={<LoadingSpinner text="Loading equipment details..." />}>
+              <DigitalTwin customerId={customerId || ''} />
+            </Suspense>
           </div>
         )}
 
         {activeSection === 'maintenance' && (
           <div className="mt-6" id="maintenance-section">
-            <MaintenanceHub 
-              customerId={customerId || ''}
-              customerLocation={{
-                city: customer?.city || 'Austin',
-                state: customer?.state || 'TX'
-              }}
-            />
+            <Suspense fallback={<LoadingSpinner text="Loading maintenance hub..." />}>
+              <MaintenanceHub 
+                customerId={customerId || ''}
+                customerLocation={{
+                  city: customer?.city || 'Austin',
+                  state: customer?.state || 'TX'
+                }}
+              />
+            </Suspense>
           </div>
         )}
 
         {activeSection === 'quotes' && (
           <div className="mt-6">
-            <QuotesAndPlans customerId={customerId || ''} />
+            <Suspense fallback={<LoadingSpinner text="Loading quotes and plans..." />}>
+              <QuotesAndPlans customerId={customerId || ''} />
+            </Suspense>
           </div>
         )}
 
@@ -1591,10 +1752,12 @@ const CustomerPortalPage: React.FC = () => {
           <div className="mt-6">
             <div className="card">
               <div className="card-body">
-                <JobPhotosTab 
-                  jobId={currentJob.id}
-                  tenantId={currentJob.tenant_id}
-                />
+                <Suspense fallback={<LoadingSpinner text="Loading photos..." />}>
+                  <JobPhotosTab 
+                    jobId={currentJob.id}
+                    tenantId={currentJob.tenant_id}
+                  />
+                </Suspense>
               </div>
             </div>
           </div>
@@ -1604,16 +1767,33 @@ const CustomerPortalPage: React.FC = () => {
           <div className="mt-6">
             <div className="card">
               <div className="card-body">
-                <DocumentsTab 
-                  jobId={currentJob.id}
-                  tenantId={currentJob.tenant_id}
-                  contactId={customer?.id}
-                />
+                <Suspense fallback={<LoadingSpinner text="Loading documents..." />}>
+                  <DocumentsTab 
+                    jobId={currentJob.id}
+                    tenantId={currentJob.tenant_id}
+                    contactId={customer?.id}
+                  />
+                </Suspense>
               </div>
             </div>
           </div>
         )}
-      </div>
+
+        {activeSection === 'referrals' && customer && (
+          <div className="row g-6">
+            <div className="col-12">
+              <Suspense fallback={<LoadingSpinner text="Loading referral program..." />}>
+                <ReferralDashboard 
+                  customerId={customer.id}
+                  customerName={`${customer.first_name} ${customer.last_name}`}
+                  tenantId={customer.tenant_id}
+                />
+              </Suspense>
+            </div>
+          </div>
+        )}
+        </div>
+        </div>
 
       {/* Chat Widget - Always visible */}
       <ChatWidget />
@@ -1627,24 +1807,42 @@ const CustomerPortalPage: React.FC = () => {
         </div>
       )}
 
-      {/* Service Scheduling Modal */}
-      <ServiceSchedulingModal
-        isOpen={showSchedulingModal}
-        onClose={() => setShowSchedulingModal(false)}
-        customerId={customerId || ''}
-        customerName={customer ? `${customer.first_name} ${customer.last_name}` : ''}
-        customerPhone={customer?.phone}
-        customerEmail={customer?.email}
+      {/* Floating CTA Bar */}
+      <FloatingCTABar
+        tenantPhone={tenantPhone}
+        onScheduleService={() => setShowSchedulingModal(true)}
+        onContactTechnician={() => setShowContactModal(true)}
+        onPayInvoice={() => alert('Payment portal coming soon! Please call us to pay your invoice.')}
+        currentJob={currentJob}
+        hasUnpaidInvoices={false} // TODO: Get real invoice status
       />
 
+      {/* Service Scheduling Modal */}
+      {showSchedulingModal && (
+        <Suspense fallback={<LoadingSpinner text="Loading scheduler..." />}>
+          <ServiceSchedulingModal
+            isOpen={showSchedulingModal}
+            onClose={() => setShowSchedulingModal(false)}
+            customerId={customerId || ''}
+            customerName={customer ? `${customer.first_name} ${customer.last_name}` : ''}
+            customerPhone={customer?.phone}
+            customerEmail={customer?.email}
+          />
+        </Suspense>
+      )}
+
       {/* Contact Technician Modal */}
-      <ContactTechnicianModal
-        isOpen={showContactModal}
-        onClose={() => setShowContactModal(false)}
-        technicianName={currentJob?.technician_name || 'Mike Rodriguez'}
-        technicianPhone='+15551234567'
-        jobId={currentJob?.id}
-      />
+      {showContactModal && (
+        <Suspense fallback={<LoadingSpinner text="Loading messenger..." />}>
+          <ContactTechnicianModal
+            isOpen={showContactModal}
+            onClose={() => setShowContactModal(false)}
+            technicianName={currentJob?.technician_name || 'Mike Rodriguez'}
+            technicianPhone={tenantPhone || undefined}
+            jobId={currentJob?.id}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

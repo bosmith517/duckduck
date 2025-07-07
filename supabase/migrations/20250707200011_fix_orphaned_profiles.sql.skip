@@ -1,0 +1,197 @@
+-- Fix orphaned user profiles (profiles without auth users)
+-- This helps users who were created in user_profiles but not in auth
+
+-- 1. Create a function to send password reset for orphaned profiles
+CREATE OR REPLACE FUNCTION send_password_reset_for_profile(p_email TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_profile RECORD;
+    v_auth_exists BOOLEAN;
+BEGIN
+    -- Check if profile exists
+    SELECT * INTO v_profile
+    FROM user_profiles
+    WHERE email = p_email
+    LIMIT 1;
+    
+    IF v_profile.id IS NULL THEN
+        RETURN json_build_object('success', false, 'error', 'No profile found with this email');
+    END IF;
+    
+    -- Check if auth user exists
+    SELECT EXISTS(SELECT 1 FROM auth.users WHERE email = p_email) INTO v_auth_exists;
+    
+    IF v_auth_exists THEN
+        RETURN json_build_object(
+            'success', true, 
+            'message', 'Auth user exists. Use regular password reset.',
+            'auth_exists', true
+        );
+    END IF;
+    
+    -- For profiles without auth users, we need to create an invitation
+    INSERT INTO team_invitations (
+        profile_id,
+        email,
+        tenant_id,
+        invited_by,
+        invitation_message,
+        token,
+        expires_at
+    ) VALUES (
+        v_profile.id,
+        v_profile.email,
+        v_profile.tenant_id,
+        v_profile.id, -- Self-invitation for orphaned accounts
+        'Please complete your account setup',
+        encode(gen_random_bytes(32), 'hex'),
+        NOW() + INTERVAL '7 days'
+    )
+    RETURNING token INTO v_profile;
+    
+    RETURN json_build_object(
+        'success', true,
+        'message', 'Invitation created for account setup',
+        'auth_exists', false,
+        'needs_invitation', true
+    );
+END;
+$$;
+
+-- 2. Create a view to see orphaned profiles
+CREATE OR REPLACE VIEW v_orphaned_profiles AS
+SELECT 
+    up.id as profile_id,
+    up.email,
+    up.first_name,
+    up.last_name,
+    up.role,
+    up.tenant_id,
+    up.created_at,
+    t.company_name,
+    NOT EXISTS(SELECT 1 FROM auth.users au WHERE au.email = up.email) as missing_auth
+FROM user_profiles up
+LEFT JOIN tenants t ON t.id = up.tenant_id
+WHERE NOT EXISTS(SELECT 1 FROM auth.users au WHERE au.id = up.id);
+
+-- Grant access to admins
+GRANT SELECT ON v_orphaned_profiles TO authenticated;
+
+-- 3. Create a function to properly link orphaned profiles when user signs up
+CREATE OR REPLACE FUNCTION link_orphaned_profile_on_signup()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_profile RECORD;
+BEGIN
+    -- Check if there's an orphaned profile with this email
+    SELECT * INTO v_profile
+    FROM user_profiles
+    WHERE email = NEW.email
+    AND id != NEW.id
+    LIMIT 1;
+    
+    IF v_profile.id IS NOT NULL THEN
+        -- Update the orphaned profile to use the new auth user's ID
+        UPDATE user_profiles
+        SET 
+            id = NEW.id,
+            updated_at = NOW()
+        WHERE id = v_profile.id;
+        
+        -- Log this action
+        INSERT INTO system_logs (
+            action,
+            details,
+            user_id,
+            created_at
+        ) VALUES (
+            'orphaned_profile_linked',
+            json_build_object(
+                'old_profile_id', v_profile.id,
+                'new_auth_id', NEW.id,
+                'email', NEW.email
+            ),
+            NEW.id,
+            NOW()
+        );
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+-- 4. Create trigger to link orphaned profiles on signup
+DROP TRIGGER IF EXISTS link_orphaned_profile_trigger ON auth.users;
+CREATE TRIGGER link_orphaned_profile_trigger
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION link_orphaned_profile_on_signup();
+
+-- 5. Create system_logs table if it doesn't exist
+CREATE TABLE IF NOT EXISTS system_logs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    action TEXT NOT NULL,
+    details JSONB,
+    user_id UUID,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. Create a function for admins to manually create auth users
+CREATE OR REPLACE FUNCTION admin_create_auth_user(
+    p_email TEXT,
+    p_temporary_password TEXT
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_is_admin BOOLEAN;
+    v_profile RECORD;
+BEGIN
+    -- Check if current user is admin
+    SELECT role IN ('admin', 'manager') INTO v_is_admin
+    FROM user_profiles
+    WHERE id = auth.uid();
+    
+    IF NOT v_is_admin THEN
+        RETURN json_build_object('success', false, 'error', 'Unauthorized');
+    END IF;
+    
+    -- Get the profile
+    SELECT * INTO v_profile
+    FROM user_profiles
+    WHERE email = p_email;
+    
+    IF v_profile.id IS NULL THEN
+        RETURN json_build_object('success', false, 'error', 'Profile not found');
+    END IF;
+    
+    -- Note: Actually creating the auth user requires using Supabase Admin API
+    -- This function returns the necessary information
+    RETURN json_build_object(
+        'success', true,
+        'message', 'Use Supabase Admin API or Dashboard to create auth user',
+        'profile_id', v_profile.id,
+        'email', v_profile.email,
+        'instructions', 'Go to Supabase Dashboard > Authentication > Users > Invite User'
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION send_password_reset_for_profile(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION admin_create_auth_user(TEXT, TEXT) TO authenticated;
+
+-- 7. Add comment
+COMMENT ON VIEW v_orphaned_profiles IS 'Shows user profiles that dont have corresponding auth users';
+COMMENT ON FUNCTION send_password_reset_for_profile(TEXT) IS 'Creates invitation for profiles without auth users';
+COMMENT ON FUNCTION admin_create_auth_user(TEXT, TEXT) IS 'Helper for admins to see how to create auth users';

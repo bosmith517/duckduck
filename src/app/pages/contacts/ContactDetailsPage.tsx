@@ -8,6 +8,7 @@ import { showToast } from '../../utils/toast'
 import { ClickablePhoneNumber, PhoneNumberDisplay } from '../../components/communications/ClickablePhoneNumber'
 import { SMSChatInterface } from '../../components/communications/SMSChatInterface'
 import { VideoMeetingInterface, QuickVideoButton } from '../../components/communications/VideoMeetingInterface'
+import { EmailHistory } from '../../components/communications/EmailHistory'
 
 const ContactDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -224,6 +225,18 @@ const ContactDetailsPage: React.FC = () => {
                 Video Meetings
               </a>
             </li>
+            {contact.email && (
+              <li className='nav-item'>
+                <a
+                  className={`nav-link ${activeTab === 'email' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('email')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <i className='ki-duotone ki-sms fs-2 me-2'></i>
+                  Email
+                </a>
+              </li>
+            )}
             <li className='nav-item'>
               <a
                 className={`nav-link ${activeTab === 'activity' ? 'active' : ''}`}
@@ -387,6 +400,15 @@ const ContactDetailsPage: React.FC = () => {
           <div className='col-xl-12'>
             <VideoMeetingInterface
               contactId={contact.id}
+            />
+          </div>
+        )}
+
+        {activeTab === 'email' && (
+          <div className='col-xl-12'>
+            <EmailHistory
+              contactId={contact.id}
+              showComposer={true}
             />
           </div>
         )}

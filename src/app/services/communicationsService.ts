@@ -67,14 +67,22 @@ class CommunicationsService {
 
   async answerInboundCall(callId: string): Promise<void> {
     try {
-      const { error } = await supabase.functions.invoke('answer-inbound-call', {
-        body: { call_id: callId }
-      })
+      // Update call status in database
+      const { error } = await supabase
+        .from('calls')
+        .update({ 
+          status: 'connected',
+          answered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', callId)
 
       if (error) {
         console.error('Error answering inbound call:', error)
         throw error
       }
+
+      // TODO: Integrate with relay service API to actually answer the call
     } catch (error) {
       console.error('Error in answerInboundCall:', error)
       throw error
@@ -83,14 +91,22 @@ class CommunicationsService {
 
   async rejectInboundCall(callId: string): Promise<void> {
     try {
-      const { error } = await supabase.functions.invoke('reject-inbound-call', {
-        body: { call_id: callId }
-      })
+      // Update call status in database
+      const { error } = await supabase
+        .from('calls')
+        .update({ 
+          status: 'rejected',
+          ended_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', callId)
 
       if (error) {
         console.error('Error rejecting inbound call:', error)
         throw error
       }
+
+      // TODO: Integrate with relay service API to actually reject the call
     } catch (error) {
       console.error('Error in rejectInboundCall:', error)
       throw error
@@ -99,14 +115,40 @@ class CommunicationsService {
 
   async hangupCall(callId: string): Promise<void> {
     try {
-      const { error } = await supabase.functions.invoke('hangup-call', {
-        body: { call_id: callId }
-      })
+      // Get the call to calculate duration
+      const { data: call } = await supabase
+        .from('calls')
+        .select('*')
+        .eq('id', callId)
+        .single()
+
+      if (!call) throw new Error('Call not found')
+
+      // Calculate duration if call was answered
+      let duration = 0
+      if (call.answered_at && !call.ended_at) {
+        const startTime = new Date(call.answered_at).getTime()
+        const endTime = new Date().getTime()
+        duration = Math.floor((endTime - startTime) / 1000) // Duration in seconds
+      }
+
+      // Update call status in database
+      const { error } = await supabase
+        .from('calls')
+        .update({ 
+          status: 'completed',
+          ended_at: new Date().toISOString(),
+          duration: duration,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', callId)
 
       if (error) {
         console.error('Error hanging up call:', error)
         throw error
       }
+
+      // TODO: Integrate with relay service API to actually end the call
     } catch (error) {
       console.error('Error in hangupCall:', error)
       throw error
@@ -115,17 +157,12 @@ class CommunicationsService {
 
   async muteCall(callId: string, muted: boolean): Promise<void> {
     try {
-      const { error } = await supabase.functions.invoke('mute-call', {
-        body: { 
-          call_id: callId,
-          muted: muted
-        }
-      })
-
-      if (error) {
-        console.error('Error muting/unmuting call:', error)
-        throw error
-      }
+      // For now, we'll just track the mute state locally
+      // In a real implementation, this would communicate with the relay service
+      console.log(`Call ${callId} mute status: ${muted}`)
+      
+      // TODO: Integrate with relay service API to actually mute/unmute the call
+      // The relay service would need to handle the WebRTC audio track muting
     } catch (error) {
       console.error('Error in muteCall:', error)
       throw error
@@ -156,7 +193,7 @@ class CommunicationsService {
       }
 
       let query = supabase
-        .from('call_logs')
+        .from('calls')
         .select(`
           *,
           contact:contacts (

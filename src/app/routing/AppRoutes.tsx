@@ -27,6 +27,8 @@ import SignupPage from '../pages/marketing/SignupPage'
 import HomeownerSignupPage from '../pages/marketing/HomeownerSignupPage'
 import CustomerPortalLandingPage from '../pages/marketing/CustomerPortalLandingPage'
 import {ResetPasswordPage} from '../pages/auth/ResetPasswordPage'
+import {AuthCallbackPage} from '../pages/auth/AuthCallbackPage'
+import {AcceptInvitationPage} from '../pages/auth/AcceptInvitationPage'
 
 
 /**
@@ -90,6 +92,8 @@ const AppRoutes: FC = () => {
         
         {/* Auth routes */}
         <Route path='auth/reset-password' element={<ResetPasswordPage />} />
+        <Route path='auth/callback' element={<AuthCallbackPage />} />
+        <Route path='auth/accept-invitation' element={<AcceptInvitationPage />} />
         
         <Route element={<App />}>
           <Route path='error/*' element={<ErrorsPage />} />

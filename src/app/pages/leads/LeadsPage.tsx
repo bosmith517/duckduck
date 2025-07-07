@@ -24,6 +24,8 @@ interface Lead {
   created_at: string
   updated_at: string
   converted_to_job_id?: string
+  converted_contact_id?: string
+  converted_account_id?: string
 }
 
 const LeadsPage: React.FC = () => {
@@ -273,12 +275,23 @@ const LeadsPage: React.FC = () => {
                     <tr key={lead.id}>
                       <td>
                         <div className='d-flex flex-column'>
-                          <span className='text-gray-800 fs-6 fw-bolder mb-1'>
-                            {lead.caller_name}
-                          </span>
+                          <div className='d-flex align-items-center'>
+                            <span className='text-gray-800 fs-6 fw-bolder mb-1'>
+                              {lead.caller_name}
+                            </span>
+                            {lead.caller_type === 'business' && (
+                              <span className='badge badge-light-info ms-2'>Business</span>
+                            )}
+                          </div>
                           <span className='text-muted fs-7'>{lead.phone_number}</span>
                           {lead.email && (
                             <span className='text-muted fs-7'>{lead.email}</span>
+                          )}
+                          {(lead.converted_contact_id || lead.converted_account_id) && (
+                            <span className='badge badge-light-success mt-1'>
+                              <i className='fas fa-check-circle me-1'></i>
+                              {lead.converted_account_id ? 'Account Created' : 'Contact Created'}
+                            </span>
                           )}
                         </div>
                       </td>

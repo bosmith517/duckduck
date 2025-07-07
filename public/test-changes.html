@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Changes Visibility</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 50px;
+            background-color: #f0f0f0;
+        }
+        .alert {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .timestamp {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="alert">
+        <h1>✅ Changes ARE Being Applied!</h1>
+        <p>If you can see this green alert, then file changes are working correctly.</p>
+    </div>
+    
+    <div class="timestamp">
+        <p>File created at: 2025-07-07 07:11:00</p>
+        <p>Current time: <span id="time"></span></p>
+    </div>
+    
+    <h2>What this means:</h2>
+    <ul>
+        <li>File system changes ARE working</li>
+        <li>The issue is likely with the Vite development server or browser caching</li>
+        <li>Try accessing this URL directly: http://localhost:5173/test-changes.html</li>
+    </ul>
+    
+    <script>
+        document.getElementById('time').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>

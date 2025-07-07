@@ -56,8 +56,19 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
 
     // This listener sets the session/user and loads user profile/tenant data
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session)
+      
       setSession(session)
       setUser(session?.user ?? null)
+      
+      // Handle password recovery flow
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('Password recovery event detected, redirecting to reset password page')
+        // Don't load profile data for password recovery, just redirect
+        setAuthLoading(false)
+        window.location.href = '/auth/reset-password'
+        return
+      }
       
       if (session?.user) {
         // Load profile data asynchronously without blocking
@@ -83,7 +94,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle() // Use maybeSingle to handle missing profiles gracefully
 
       if (profileError) {
         console.error('Error loading user profile:', profileError)
@@ -91,14 +102,58 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
         return
       }
 
-      setUserProfile(profile)
+      let finalProfile = profile
+      let finalTenantId = profile?.tenant_id
+
+      // If no profile exists, try to create one for invited users
+      if (!profile) {
+        console.log('No profile found, attempting to create one...')
+        const { data: ensureResult, error: ensureError } = await supabase
+          .rpc('ensure_user_profile')
+        
+        if (ensureError) {
+          console.error('Error ensuring user profile:', ensureError)
+          setAuthLoading(false)
+          return
+        }
+
+        if (ensureResult?.success) {
+          // Retry loading the profile
+          const { data: newProfile, error: retryError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle()
+          
+          if (retryError || !newProfile) {
+            console.error('Error loading profile after creation:', retryError)
+            setAuthLoading(false)
+            return
+          }
+          
+          finalProfile = newProfile
+          finalTenantId = newProfile.tenant_id
+          setUserProfile(newProfile)
+        } else {
+          console.error('Could not create user profile:', ensureResult?.message)
+          if (ensureResult?.error === 'pending_invitation') {
+            // Redirect to a page that handles invitation acceptance
+            window.location.href = '/auth/accept-invitation'
+          }
+          setAuthLoading(false)
+          return
+        }
+      } else {
+        // Profile exists, continue as normal
+        setUserProfile(profile)
+      }
 
       // Load tenant information
-      if (profile?.tenant_id) {
+      if (finalTenantId) {
         const { data: tenantData, error: tenantError } = await supabase
           .from('tenants')
           .select('*')
-          .eq('id', profile.tenant_id)
+          .eq('id', finalTenantId)
           .single()
 
         if (tenantError) {
@@ -117,10 +172,10 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
         username: currentUser?.email || 'user',
         password: undefined,
         email: currentUser?.email || '',
-        first_name: profile?.first_name || currentUser?.user_metadata?.first_name || 'User',
-        last_name: profile?.last_name || currentUser?.user_metadata?.last_name || '',
-        fullname: `${profile?.first_name || currentUser?.user_metadata?.first_name || 'User'} ${profile?.last_name || currentUser?.user_metadata?.last_name || ''}`.trim(),
-        roles: [profile?.role === 'admin' ? 1 : profile?.role === 'agent' ? 2 : 3],
+        first_name: finalProfile?.first_name || currentUser?.user_metadata?.first_name || 'User',
+        last_name: finalProfile?.last_name || currentUser?.user_metadata?.last_name || '',
+        fullname: `${finalProfile?.first_name || currentUser?.user_metadata?.first_name || 'User'} ${finalProfile?.last_name || currentUser?.user_metadata?.last_name || ''}`.trim(),
+        roles: [finalProfile?.role === 'admin' ? 1 : finalProfile?.role === 'agent' ? 2 : 3],
       }
       setCurrentUser(userModel)
 

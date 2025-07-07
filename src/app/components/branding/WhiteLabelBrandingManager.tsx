@@ -154,6 +154,7 @@ const WhiteLabelBrandingManager: React.FC = () => {
 
       const brandingData = {
         ...branding,
+        tenant_id: userProfile?.tenant_id,
         logo_url: logoUrl,
         portal_subdomain: portalSubdomain,
         updated_at: new Date().toISOString()
