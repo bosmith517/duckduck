@@ -15,5 +15,9 @@ module.exports = {
       'warn',
       { allowConstantExport: true },
     ],
+    // Prevent console.log in production code
+    'no-console': ['error', { 
+      allow: ['warn', 'error'] 
+    }],
   },
 }

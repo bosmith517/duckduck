@@ -45,6 +45,10 @@ export const AuthCallbackPage: React.FC = () => {
           // This is a password reset
           console.log('Password recovery callback detected');
           navigate('/auth/reset-password');
+        } else if (type === 'invite') {
+          // This is an invite - user needs to set initial password
+          console.log('Invite callback detected - redirecting to password setup');
+          navigate('/auth/password-setup');
         } else if (type === 'signup') {
           // This is an email confirmation
           console.log('Signup confirmation callback detected');

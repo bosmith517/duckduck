@@ -6,8 +6,12 @@ import {LayoutProvider} from '../_metronic/layout/core'
 import {SupabaseAuthInit} from './modules/auth/core/SupabaseAuth'
 import {ThemeModeProvider} from '../_metronic/partials/layout/theme-mode/ThemeModeProvider'
 import {SoftphoneProvider} from './contexts/SoftphoneContext'
+import {useAuthCallback} from './hooks/useAuthCallback'
 
 const App = () => {
+  // Handle auth callbacks from any page
+  useAuthCallback();
+  
   return (
     <I18nProvider>
       <LayoutProvider>

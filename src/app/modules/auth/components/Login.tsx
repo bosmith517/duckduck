@@ -4,7 +4,7 @@ import * as Yup from 'yup'
 import clsx from 'clsx'
 import {Link} from 'react-router-dom'
 import {useFormik} from 'formik'
-import {getUserByToken, login} from '../core/_requests'
+// Removed unused imports - using Supabase Auth instead
 import {toAbsoluteUrl} from '../../../../_metronic/helpers'
 import {useSupabaseAuth} from '../core/SupabaseAuth'
 import {ForgotPasswordModal} from '../../../components/auth/ForgotPasswordModal'

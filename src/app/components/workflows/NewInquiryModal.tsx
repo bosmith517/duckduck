@@ -189,6 +189,8 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
         .insert(leadData)
         .select()
         .single()
+      
+      console.log('Lead creation result:', { lead, leadError })
 
       if (leadError) {
         console.error('Error creating lead:', leadError)
@@ -213,23 +215,28 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
       let contactId = null
       let accountId = null
 
+      console.log('Starting contact/account creation for caller_type:', values.caller_type)
+
       if (values.caller_type === 'individual') {
         // Create Contact for residential customers
         const contactData = {
           tenant_id: userProfile.tenant_id,
           first_name: values.caller_name.split(' ')[0] || values.caller_name,
           last_name: values.caller_name.split(' ').slice(1).join(' ') || '',
+          name: values.caller_name, // Adding full name field
           email: values.email || null,
           phone: values.phone_number,
-          lead_id: lead.id, // Link to lead
-          contact_type: 'individual',
-          address: values.street_address || null,
+          // lead_id: lead.id, // Remove - field doesn't exist in contacts table
+          // contact_type: 'individual', // Remove - field doesn't exist
+          address_line1: values.street_address || null, // Changed from address
           city: values.city || null,
           state: values.state || null,
-          zip: values.zip_code || null,
+          zip_code: values.zip_code || null, // Changed from zip
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
+        
+        console.log('Creating contact with data:', contactData)
 
         const { data: contact, error: contactError } = await supabase
           .from('contacts')
@@ -237,34 +244,45 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
           .select()
           .single()
 
+        console.log('Contact creation result:', { contact, contactError })
+
         if (contactError) {
           console.error('Error creating contact:', contactError)
-          throw new Error('Failed to create contact record')
+          console.error('Contact data that failed:', contactData)
+          throw new Error(`Failed to create contact record: ${contactError.message}`)
         }
 
         contactId = contact.id
 
         // Update lead with contact reference
-        await supabase
+        console.log('Updating lead with converted_contact_id:', contactId)
+        const { error: updateContactError } = await supabase
           .from('leads')
           .update({ converted_contact_id: contactId })
           .eq('id', lead.id)
+        
+        if (updateContactError) {
+          console.error('Error updating lead with contact reference:', updateContactError)
+          // Don't throw - this is a nice-to-have link
+        }
 
       } else {
         // Create Account for business clients
         const accountData = {
           tenant_id: userProfile.tenant_id,
           name: values.caller_name,
-          account_type: 'customer',
+          type: 'customer', // Changed from account_type
           email: values.email || null,
           phone: values.phone_number,
           billing_address: values.street_address || null,
-          billing_city: values.city || null,
-          billing_state: values.state || null,
-          billing_zip: values.zip_code || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          city: values.city || null, // Changed from billing_city
+          state: values.state || null, // Changed from billing_state
+          zip_code: values.zip_code || null, // Changed from billing_zip
+          created_at: new Date().toISOString()
+          // updated_at field doesn't exist in accounts table
         }
+        
+        console.log('Creating account with data:', accountData)
 
         const { data: account, error: accountError } = await supabase
           .from('accounts')
@@ -272,33 +290,45 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
           .select()
           .single()
 
+        console.log('Account creation result:', { account, accountError })
+
         if (accountError) {
           console.error('Error creating account:', accountError)
-          throw new Error('Failed to create account record')
+          console.error('Account data that failed:', accountData)
+          throw new Error(`Failed to create account record: ${accountError.message}`)
         }
 
         accountId = account.id
 
         // Update lead with account reference
-        await supabase
+        console.log('Updating lead with converted_account_id:', accountId)
+        const { error: updateAccountError } = await supabase
           .from('leads')
           .update({ converted_account_id: accountId })
           .eq('id', lead.id)
+        
+        if (updateAccountError) {
+          console.error('Error updating lead with account reference:', updateAccountError)
+          // Don't throw - this is a nice-to-have link
+        }
 
         // Also create a primary contact for the business
         const primaryContactData = {
           tenant_id: userProfile.tenant_id,
           account_id: accountId,
+          name: values.caller_name, // Adding full name field
           first_name: values.caller_name.split(' ')[0] || values.caller_name,
           last_name: values.caller_name.split(' ').slice(1).join(' ') || '',
           email: values.email || null,
           phone: values.phone_number,
           is_primary: true,
-          contact_type: 'business',
-          lead_id: lead.id,
+          // contact_type: 'business', // Remove - field doesn't exist
+          // lead_id: lead.id, // Remove - field doesn't exist
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
+        
+        console.log('Creating primary contact with data:', primaryContactData)
 
         const { data: primaryContact, error: primaryContactError } = await supabase
           .from('contacts')
@@ -306,8 +336,11 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
           .select()
           .single()
 
+        console.log('Primary contact creation result:', { primaryContact, primaryContactError })
+
         if (primaryContactError) {
           console.error('Error creating primary contact:', primaryContactError)
+          console.error('Primary contact data that failed:', primaryContactData)
           // Don't throw - primary contact is helpful but not critical
         } else {
           contactId = primaryContact.id

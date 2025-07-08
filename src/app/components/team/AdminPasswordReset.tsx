@@ -37,7 +37,7 @@ export const AdminPasswordReset: React.FC<AdminPasswordResetProps> = ({
 
       // Then trigger the actual Supabase Auth password reset
       const { error: authError } = await supabase.auth.resetPasswordForEmail(userEmail, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       })
 
       if (authError) {

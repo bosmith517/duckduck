@@ -29,6 +29,7 @@ import CustomerPortalLandingPage from '../pages/marketing/CustomerPortalLandingP
 import {ResetPasswordPage} from '../pages/auth/ResetPasswordPage'
 import {AuthCallbackPage} from '../pages/auth/AuthCallbackPage'
 import {AcceptInvitationPage} from '../pages/auth/AcceptInvitationPage'
+import {PasswordSetupPage} from '../pages/auth/PasswordSetupPage'
 
 
 /**
@@ -94,6 +95,7 @@ const AppRoutes: FC = () => {
         <Route path='auth/reset-password' element={<ResetPasswordPage />} />
         <Route path='auth/callback' element={<AuthCallbackPage />} />
         <Route path='auth/accept-invitation' element={<AcceptInvitationPage />} />
+        <Route path='auth/password-setup' element={<PasswordSetupPage />} />
         
         <Route element={<App />}>
           <Route path='error/*' element={<ErrorsPage />} />
@@ -110,14 +112,15 @@ const AppRoutes: FC = () => {
             <>
               <Route path='dashboard/*' element={<PrivateRoutes />} />
               <Route path='app/*' element={<PrivateRoutes />} />
-              <Route path='*' element={<PrivateRoutes />} />
               <Route path='auth/*' element={<Navigate to='/dashboard' />} />
+              <Route path='*' element={<Navigate to='/dashboard' />} />
             </>
           ) : (
             <>
               <Route path='auth/*' element={<AuthPage />} />
-              <Route path='dashboard' element={<Navigate to='/auth/login' />} />
+              <Route path='dashboard/*' element={<Navigate to='/auth/login' />} />
               <Route path='app/*' element={<Navigate to='/auth/login' />} />
+              <Route path='*' element={<Navigate to='/auth/login' />} />
             </>
           )}
         </Route>

@@ -25,7 +25,6 @@ interface TeamMember {
 }
 
 const TeamPage: React.FC = () => {
-  console.log('TeamPage: Component rendering')
   
   const [activeTab, setActiveTab] = useState<'directory' | 'chat'>('directory')
   const [activeChatMember, setActiveChatMember] = useState<TeamMember | null>(null)
@@ -93,11 +92,9 @@ const TeamPage: React.FC = () => {
 
   // Load team members from database
   const loadTeamMembers = async () => {
-    console.log('Starting loadTeamMembers...')
     setIsLoadingMembers(true)
     try {
       const { data, error } = await teamMemberService.getTeamMembers()
-      console.log('Team members response:', { data, error })
       
       if (error) {
         console.error('Error loading team members:', error)
@@ -136,7 +133,6 @@ const TeamPage: React.FC = () => {
         setTeamMembers(formattedMembers)
       } else {
         // No team members found
-        console.log('No team members found')
         setTeamMembers([])
       }
     } catch (err) {
@@ -149,16 +145,12 @@ const TeamPage: React.FC = () => {
 
   // Handler functions
   const handleAddMember = () => {
-    console.log('handleAddMember called - opening modal')
     setShowAddMemberModal(true)
     setError(null)
     setSuccess(null)
-    console.log('showAddMemberModal set to:', true)
   }
 
   const handleSaveMember = async () => {
-    console.log('handleSaveMember called')
-    console.log('Form data:', addMemberForm)
     
     setIsLoading(true)
     setError(null)
@@ -166,7 +158,6 @@ const TeamPage: React.FC = () => {
     try {
       // Validate form
       if (!addMemberForm.firstName || !addMemberForm.lastName || !addMemberForm.email || !addMemberForm.role) {
-        console.log('Validation failed - missing required fields')
         setError('Please fill in all required fields')
         setIsLoading(false)
         return
@@ -204,9 +195,7 @@ const TeamPage: React.FC = () => {
         department: addMemberForm.department
       }
 
-      console.log('Creating team member with data:', memberData)
       const { data, error } = await teamMemberService.createTeamMember(memberData)
-      console.log('Create team member result:', { data, error })
 
       if (error) {
         console.error('Create team member error:', error)
@@ -362,7 +351,6 @@ const TeamPage: React.FC = () => {
 
   const handleRoleSave = (userId: string, role: string, permissions: string[]) => {
     // Here you would typically make an API call to update the user's role and permissions
-    console.log('Saving role assignment:', { userId, role, permissions })
     // For demo purposes, we'll just log it
     // In production, this would call your backend API
     setShowRoleAssignmentModal(false)
@@ -674,9 +662,7 @@ const TeamPage: React.FC = () => {
       )}
 
       {/* Add Member Modal */}
-      {console.log('showAddMemberModal value:', showAddMemberModal)}
       {showAddMemberModal && (
-        console.log('Rendering Add Member Modal'),
         <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-dialog-centered modal-lg">
             <div className="modal-content">
@@ -822,7 +808,6 @@ const TeamPage: React.FC = () => {
                 <button 
                   className="btn btn-primary"
                   onClick={() => {
-                    console.log('Add Member button clicked!');
                     handleSaveMember();
                   }}
                   disabled={isLoading}

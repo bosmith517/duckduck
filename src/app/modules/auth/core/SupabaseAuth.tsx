@@ -56,14 +56,14 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
 
     // This listener sets the session/user and loads user profile/tenant data
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session)
+      // Auth state changed
       
       setSession(session)
       setUser(session?.user ?? null)
       
       // Handle password recovery flow
       if (event === 'PASSWORD_RECOVERY') {
-        console.log('Password recovery event detected, redirecting to reset password page')
+        // Password recovery event detected
         // Don't load profile data for password recovery, just redirect
         setAuthLoading(false)
         window.location.href = '/auth/reset-password'
@@ -107,7 +107,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
 
       // If no profile exists, try to create one for invited users
       if (!profile) {
-        console.log('No profile found, attempting to create one...')
+        // No profile found, attempting to create one
         const { data: ensureResult, error: ensureError } = await supabase
           .rpc('ensure_user_profile')
         
@@ -235,7 +235,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
         return { error: new Error('User creation failed') }
       }
 
-      console.log('User created successfully, setting up profile...')
+      // User created successfully, setting up profile
       
       // Step 2: Call the Edge Function to create tenant and user profile
       const { data: setupData, error: setupError } = await supabase.functions.invoke('handle-new-user-signup', {
@@ -254,7 +254,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
         return { error: setupError || new Error('Failed to set up user profile') }
       }
 
-      console.log('Profile setup completed:', setupData)
+      // Profile setup completed
       setAuthLoading(false)
       return { error: null }
       

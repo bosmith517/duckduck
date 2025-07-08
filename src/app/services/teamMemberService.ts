@@ -30,10 +30,8 @@ class TeamMemberService {
    */
   async getTeamMembers(): Promise<{ data: TeamMember[] | null; error: any }> {
     try {
-      console.log('TeamMemberService: Getting team members...');
       
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user:', user);
       if (!user) throw new Error('Not authenticated');
 
       // Get the current user's tenant_id
@@ -43,14 +41,12 @@ class TeamMemberService {
         .eq('id', user.id)
         .single();
 
-      console.log('Current user profile:', { currentUserProfile, profileError });
 
       if (!currentUserProfile?.tenant_id) {
         throw new Error('No tenant found for current user');
       }
 
       // First, let's check if the view exists and is accessible
-      console.log('Fetching from v_team_members for tenant:', currentUserProfile.tenant_id);
       
       // Try the view first
       let { data, error } = await supabase
@@ -59,11 +55,9 @@ class TeamMemberService {
         .eq('tenant_id', currentUserProfile.tenant_id)
         .order('created_at', { ascending: false });
 
-      console.log('v_team_members result:', { data, error });
 
       // If view fails, try direct table access
       if (error) {
-        console.log('View failed, trying direct user_profiles table...');
         const result = await supabase
           .from('user_profiles')
           .select('*')
@@ -72,7 +66,6 @@ class TeamMemberService {
         
         data = result.data;
         error = result.error;
-        console.log('user_profiles result:', { data, error });
       }
 
       return { data, error };
@@ -126,9 +119,8 @@ class TeamMemberService {
   }
 
   /**
-   * Create a new team member
-   * This creates a user profile record without creating an auth user (to avoid rate limits)
-   * The user will need to be invited separately via email to create their auth account
+   * Create a new team member and send invitation
+   * This now combines creation and invitation in one step
    */
   async createTeamMember(member: TeamMemberInvite): Promise<{ data: TeamMember | null; error: any }> {
     try {
@@ -143,42 +135,42 @@ class TeamMemberService {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Use the database function to create team member with proper tenant association
-      const { data, error } = await supabase.rpc('create_team_member', {
-        p_email: member.email,
-        p_first_name: firstName,
-        p_last_name: lastName,
-        p_role: member.role,
-        p_phone: member.phone || null,
-        p_department: member.department || null,
-        p_employee_id: null,
-        p_hourly_rate: null,
-        p_salary: null
-      });
+      // Send invitation which will also create the user profile
+      const { data: inviteData, error: inviteError } = await this.inviteTeamMember(
+        member.email,
+        member.role,
+        firstName,
+        lastName
+      );
 
-      if (error) throw error;
+      if (inviteError) throw inviteError;
 
       // Get the created profile to return
       const { data: profileData, error: fetchError } = await supabase
-        .from('v_team_members')
+        .from('user_profiles')
         .select('*')
-        .eq('id', data)
+        .eq('email', member.email)
+        .eq('tenant_id', (await supabase.auth.getUser()).data.user?.user_metadata?.tenant_id)
         .single();
 
       if (fetchError) {
-        // Fallback to regular user_profiles table
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', data)
-          .single();
-        
-        if (fallbackError) throw fallbackError;
-        return { data: fallbackData, error: null };
+        console.error('Error fetching created profile:', fetchError);
+        // Return a basic object since the invitation was sent successfully
+        return {
+          data: {
+            email: member.email,
+            role: member.role,
+            first_name: firstName,
+            last_name: lastName,
+            full_name: member.full_name,
+            phone: member.phone,
+            department: member.department,
+            is_active: false // Will be active after invitation accepted
+          } as TeamMember,
+          error: null
+        };
       }
 
-      console.log('Team member created successfully:', profileData);
-      
       return { data: profileData, error: null };
     } catch (error) {
       console.error('Error creating team member:', error);
@@ -189,16 +181,33 @@ class TeamMemberService {
   /**
    * Send invitation to a team member to complete their account setup
    */
-  async inviteTeamMember(profileId: string, message?: string): Promise<{ data: any; error: any }> {
+  async inviteTeamMember(email: string, role: string, firstName?: string, lastName?: string): Promise<{ data: any; error: any }> {
     try {
-      const { data, error } = await supabase.rpc('invite_team_member', {
-        p_profile_id: profileId,
-        p_invitation_message: message || 'You have been invited to join our team!'
+      // Call the Edge Function to send invitation
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error('Not authenticated');
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-team-invitation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.session.access_token}`
+        },
+        body: JSON.stringify({
+          email,
+          role,
+          firstName: firstName || null,
+          lastName: lastName || null
+        })
       });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      return { data, error: null };
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to send invitation');
+      }
+
+      return { data: result, error: null };
     } catch (error) {
       console.error('Error sending team member invitation:', error);
       return { data: null, error };

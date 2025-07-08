@@ -11,7 +11,8 @@
       "Bash(timeout 15s npm run dev)",
       "Bash(timeout 10s npx vite --version)",
       "Bash(sed:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(cd:*)"
     ],
     "deny": []
   }
