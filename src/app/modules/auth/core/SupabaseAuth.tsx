@@ -64,9 +64,9 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       // Handle password recovery flow
       if (event === 'PASSWORD_RECOVERY') {
         // Password recovery event detected
-        // Don't load profile data for password recovery, just redirect
+        console.log('PASSWORD_RECOVERY event detected')
         setAuthLoading(false)
-        window.location.href = '/auth/reset-password'
+        // Don't auto-redirect to prevent loops
         return
       }
       
@@ -89,14 +89,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
   // Separate async function to load user profile
   const loadUserProfile = async (userId: string) => {
     try {
-      // Check if this is a password recovery session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user?.recovery_sent_at) {
-        console.log('Password recovery session detected')
-        setAuthLoading(false)
-        window.location.href = '/auth/reset-password'
-        return
-      }
+      // Removed password recovery check here to prevent redirect loop
       
       // Load user profile from database
       const { data: profile, error: profileError } = await supabase

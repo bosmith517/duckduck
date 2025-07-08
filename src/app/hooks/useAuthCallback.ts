@@ -18,16 +18,7 @@ export const useAuthCallback = () => {
     const urlAccessToken = urlParams.get('access_token');
     const urlRefreshToken = urlParams.get('refresh_token');
 
-    // Check if we just came from a Supabase email verification
-    const token = urlParams.get('token');
-    const verifyType = urlParams.get('type');
-    
-    if (token && verifyType === 'recovery') {
-      // This is a password recovery that was just verified
-      console.log('Password recovery verified, redirecting to reset page');
-      navigate('/auth/reset-password');
-      return;
-    }
+    // Removed automatic redirect to prevent loops
 
     if ((accessToken && refreshToken) || (urlAccessToken && urlRefreshToken)) {
       // We have auth tokens, process them
@@ -62,7 +53,8 @@ export const useAuthCallback = () => {
 
       // Navigate based on type
       if (type === 'recovery') {
-        navigate('/auth/reset-password');
+        // Don't navigate here - let AppRoutes handle it
+        console.log('Recovery session set by useAuthCallback');
       } else if (type === 'invite') {
         navigate('/auth/password-setup');
       } else if (type === 'magiclink') {

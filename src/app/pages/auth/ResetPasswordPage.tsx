@@ -27,20 +27,85 @@ export const ResetPasswordPage: React.FC = () => {
   const [isValidToken, setIsValidToken] = useState(true);
 
   useEffect(() => {
-    // Check if we have a valid session from the email link
-    checkSession();
+    // First, check if we have tokens in the URL that need to be processed
+    const processTokensIfPresent = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const urlParams = new URLSearchParams(window.location.search);
+      
+      const accessToken = hashParams.get('access_token') || urlParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || urlParams.get('refresh_token');
+      const type = hashParams.get('type') || urlParams.get('type');
+      
+      if (type === 'recovery' && accessToken && refreshToken) {
+        console.log('Found recovery tokens in URL, setting session...');
+        
+        try {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          
+          if (error) {
+            console.error('Error setting session from tokens:', error);
+            setIsValidToken(false);
+            return;
+          }
+          
+          console.log('Session set successfully from recovery tokens');
+          
+          // Clear the URL to prevent reprocessing
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Now check the session
+          checkSession();
+        } catch (err) {
+          console.error('Error processing recovery tokens:', err);
+          setIsValidToken(false);
+        }
+      } else {
+        // No tokens in URL, just check if we have an existing session
+        checkSession();
+      }
+    };
+    
+    processTokensIfPresent();
   }, []);
 
   const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log('Reset password page - checking session:', session?.user?.email);
-    
-    if (!session) {
-      console.log('No session found on reset password page');
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('Reset password page - checking session:', session?.user?.email);
+      console.log('Session details:', {
+        user: session?.user?.email,
+        expires_at: session?.expires_at,
+        created_at: session?.user?.created_at,
+        recovery_sent_at: session?.user?.recovery_sent_at,
+        error: error
+      });
+      
+      if (error) {
+        console.error('Error getting session:', error);
+        setIsValidToken(false);
+        return;
+      }
+      
+      if (!session) {
+        console.log('No session found on reset password page');
+        // Check URL for error messages
+        const urlParams = new URLSearchParams(window.location.search);
+        const errorCode = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+        if (errorCode) {
+          console.error('Auth error in URL:', errorCode, errorDescription);
+        }
+        setIsValidToken(false);
+      } else {
+        console.log('Valid session found for password reset');
+        setIsValidToken(true);
+      }
+    } catch (err) {
+      console.error('Error checking session:', err);
       setIsValidToken(false);
-    } else {
-      console.log('Valid session found for password reset');
-      setIsValidToken(true);
     }
   };
 
@@ -100,8 +165,14 @@ export const ResetPasswordPage: React.FC = () => {
                 <span className="path3"></span>
               </i>
               <div className="d-flex flex-column">
-                <h4 className="mb-1 text-danger">Link Expired</h4>
-                <span>Password reset links expire after 1 hour for security reasons.</span>
+                <h4 className="mb-1 text-danger">Link Invalid or Expired</h4>
+                <span>This password reset link is no longer valid. This can happen if:
+                  <ul className="mt-2 mb-0">
+                    <li>The link has expired (links are valid for a limited time)</li>
+                    <li>The link has already been used</li>
+                    <li>A newer reset link was requested</li>
+                  </ul>
+                </span>
               </div>
             </div>
 
