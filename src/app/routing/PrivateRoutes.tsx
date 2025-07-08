@@ -92,6 +92,9 @@ const PrivateRoutes = () => {
   const CustomerPortalLandingPage = lazy(() => import('../pages/marketing/CustomerPortalLandingPage'))
   const SignupPage = lazy(() => import('../pages/marketing/SignupPage'))
   const InspectionsPage = lazy(() => import('../pages/inspections/InspectionsPage'))
+  const ScheduleInspectionPage = lazy(() => import('../pages/inspections/ScheduleInspectionPage'))
+  const PermittingProcessPage = lazy(() => import('../pages/inspections/PermittingProcessPage'))
+  const InspectionHistoryPage = lazy(() => import('../pages/inspections/InspectionHistoryPage'))
   const MilestonesPage = lazy(() => import('../pages/milestones/MilestonesPage'))
   const TeamMaterialsPage = lazy(() => import('../pages/team-materials/TeamMaterialsPage'))
   const VendorsPage = lazy(() => import('../pages/vendors/VendorsPage'))
@@ -168,6 +171,30 @@ const PrivateRoutes = () => {
             element={
               <SuspensedView>
                 <InspectionsPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='inspections/schedule'
+            element={
+              <SuspensedView>
+                <ScheduleInspectionPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='inspections/permits'
+            element={
+              <SuspensedView>
+                <PermittingProcessPage />
+              </SuspensedView>
+            }
+          />
+          <Route
+            path='inspections/history'
+            element={
+              <SuspensedView>
+                <InspectionHistoryPage />
               </SuspensedView>
             }
           />

@@ -47,7 +47,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'Start by inviting your team members. Assign roles like technicians, dispatchers, and office staff.',
       action: () => {
         onHide();
-        navigate('/app/teams');
+        navigate('/teams');
       },
       icon: 'ki-people'
     },
@@ -56,7 +56,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'Set up your service offerings, pricing, and work order templates.',
       action: () => {
         onHide();
-        navigate('/app/settings/services');
+        navigate('/settings/services');
       },
       icon: 'ki-setting-2'
     },
@@ -78,7 +78,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'View real-time insights about your business performance and team productivity.',
       action: () => {
         onHide();
-        navigate('/app/analytics');
+        navigate('/analytics');
       },
       icon: 'ki-chart-line-up'
     }
@@ -96,7 +96,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'Check your assigned jobs and routes for the day. Everything is organized for efficiency.',
       action: () => {
         onHide();
-        navigate('/app/schedule');
+        navigate('/schedule');
       },
       icon: 'ki-calendar'
     },
@@ -105,7 +105,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'Update job status, add photos, and complete work orders right from your device.',
       action: () => {
         onHide();
-        navigate('/app/jobs');
+        navigate('/jobs');
       },
       icon: 'ki-briefcase'
     },
@@ -114,7 +114,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'Send updates to customers, get signatures, and handle payments on-site.',
       action: () => {
         onHide();
-        navigate('/app/communications');
+        navigate('/communications');
       },
       icon: 'ki-messages'
     }
@@ -145,7 +145,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'Assign jobs to technicians and optimize routes for maximum efficiency.',
       action: () => {
         onHide();
-        navigate('/app/dispatch');
+        navigate('/dispatch');
       },
       icon: 'ki-route'
     },
@@ -154,7 +154,7 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({ show, onHide, 
       content: 'Monitor payments, send invoices, and follow up on overdue accounts.',
       action: () => {
         onHide();
-        navigate('/app/invoices');
+        navigate('/invoices');
       },
       icon: 'ki-bill'
     }

@@ -1,32 +1,54 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import HomeownerOnboardingModal from '../../components/onboarding/HomeownerOnboardingModal'
+import styles from './LandingPage.module.scss'
 
 const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showHomeownerModal, setShowHomeownerModal] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const { currentUser, signOut } = useSupabaseAuth()
 
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    if (isMenuOpen) {
+      const handleClickOutside = () => setIsMenuOpen(false)
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [isMenuOpen])
+
   return (
-    <div className="d-flex flex-column min-vh-100 bg-white">
+    <div className={`d-flex flex-column min-vh-100 bg-white ${styles.landingPage}`}>
       {/* Navigation Header */}
       <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm fixed-top">
         <div className="container">
           <Link className="navbar-brand d-flex align-items-center" to="/">
-            <div className="symbol symbol-40px me-3">
+            <div className="symbol symbol-30px symbol-md-40px me-2 me-md-3">
               <span className="symbol-label bg-primary">
-                <i className="ki-duotone ki-technology-4 fs-2 text-white">
+                <i className="ki-duotone ki-technology-4 fs-4 fs-md-2 text-white">
                   <span className="path1"></span>
                   <span className="path2"></span>
                 </i>
               </span>
             </div>
-            <span className="fs-2 fw-bold text-dark">TradeWorks Pro</span>
+            <span className="fs-4 fs-md-2 fw-bold text-dark">TradeWorks Pro</span>
           </Link>
           
           <button 
-            className="navbar-toggler" 
+            className="navbar-toggler border-0" 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             type="button"
           >
@@ -84,19 +106,19 @@ const LandingPage: React.FC = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-light py-20" style={{marginTop: '76px'}}>
+      <section className={`bg-light py-10 py-md-20 ${styles.heroSection}`} style={{marginTop: isMobile ? '56px' : '76px'}}>
         <div className="container">
           <div className="row align-items-center">
-            <div className="col-lg-6">
-              <div className="badge bg-primary text-white mb-4 px-3 py-2 fs-7 fw-bold">
+            <div className="col-lg-6 mb-8 mb-lg-0">
+              <div className="badge bg-primary text-white mb-4 px-3 py-2 fs-8 fs-md-7 fw-bold">
                 🚀 SAVE TIME, EARN MORE, BUILD REPUTATION
               </div>
-              <h1 className="display-3 fw-bolder text-dark mb-4 lh-1">
+              <h1 className="display-6 display-md-3 fw-bolder text-dark mb-4 lh-1">
                 Grow Your Service Business  
-                <span className="text-primary">50% Faster </span>  
+                <span className="text-primary d-block d-sm-inline">50% Faster </span>  
                 Than Any Competitor
               </h1>
-              <p className="fs-4 text-gray-700 mb-6 lh-base">
+              <p className="fs-6 fs-md-4 text-gray-700 mb-6 lh-base">
                 Join 50,000+ service professionals using our all-in-one platform with built-in 
                 customer portals, AI-powered recommendations, and advanced communication tools 
                 that other platforms don't offer.
@@ -158,15 +180,15 @@ const LandingPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="d-flex gap-3 flex-wrap mb-6">
-                <Link className="btn btn-lg btn-primary text-white fw-bold px-6" to="/signup">
+              <div className={`d-flex gap-3 ${isMobile ? 'flex-column' : 'flex-wrap'} mb-6`}>
+                <Link className={`btn ${isMobile ? 'btn-lg w-100' : 'btn-lg'} btn-primary text-white fw-bold px-6`} to="/signup">
                   <i className="ki-duotone ki-rocket fs-3 me-2">
                     <span className="path1"></span>
                     <span className="path2"></span>
                   </i>
                   Start Free 14-Day Trial
                 </Link>
-                <button className="btn btn-lg btn-outline-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#demoModal">
+                <button className={`btn ${isMobile ? 'btn-lg w-100' : 'btn-lg'} btn-outline-primary fw-semibold`} data-bs-toggle="modal" data-bs-target="#demoModal">
                   <i className="ki-duotone ki-play fs-3 me-2">
                     <span className="path1"></span>
                     <span className="path2"></span>
@@ -175,7 +197,7 @@ const LandingPage: React.FC = () => {
                 </button>
               </div>
               
-              <div className="d-flex align-items-center gap-6 text-dark">
+              <div className={`d-flex align-items-center ${isMobile ? 'flex-column gap-3' : 'gap-6'} text-dark`}>
                 <div className="d-flex align-items-center">
                   <i className="ki-duotone ki-check-circle fs-4 text-success me-2">
                     <span className="path1"></span>
@@ -244,16 +266,16 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* Homeowner Section */}
-      <section className="py-10 bg-success">
+      <section className={`py-10 bg-success ${styles.homeownerSection}`}>
         <div className="container">
           <div className="row align-items-center">
-            <div className="col-lg-8">
+            <div className="col-lg-8 mb-4 mb-lg-0">
               <h2 className="text-white fw-bold mb-3">Need Service for Your Home?</h2>
               <p className="text-white fs-5 mb-4">
                 Connect with trusted professionals in your area. Get quotes, schedule service, 
                 and track your home maintenance - all in one place.
               </p>
-              <div className="d-flex gap-4 mb-4">
+              <div className={`d-flex ${isMobile ? 'flex-column' : 'flex-row'} gap-4 mb-4`}>
                 <div className="d-flex align-items-center">
                   <i className="ki-duotone ki-check-circle fs-3 text-white me-2">
                     <span className="path1"></span>
@@ -348,9 +370,9 @@ const LandingPage: React.FC = () => {
 
           <div className="row g-8">
             {/* Customer Portals */}
-            <div className="col-lg-4">
-              <div className="card h-100 border-0 shadow-sm">
-                <div className="card-body p-8">
+            <div className="col-lg-4 mb-4 mb-lg-0">
+              <div className={`card h-100 border-0 shadow-sm ${styles.featureCard}`}>
+                <div className="card-body p-4 p-md-8">
                   <div className="d-flex align-items-center mb-4">
                     <span className="badge badge-light-primary fs-8 me-3">EXCLUSIVE</span>
                     <h4 className="fw-bold text-dark mb-0">Smart Customer Portals</h4>

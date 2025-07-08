@@ -568,7 +568,7 @@ const CallCenterPage: React.FC = () => {
                 <li className='nav-item'>
                   <a
                     className='nav-link'
-                    href='/app/communications'
+                    href='/communications'
                     style={{ cursor: 'pointer' }}
                   >
                     <i className='ki-duotone ki-robot fs-2 me-2'>

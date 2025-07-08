@@ -110,16 +110,12 @@ const AppRoutes: FC = () => {
           <Route path='automation-demo' element={<AutomationDemoPage />} />
           {currentUser ? (
             <>
-              <Route path='dashboard/*' element={<PrivateRoutes />} />
-              <Route path='app/*' element={<PrivateRoutes />} />
+              <Route path='/*' element={<PrivateRoutes />} />
               <Route path='auth/*' element={<Navigate to='/dashboard' />} />
-              <Route path='*' element={<Navigate to='/dashboard' />} />
             </>
           ) : (
             <>
               <Route path='auth/*' element={<AuthPage />} />
-              <Route path='dashboard/*' element={<Navigate to='/auth/login' />} />
-              <Route path='app/*' element={<Navigate to='/auth/login' />} />
               <Route path='*' element={<Navigate to='/auth/login' />} />
             </>
           )}

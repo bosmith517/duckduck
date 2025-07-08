@@ -7,6 +7,7 @@ import PhotoCapture from '../../../components/shared/PhotoCapture'
 import { LineItemUploader } from '../../../components/estimates/LineItemUploader'
 import { supabase } from '../../../../supabaseClient'
 import { useSupabaseAuth } from '../../../modules/auth/core/SupabaseAuth'
+import { showToast } from '../../../utils/toast'
 
 // LineItem interface is now imported from estimatesService
 
@@ -123,7 +124,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
   const [availablePhotos, setAvailablePhotos] = useState<EstimatePhoto[]>([])
   const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [selectedAccountType, setSelectedAccountType] = useState<'business' | 'individual' | null>(null)
+  const [selectedAccountType, setSelectedAccountType] = useState<'business' | 'residential' | null>(null)
   const [availableJobs, setAvailableJobs] = useState<Job[]>([])
   const [showNewJobForm, setShowNewJobForm] = useState(false)
   const [newJobTitle, setNewJobTitle] = useState('')
@@ -149,13 +150,13 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
     onSubmit: async (values) => {
       setLoading(true)
       try {
-        // Determine if this is a business client (account) or individual customer (contact)
+        // Determine if this is a business client (account) or residential client (contact)
         const selectedAccount = accounts.find(acc => acc.id === values.accountId)
-        const isIndividualCustomer = selectedAccount?.type === 'individual'
+        const isResidentialClient = selectedAccount?.type === 'residential'
         
         const submitData = {
-          account_id: isIndividualCustomer ? null : values.accountId,
-          contact_id: isIndividualCustomer ? values.accountId : null,
+          account_id: isResidentialClient ? null : values.accountId,
+          contact_id: isResidentialClient ? values.accountId : null,
           job_id: values.jobId, // Include the selected job ID
           project_title: values.projectTitle,
           description: values.description,
@@ -212,11 +213,11 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
           formik.setFieldValue('clientCustomer', data.accounts[0].name || '')
           setSelectedAccountType('business')
         }
-        // Handle individual customer
+        // Handle residential client
         else if (data.contact_id && data.contacts && Array.isArray(data.contacts) && data.contacts.length > 0) {
           formik.setFieldValue('accountId', data.contact_id)
           formik.setFieldValue('clientCustomer', `${data.contacts[0].first_name || ''} ${data.contacts[0].last_name || ''}`.trim())
-          setSelectedAccountType('individual')
+          setSelectedAccountType('residential')
         }
       }
     } catch (error) {
@@ -226,40 +227,54 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
   const loadAccounts = async () => {
     try {
-      // Load business accounts
+      console.log('Loading accounts with userProfile:', userProfile)
+      console.log('Tenant ID:', userProfile?.tenant_id)
+      
+      if (!userProfile?.tenant_id) {
+        console.error('No tenant_id found in user profile')
+        showToast.error('Unable to load clients. Please ensure you are properly logged in.')
+        return
+      }
+
+      // Load business clients (accounts table)
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
-        .select('id, name, type')
-        .eq('tenant_id', userProfile?.tenant_id)
+        .select('id, name')
+        .eq('tenant_id', userProfile.tenant_id)
         .order('name')
 
-      if (accountsError) throw accountsError
+      if (accountsError) {
+        console.error('Error loading business accounts:', accountsError)
+        throw accountsError
+      }
 
-      // Load individual customers (contacts without accounts)
+      // Load residential clients (contacts table - those without account_id are residential)
       const { data: contactsData, error: contactsError } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name, contact_type')
-        .eq('tenant_id', userProfile?.tenant_id)
-        .eq('contact_type', 'individual')
-        .is('account_id', null)
+        .select('id, first_name, last_name')
+        .eq('tenant_id', userProfile.tenant_id)
+        .is('account_id', null)  // Residential clients don't have an associated business account
         .order('last_name')
 
-      if (contactsError) throw contactsError
+      if (contactsError) {
+        console.error('Error loading residential contacts:', contactsError)
+        throw contactsError
+      }
 
-      // Combine accounts and individual customers
-      const businessAccounts = (accountsData || []).map(account => ({
+      // Combine business and residential clients
+      const businessClients = (accountsData || []).map(account => ({
         id: account.id,
         name: account.name || '',
         type: 'business' as const
       }))
 
-      const individualCustomers = (contactsData || []).map(contact => ({
+      const residentialClients = (contactsData || []).map(contact => ({
         id: contact.id,
-        name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim(),
-        type: 'individual' as const
+        name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact',
+        type: 'residential' as const
       }))
 
-      const combined = [...businessAccounts, ...individualCustomers]
+      const combined = [...businessClients, ...residentialClients]
       setAccounts(combined)
     } catch (error) {
       console.error('Error loading accounts and customers:', error)
@@ -272,16 +287,16 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
     if (selectedAccount) {
       formik.setFieldValue('accountId', accountId)
       formik.setFieldValue('clientCustomer', selectedAccount.name)
-      setSelectedAccountType(selectedAccount.type === 'business' ? 'business' : 'individual')
+      setSelectedAccountType(selectedAccount.type)
       
-      // Clear job selection and load jobs for this client/customer
+      // Clear job selection and load jobs for this client
       formik.setFieldValue('jobId', '')
       formik.setFieldValue('projectTitle', '')
       loadJobsForAccount(accountId, selectedAccount.type)
     }
   }
 
-  const loadJobsForAccount = async (accountId: string, accountType: 'business' | 'individual') => {
+  const loadJobsForAccount = async (accountId: string, accountType: 'business' | 'residential') => {
     try {
       let query = supabase
         .from('jobs')
@@ -297,10 +312,11 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
         .eq('tenant_id', userProfile?.tenant_id)
         .order('created_at', { ascending: false })
 
-      // Filter by account type
+      // Filter by client type
       if (accountType === 'business') {
         query = query.eq('account_id', accountId)
       } else {
+        // Residential client
         query = query.eq('contact_id', accountId)
       }
 
@@ -332,14 +348,14 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
     setCreatingJob(true)
     try {
-      // Determine job data based on account type
-      const isIndividualCustomer = selectedAccountType === 'individual'
+      // Determine job data based on client type
+      const isResidentialClient = selectedAccountType === 'residential'
       
       const jobData = {
         title: newJobTitle.trim(),
         tenant_id: userProfile.tenant_id,
-        account_id: isIndividualCustomer ? null : formik.values.accountId,
-        contact_id: isIndividualCustomer ? formik.values.accountId : null,
+        account_id: isResidentialClient ? null : formik.values.accountId,
+        contact_id: isResidentialClient ? formik.values.accountId : null,
         status: 'Scheduled',
         description: `Job created from estimate for: ${formik.values.clientCustomer}`
       }
@@ -359,8 +375,8 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
         account_id: data.account_id,
         contact_id: data.contact_id,
         status: data.status,
-        accounts: isIndividualCustomer ? undefined : { name: formik.values.clientCustomer },
-        contacts: isIndividualCustomer ? { first_name: formik.values.clientCustomer.split(' ')[0] || '', last_name: formik.values.clientCustomer.split(' ').slice(1).join(' ') || '' } : undefined
+        accounts: isResidentialClient ? undefined : { name: formik.values.clientCustomer },
+        contacts: isResidentialClient ? { first_name: formik.values.clientCustomer.split(' ')[0] || '', last_name: formik.values.clientCustomer.split(' ').slice(1).join(' ') || '' } : undefined
       }
       
       setAvailableJobs(prev => [newJob, ...prev])
@@ -383,15 +399,15 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
   // Helper function to get appropriate label
   const getClientCustomerLabel = () => {
-    if (selectedAccountType === 'individual') return 'Customer'
-    if (selectedAccountType === 'business') return 'Client' 
-    return 'Client/Customer'
+    if (selectedAccountType === 'residential') return 'Residential Client'
+    if (selectedAccountType === 'business') return 'Business Client' 
+    return 'Client'
   }
 
   const getClientCustomerPlaceholder = () => {
-    if (selectedAccountType === 'individual') return 'Select a customer...'
-    if (selectedAccountType === 'business') return 'Select a client...'
-    return 'Select a client or customer...'
+    if (selectedAccountType === 'residential') return 'Select a residential client...'
+    if (selectedAccountType === 'business') return 'Select a business client...'
+    return 'Select a client...'
   }
 
 
@@ -540,7 +556,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                     <option value=''>{getClientCustomerPlaceholder()}</option>
                     {accounts.map(account => (
                       <option key={account.id} value={account.id}>
-                        {account.name} {account.type === 'business' ? '(Client)' : '(Customer)'}
+                        {account.name} {account.type === 'business' ? '(Business)' : '(Residential)'}
                       </option>
                     ))}
                   </select>
@@ -551,7 +567,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                   )}
                   {accounts.length === 0 && (
                     <div className='form-text text-muted'>
-                      No clients or customers found. Please create clients/customers in the Contacts section first.
+                      No clients found. Please create business clients in the Accounts section or residential clients in the Contacts section first.
                     </div>
                   )}
                 </div>
@@ -599,9 +615,9 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                       >
                         <option value=''>
                           {!formik.values.accountId 
-                            ? 'Please select a client/customer first' 
+                            ? 'Please select a client first' 
                             : availableJobs.length === 0 
-                            ? 'No jobs found for this client/customer'
+                            ? 'No jobs found for this client'
                             : 'Select a job...'}
                         </option>
                         {availableJobs.map(job => (
