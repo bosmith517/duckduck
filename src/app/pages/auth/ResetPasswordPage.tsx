@@ -33,8 +33,14 @@ export const ResetPasswordPage: React.FC = () => {
 
   const checkSession = async () => {
     const { data: { session } } = await supabase.auth.getSession();
+    console.log('Reset password page - checking session:', session?.user?.email);
+    
     if (!session) {
+      console.log('No session found on reset password page');
       setIsValidToken(false);
+    } else {
+      console.log('Valid session found for password reset');
+      setIsValidToken(true);
     }
   };
 

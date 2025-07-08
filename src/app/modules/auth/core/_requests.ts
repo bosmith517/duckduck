@@ -37,8 +37,15 @@ export function register(
 export async function requestPassword(email: string) {
   const { supabase } = await import('../../../../supabaseClient');
   
+  // Use the app URL directly to ensure proper redirect
+  const redirectUrl = window.location.origin.includes('localhost') 
+    ? `${window.location.origin}/auth/callback`
+    : 'https://app.tradeworkspro.com/auth/callback';
+  
+  console.log('Sending password reset email with redirect URL:', redirectUrl);
+  
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/callback`,
+    redirectTo: redirectUrl,
   });
   
   if (error) {

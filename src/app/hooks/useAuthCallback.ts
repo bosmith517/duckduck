@@ -12,9 +12,30 @@ export const useAuthCallback = () => {
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
 
-    if (accessToken && refreshToken) {
+    // Also check URL query params (Supabase sometimes uses these)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlType = urlParams.get('type');
+    const urlAccessToken = urlParams.get('access_token');
+    const urlRefreshToken = urlParams.get('refresh_token');
+
+    // Check if we just came from a Supabase email verification
+    const token = urlParams.get('token');
+    const verifyType = urlParams.get('type');
+    
+    if (token && verifyType === 'recovery') {
+      // This is a password recovery that was just verified
+      console.log('Password recovery verified, redirecting to reset page');
+      navigate('/auth/reset-password');
+      return;
+    }
+
+    if ((accessToken && refreshToken) || (urlAccessToken && urlRefreshToken)) {
       // We have auth tokens, process them
-      handleAuthTokens(accessToken, refreshToken, type);
+      handleAuthTokens(
+        accessToken || urlAccessToken!, 
+        refreshToken || urlRefreshToken!, 
+        type || urlType
+      );
     }
   }, []);
 

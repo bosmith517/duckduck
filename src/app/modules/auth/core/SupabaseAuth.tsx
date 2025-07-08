@@ -89,6 +89,15 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
   // Separate async function to load user profile
   const loadUserProfile = async (userId: string) => {
     try {
+      // Check if this is a password recovery session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user?.recovery_sent_at) {
+        console.log('Password recovery session detected')
+        setAuthLoading(false)
+        window.location.href = '/auth/reset-password'
+        return
+      }
+      
       // Load user profile from database
       const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
