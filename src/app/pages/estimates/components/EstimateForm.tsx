@@ -22,7 +22,7 @@ interface EstimatePhoto {
 interface Account {
   id: string
   name: string
-  type: 'business' | 'individual'
+  type: 'business' | 'residential'
 }
 
 interface EstimateFormValues {

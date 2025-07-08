@@ -33,7 +33,7 @@ const DatabaseDebugPage: React.FC = () => {
         dataCount: data?.length || 0 
       }
     } catch (e) {
-      testResults.accountsBasicQuery = { error: e.message }
+      testResults.accountsBasicQuery = { error: e instanceof Error ? e.message : String(e) }
     }
 
     // Test 3: Try to query accounts with tenant_id
@@ -53,7 +53,7 @@ const DatabaseDebugPage: React.FC = () => {
         data: data?.slice(0, 2) // Show first 2 records
       }
     } catch (e) {
-      testResults.accountsWithTenant = { error: e.message }
+      testResults.accountsWithTenant = { error: e instanceof Error ? e.message : String(e) }
     }
 
     // Test 4: Try to query contacts
@@ -74,7 +74,7 @@ const DatabaseDebugPage: React.FC = () => {
         data: data?.slice(0, 2) // Show first 2 records
       }
     } catch (e) {
-      testResults.contactsQuery = { error: e.message }
+      testResults.contactsQuery = { error: e instanceof Error ? e.message : String(e) }
     }
 
     // Test 5: Check RLS status (requires database introspection)
