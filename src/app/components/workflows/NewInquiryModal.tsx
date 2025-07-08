@@ -223,15 +223,13 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
           tenant_id: userProfile.tenant_id,
           first_name: values.caller_name.split(' ')[0] || values.caller_name,
           last_name: values.caller_name.split(' ').slice(1).join(' ') || '',
-          name: values.caller_name, // Adding full name field
+          name: values.caller_name, // Full name field
           email: values.email || null,
           phone: values.phone_number,
-          // lead_id: lead.id, // Remove - field doesn't exist in contacts table
-          // contact_type: 'individual', // Remove - field doesn't exist
-          address_line1: values.street_address || null, // Changed from address
+          address: values.street_address || null, // Using 'address' not 'address_line1'
           city: values.city || null,
           state: values.state || null,
-          zip_code: values.zip_code || null, // Changed from zip
+          zip: values.zip_code || null, // Using 'zip' not 'zip_code'
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }

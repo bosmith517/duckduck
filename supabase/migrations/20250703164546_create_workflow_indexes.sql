@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_workflow_rules_tenant_entity ON workflow_rules(tenant_id, entity_type, active);

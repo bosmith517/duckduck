@@ -1,243 +1,407 @@
--- Create dummy customer data with real address and comprehensive information
--- Run this after the Phase 1 contacts migration
-
--- First, update the existing contact with comprehensive dummy data
-UPDATE contacts 
-SET 
-    first_name = 'Sarah',
-    last_name = 'Johnson',
-    name = 'Sarah Johnson',
-    email = 'sarah.johnson@email.com',
-    phone = '(555) 123-4567',
-    company = 'Johnson Family Trust',
-    job_title = 'Homeowner',
-    
-    -- Real address in Austin, TX for testing
-    address_line1 = '2101 S Lamar Blvd',
-    address_line2 = 'Unit 205',
-    city = 'Austin',
-    state = 'TX',
-    zip_code = '78704',
-    country = 'US',
-    latitude = 30.2500,
-    longitude = -97.7667,
-    
-    -- Communication preferences
-    preferred_contact_method = 'phone',
-    preferred_contact_time = 'weekday mornings',
-    timezone = 'America/Chicago',
-    language_preference = 'en',
-    
-    -- AI-relevant fields
-    communication_notes = 'Prefers advance notice for appointments. Has a friendly golden retriever named Max.',
-    ai_interaction_preferences = '{"allow_ai_scheduling": true, "requires_human_confirmation": false, "preferred_appointment_window": "9am-2pm"}',
-    customer_lifetime_value = 3850.00,
-    lead_source = 'google_search',
-    tags = ARRAY['residential', 'hvac_customer', 'repeat_customer', 'high_value', 'pet_owner'],
-    
-    -- Relationship tracking
-    is_decision_maker = true,
-    birthday = '1985-03-15',
-    last_contacted_at = NOW() - INTERVAL '2 days',
-    next_followup_date = CURRENT_DATE + INTERVAL '6 months',
-    
-    updated_at = NOW()
-WHERE id = 'c9882d63-65d4-4b5c-9a51-c26f5b18649b';
-
--- First create an account for our customer if it doesn't exist
-INSERT INTO accounts (
-    id,
-    tenant_id,
-    name,
-    address_line1,
-    city,
-    state,
-    zip_code,
-    phone,
-    email,
-    type,
-    industry,
-    account_status
-) VALUES (
-    'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-    '10076fd5-e70f-4062-8192-e42173cf57fd',
-    'Johnson Family Trust',
-    '2101 S Lamar Blvd, Unit 205',
-    'Austin',
-    'TX',
-    '78704',
-    '(555) 123-4567',
-    'sarah.johnson@email.com',
-    'residential',
-    'homeowner',
-    'ACTIVE'
-) ON CONFLICT (id) DO NOTHING;
-
--- Update the contact to link to the account
-UPDATE contacts 
-SET account_id = 'a1b2c3d4-e5f6-7890-1234-567890abcdef'
-WHERE id = 'c9882d63-65d4-4b5c-9a51-c26f5b18649b';
-
--- Clear any existing jobs for this contact to start fresh
-DELETE FROM job_status_updates WHERE job_id IN (
-    SELECT id FROM jobs WHERE contact_id = 'c9882d63-65d4-4b5c-9a51-c26f5b18649b'
-);
-DELETE FROM jobs WHERE contact_id = 'c9882d63-65d4-4b5c-9a51-c26f5b18649b';
-
--- Create some realistic job history
-INSERT INTO jobs (
-    id,
-    tenant_id,
-    account_id,
-    contact_id,
-    title,
-    description,
-    status,
-    start_date,
-    estimated_hours,
-    estimated_cost,
-    actual_cost,
-    priority,
-    location_address,
-    location_city,
-    location_state,
-    location_zip,
-    notes,
-    created_at
-) VALUES 
--- Current upcoming job
-(
-    gen_random_uuid(),
-    '10076fd5-e70f-4062-8192-e42173cf57fd',
-    'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-    'c9882d63-65d4-4b5c-9a51-c26f5b18649b',
-    'Annual HVAC Maintenance',
-    'Comprehensive inspection and maintenance of central air conditioning and heating system. Includes filter replacement, coil cleaning, and system diagnostics.',
-    'Scheduled',
-    CURRENT_DATE + INTERVAL '3 days' + TIME '10:00:00',
-    3.0,
-    295.00,
-    null,
-    'medium',
-    '2101 S Lamar Blvd, Unit 205',
-    'Austin',
-    'TX',
-    '78704',
-    'Customer mentioned some unusual noises from the unit. Check belt tension and fan motor.',
-    NOW() - INTERVAL '5 days'
-),
-
--- Completed job from 3 months ago
-(
-    gen_random_uuid(),
-    '10076fd5-e70f-4062-8192-e42173cf57fd',
-    'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-    'c9882d63-65d4-4b5c-9a51-c26f5b18649b',
-    'Emergency AC Repair',
-    'AC unit stopped cooling. Diagnosed faulty capacitor and replaced. Also cleaned evaporator coils and checked refrigerant levels.',
-    'Completed',
-    CURRENT_DATE - INTERVAL '3 months' + TIME '14:30:00',
-    2.5,
-    385.00,
-    385.00,
-    'high',
-    '2101 S Lamar Blvd, Unit 205',
-    'Austin',
-    'TX',
-    '78704',
-    'Emergency call - customer very satisfied with quick response time.',
-    NOW() - INTERVAL '3 months'
-),
-
--- Completed job from 8 months ago
-(
-    gen_random_uuid(),
-    '10076fd5-e70f-4062-8192-e42173cf57fd',
-    'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-    'c9882d63-65d4-4b5c-9a51-c26f5b18649b',
-    'Furnace Tune-Up',
-    'Pre-winter furnace inspection and tune-up. Replaced air filter, cleaned heat exchanger, and tested safety controls.',
-    'Completed',
-    CURRENT_DATE - INTERVAL '8 months' + TIME '09:00:00',
-    2.0,
-    185.00,
-    185.00,
-    'medium',
-    '2101 S Lamar Blvd, Unit 205',
-    'Austin',
-    'TX',
-    '78704',
-    'All systems operating efficiently. Recommended annual service plan.',
-    NOW() - INTERVAL '8 months'
-),
-
--- Completed job from 1 year ago
-(
-    gen_random_uuid(),
-    '10076fd5-e70f-4062-8192-e42173cf57fd',
-    'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-    'c9882d63-65d4-4b5c-9a51-c26f5b18649b',
-    'Ductwork Inspection & Sealing',
-    'Comprehensive ductwork inspection revealed several leaks. Sealed ducts and improved system efficiency by 15%.',
-    'Completed',
-    CURRENT_DATE - INTERVAL '12 months' + TIME '11:00:00',
-    4.5,
-    575.00,
-    575.00,
-    'medium',
-    '2101 S Lamar Blvd, Unit 205',
-    'Austin',
-    'TX',
-    '78704',
-    'Significant energy savings achieved. Customer enrolled in annual maintenance plan.',
-    NOW() - INTERVAL '12 months'
-),
-
--- Completed job from 1.5 years ago (initial service)
-(
-    gen_random_uuid(),
-    '10076fd5-e70f-4062-8192-e42173cf57fd',
-    'a1b2c3d4-e5f6-7890-1234-567890abcdef',
-    'c9882d63-65d4-4b5c-9a51-c26f5b18649b',
-    'New Customer System Evaluation',
-    'Complete HVAC system evaluation for new customer. System in good condition but recommended regular maintenance.',
-    'Completed',
-    CURRENT_DATE - INTERVAL '18 months' + TIME '13:00:00',
-    1.5,
-    125.00,
-    125.00,
-    'low',
-    '2101 S Lamar Blvd, Unit 205',
-    'Austin',
-    'TX',
-    '78704',
-    'New customer - referred by neighbor. Very satisfied with thorough evaluation.',
-    NOW() - INTERVAL '18 months'
-);
-
--- Job status updates will be created automatically by the system
--- No need to manually insert them here as they reference specific job IDs
-
--- Verify the data
-SELECT 
-    'Customer Data Updated' as result,
-    first_name,
-    last_name,
-    address_line1,
-    city,
-    state,
-    phone,
-    tags
-FROM contacts 
-WHERE id = 'c9882d63-65d4-4b5c-9a51-c26f5b18649b';
-
--- Show job history
-SELECT 
-    'Job History Created' as result,
-    title,
-    status,
-    start_date,
-    estimated_cost
-FROM jobs 
-WHERE contact_id = 'c9882d63-65d4-4b5c-9a51-c26f5b18649b'
-ORDER BY start_date DESC;
+npm install @capacitor/camera @capacitor/geolocation @capacitor/push-notifications
+Unchecked runtime.lastError: Cannot create item with duplicate id LastPass https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id separator https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Item https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Password https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Address https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id Add Payment Card https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id Add other item https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id Save all entered data https://playhouse-git-main-bosmith517s-projects.vercel.app/
+Unchecked runtime.lastError: Cannot create item with duplicate id Generate Secure Password https://playhouse-git-main-bosmith517s-projects.vercel.app/
+index-rqCberUu.js:1407 AppRoutes - authLoading: true currentUser: undefined
+index-rqCberUu.js:1407 AppRoutes - showing loading screen
+rl-cs.js:1 [Komodo]   CS Register csid_syjdw2_umq1fh_2_6_2
+index-rqCberUu.js:138 Auth state changed: INITIAL_SESSION undefined
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: undefined
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: false
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: undefined
+favicon.ico:1 
+            
+            
+           GET https://playhouse-git-main-bosmith517s-projects.vercel.app/auth/media/logos/favicon.ico 404 (Not Found)
+index-rqCberUu.js:1407 AppRoutes - authLoading: true currentUser: undefined
+index-rqCberUu.js:1407 AppRoutes - showing loading screen
+index-rqCberUu.js:137 
+            
+            
+           POST https://eskpnhbemnxkxafjbbdx.supabase.co/auth/v1/token?grant_type=password 400 (Bad Request)
+(anonymous) @ index-rqCberUu.js:137
+Kte @ index-rqCberUu.js:137
+Mt @ index-rqCberUu.js:137
+signInWithPassword @ index-rqCberUu.js:137
+k @ index-rqCberUu.js:138
+onSubmit @ index-rqCberUu.js:1406
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+Promise.then
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+J5 @ index-rqCberUu.js:38
+tW @ index-rqCberUu.js:38
+rW @ index-rqCberUu.js:38
+tT @ index-rqCberUu.js:38
+LR @ index-rqCberUu.js:38
+(anonymous) @ index-rqCberUu.js:38
+kE @ index-rqCberUu.js:41
+aR @ index-rqCberUu.js:38
+Ux @ index-rqCberUu.js:38
+JS @ index-rqCberUu.js:38
+bW @ index-rqCberUu.js:38
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: undefined
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: false
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: undefined
+favicon.ico:1 
+            
+            
+           GET https://playhouse-git-main-bosmith517s-projects.vercel.app/auth/media/logos/favicon.ico 404 (Not Found)
+Image
+(anonymous) @ web-client-content-script.js:2
+gd @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+p @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+u @ web-client-content-script.js:2
+i @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+nu @ web-client-content-script.js:2
+kl @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+k @ web-client-content-script.js:2
+L @ web-client-content-script.js:2
+index-rqCberUu.js:1407 AppRoutes - authLoading: true currentUser: undefined
+index-rqCberUu.js:1407 AppRoutes - showing loading screen
+index-rqCberUu.js:137 
+            
+            
+           POST https://eskpnhbemnxkxafjbbdx.supabase.co/auth/v1/token?grant_type=password 400 (Bad Request)
+(anonymous) @ index-rqCberUu.js:137
+Kte @ index-rqCberUu.js:137
+Mt @ index-rqCberUu.js:137
+signInWithPassword @ index-rqCberUu.js:137
+k @ index-rqCberUu.js:138
+onSubmit @ index-rqCberUu.js:1406
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+Promise.then
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+J5 @ index-rqCberUu.js:38
+tW @ index-rqCberUu.js:38
+rW @ index-rqCberUu.js:38
+tT @ index-rqCberUu.js:38
+LR @ index-rqCberUu.js:38
+(anonymous) @ index-rqCberUu.js:38
+kE @ index-rqCberUu.js:41
+aR @ index-rqCberUu.js:38
+Ux @ index-rqCberUu.js:38
+JS @ index-rqCberUu.js:38
+bW @ index-rqCberUu.js:38
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: undefined
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: false
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: undefined
+favicon.ico:1 
+            
+            
+           GET https://playhouse-git-main-bosmith517s-projects.vercel.app/auth/media/logos/favicon.ico 404 (Not Found)
+Image
+(anonymous) @ web-client-content-script.js:2
+gd @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+p @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+u @ web-client-content-script.js:2
+i @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+nu @ web-client-content-script.js:2
+kl @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+k @ web-client-content-script.js:2
+L @ web-client-content-script.js:2
+index-rqCberUu.js:47 
+            
+            
+           POST https://preview.keenthemes.com/metronic8/laravel/api/forgot_password 422 (Unprocessable Content)
+(anonymous) @ index-rqCberUu.js:47
+xhr @ index-rqCberUu.js:47
+sN @ index-rqCberUu.js:49
+Promise.then
+_request @ index-rqCberUu.js:50
+request @ index-rqCberUu.js:49
+(anonymous) @ index-rqCberUu.js:50
+(anonymous) @ index-rqCberUu.js:45
+Jpe @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1406
+setTimeout
+onSubmit @ index-rqCberUu.js:1406
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+Promise.then
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+J5 @ index-rqCberUu.js:38
+tW @ index-rqCberUu.js:38
+rW @ index-rqCberUu.js:38
+tT @ index-rqCberUu.js:38
+LR @ index-rqCberUu.js:38
+(anonymous) @ index-rqCberUu.js:38
+kE @ index-rqCberUu.js:41
+aR @ index-rqCberUu.js:38
+Ux @ index-rqCberUu.js:38
+JS @ index-rqCberUu.js:38
+bW @ index-rqCberUu.js:38
+index-rqCberUu.js:1407 AppRoutes - authLoading: true currentUser: undefined
+index-rqCberUu.js:1407 AppRoutes - showing loading screen
+index-rqCberUu.js:137 
+            
+            
+           POST https://eskpnhbemnxkxafjbbdx.supabase.co/auth/v1/token?grant_type=password 400 (Bad Request)
+(anonymous) @ index-rqCberUu.js:137
+Kte @ index-rqCberUu.js:137
+Mt @ index-rqCberUu.js:137
+signInWithPassword @ index-rqCberUu.js:137
+k @ index-rqCberUu.js:138
+onSubmit @ index-rqCberUu.js:1406
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+Promise.then
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+J5 @ index-rqCberUu.js:38
+tW @ index-rqCberUu.js:38
+rW @ index-rqCberUu.js:38
+tT @ index-rqCberUu.js:38
+LR @ index-rqCberUu.js:38
+(anonymous) @ index-rqCberUu.js:38
+kE @ index-rqCberUu.js:41
+aR @ index-rqCberUu.js:38
+Ux @ index-rqCberUu.js:38
+JS @ index-rqCberUu.js:38
+bW @ index-rqCberUu.js:38
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: undefined
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: false
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: undefined
+favicon.ico:1 
+            
+            
+           GET https://playhouse-git-main-bosmith517s-projects.vercel.app/auth/media/logos/favicon.ico 404 (Not Found)
+Image
+(anonymous) @ web-client-content-script.js:2
+gd @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+p @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+u @ web-client-content-script.js:2
+i @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+nu @ web-client-content-script.js:2
+kl @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+k @ web-client-content-script.js:2
+L @ web-client-content-script.js:2
+index-rqCberUu.js:1407 AppRoutes - authLoading: true currentUser: undefined
+index-rqCberUu.js:1407 AppRoutes - showing loading screen
+index-rqCberUu.js:137 
+            
+            
+           POST https://eskpnhbemnxkxafjbbdx.supabase.co/auth/v1/token?grant_type=password 400 (Bad Request)
+(anonymous) @ index-rqCberUu.js:137
+Kte @ index-rqCberUu.js:137
+Mt @ index-rqCberUu.js:137
+signInWithPassword @ index-rqCberUu.js:137
+k @ index-rqCberUu.js:138
+onSubmit @ index-rqCberUu.js:1406
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+Promise.then
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+J5 @ index-rqCberUu.js:38
+tW @ index-rqCberUu.js:38
+rW @ index-rqCberUu.js:38
+tT @ index-rqCberUu.js:38
+LR @ index-rqCberUu.js:38
+(anonymous) @ index-rqCberUu.js:38
+kE @ index-rqCberUu.js:41
+aR @ index-rqCberUu.js:38
+Ux @ index-rqCberUu.js:38
+JS @ index-rqCberUu.js:38
+bW @ index-rqCberUu.js:38
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: undefined
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: false
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: undefined
+favicon.ico:1 
+            
+            
+           GET https://playhouse-git-main-bosmith517s-projects.vercel.app/auth/media/logos/favicon.ico 404 (Not Found)
+Image
+(anonymous) @ web-client-content-script.js:2
+gd @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+p @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+u @ web-client-content-script.js:2
+i @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+nu @ web-client-content-script.js:2
+kl @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+k @ web-client-content-script.js:2
+L @ web-client-content-script.js:2
+index-rqCberUu.js:1407 AppRoutes - authLoading: true currentUser: undefined
+index-rqCberUu.js:1407 AppRoutes - showing loading screen
+index-rqCberUu.js:137 
+            
+            
+           POST https://eskpnhbemnxkxafjbbdx.supabase.co/auth/v1/token?grant_type=password 400 (Bad Request)
+(anonymous) @ index-rqCberUu.js:137
+Kte @ index-rqCberUu.js:137
+Mt @ index-rqCberUu.js:137
+signInWithPassword @ index-rqCberUu.js:137
+k @ index-rqCberUu.js:138
+onSubmit @ index-rqCberUu.js:1406
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+Promise.then
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+(anonymous) @ index-rqCberUu.js:1403
+J5 @ index-rqCberUu.js:38
+tW @ index-rqCberUu.js:38
+rW @ index-rqCberUu.js:38
+tT @ index-rqCberUu.js:38
+LR @ index-rqCberUu.js:38
+(anonymous) @ index-rqCberUu.js:38
+kE @ index-rqCberUu.js:41
+aR @ index-rqCberUu.js:38
+Ux @ index-rqCberUu.js:38
+JS @ index-rqCberUu.js:38
+bW @ index-rqCberUu.js:38
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: undefined
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: false
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: undefined
+favicon.ico:1 
+            
+            
+           GET https://playhouse-git-main-bosmith517s-projects.vercel.app/auth/media/logos/favicon.ico 404 (Not Found)
+Image
+(anonymous) @ web-client-content-script.js:2
+gd @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+p @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+u @ web-client-content-script.js:2
+i @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+nu @ web-client-content-script.js:2
+kl @ web-client-content-script.js:2
+(anonymous) @ web-client-content-script.js:2
+k @ web-client-content-script.js:2
+L @ web-client-content-script.js:2
+index-rqCberUu.js:1407 AppRoutes - authLoading: true currentUser: undefined
+index-rqCberUu.js:1407 AppRoutes - showing loading screen
+index-rqCberUu.js:138 Auth state changed: SIGNED_IN 4bff5ef2-0ec1-48c6-bdbd-d1909fc1e6e3
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: {id: 1, username: 'testuser123@anydomain.com', password: undefined, email: 'testuser123@anydomain.com', first_name: 'John', …}
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: true
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: {id: 1, username: 'testuser123@anydomain.com', password: undefined, email: 'testuser123@anydomain.com', first_name: 'John', …}
+index-rqCberUu.js:314 Waiting for user profile to initialize channels...
+index-rqCberUu.js:599 User is logged in, now fetching details...
+index-rqCberUu.js:45 trigger scoll
+index-rqCberUu.js:599 Profile found, updating context
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: {id: 4, username: 'testuser123@anydomain.com', password: undefined, email: 'testuser123@anydomain.com', first_name: 'John', …}
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: true
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: {id: 4, username: 'testuser123@anydomain.com', password: undefined, email: 'testuser123@anydomain.com', first_name: 'John', …}
+index-rqCberUu.js:599 Tenant found, updating context
+index-rqCberUu.js:1407 AppRoutes - authLoading: false currentUser: {id: 4, username: 'testuser123@anydomain.com', password: undefined, email: 'testuser123@anydomain.com', first_name: 'John', …}
+index-rqCberUu.js:1412 AppRoutes - rendering routes, currentUser: true
+index-rqCberUu.js:138 SupabaseAuthInit - authLoading: false currentUser: {id: 4, username: 'testuser123@anydomain.com', password: undefined, email: 'testuser123@anydomain.com', first_name: 'John', …}
+index-rqCberUu.js:314 General channel already exists.
+index-rqCberUu.js:314 Setting up subscription for channel: f17537c9-31d7-4f04-82cd-1b3d98518e56
+index-rqCberUu.js:314 Successfully subscribed!
+index-rqCberUu.js:136 
+            
+            
+           POST https://eskpnhbemnxkxafjbbdx.supabase.co/functions/v1/generate-signalwire-token 500 (Internal Server Error)
+(anonymous) @ index-rqCberUu.js:136
+(anonymous) @ index-rqCberUu.js:136
+c @ index-rqCberUu.js:136
+Promise.then
+f @ index-rqCberUu.js:136
+(anonymous) @ index-rqCberUu.js:136
+cte @ index-rqCberUu.js:136
+(anonymous) @ index-rqCberUu.js:136
+(anonymous) @ index-rqCberUu.js:131
+(anonymous) @ index-rqCberUu.js:131
+(anonymous) @ index-rqCberUu.js:131
+see @ index-rqCberUu.js:131
+invoke @ index-rqCberUu.js:131
+M @ index-rqCberUu.js:387
+await in M
+(anonymous) @ index-rqCberUu.js:387
+await in (anonymous)
+(anonymous) @ index-rqCberUu.js:387
+kb @ index-rqCberUu.js:41
+Zu @ index-rqCberUu.js:41
+RV @ index-rqCberUu.js:41
+Zl @ index-rqCberUu.js:41
+IT @ index-rqCberUu.js:41
+ml @ index-rqCberUu.js:39
+(anonymous) @ index-rqCberUu.js:41
+index-rqCberUu.js:387 Error initializing SignalWire client: FunctionsHttpError: Edge Function returned a non-2xx status code
+    at iee.<anonymous> (index-rqCberUu.js:131:2509)
+    at Generator.next (<anonymous>)
+    at c (index-rqCberUu.js:131:1387)
+M @ index-rqCberUu.js:387
+await in M
+(anonymous) @ index-rqCberUu.js:387
+await in (anonymous)
+(anonymous) @ index-rqCberUu.js:387
+kb @ index-rqCberUu.js:41
+Zu @ index-rqCberUu.js:41
+RV @ index-rqCberUu.js:41
+Zl @ index-rqCberUu.js:41
+IT @ index-rqCberUu.js:41
+ml @ index-rqCberUu.js:39
+(anonymous) @ index-rqCberUu.js:41
+index-rqCberUu.js:45 trigger scoll
+index-rqCberUu.js:45 trigger scoll
+index-rqCberUu.js:45 trigger scoll
+index-rqCberUu.js:45 trigger scoll
+index-rqCberUu.js:45 trigger scoll
+index-rqCberUu.js:45 trigger scoll

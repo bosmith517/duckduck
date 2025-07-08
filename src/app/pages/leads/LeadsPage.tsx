@@ -128,6 +128,23 @@ const LeadsPage: React.FC = () => {
     }
   }
 
+  const handleDeleteLead = async (leadId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this lead? This action cannot be undone.')) return
+
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .delete()
+        .eq('id', leadId)
+
+      if (error) throw error
+      fetchLeads()
+    } catch (error) {
+      console.error('Error deleting lead:', error)
+      alert('Error deleting lead')
+    }
+  }
+
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency) {
       case 'emergency':
@@ -307,7 +324,7 @@ const LeadsPage: React.FC = () => {
                       </td>
                       <td>
                         <span className={`badge ${getStatusBadge(lead.status)} fw-bolder`}>
-                          {lead.status.toUpperCase()}
+                          {lead.status.replace(/_/g, ' ').toUpperCase()}
                         </span>
                       </td>
                       <td>
@@ -374,6 +391,19 @@ const LeadsPage: React.FC = () => {
                                   <span className='path2'></span>
                                 </i>
                               </button>
+                              <button
+                                className='btn btn-sm btn-danger'
+                                onClick={() => handleDeleteLead(lead.id)}
+                                title='Delete Lead'
+                              >
+                                <i className='ki-duotone ki-trash fs-4'>
+                                  <span className='path1'></span>
+                                  <span className='path2'></span>
+                                  <span className='path3'></span>
+                                  <span className='path4'></span>
+                                  <span className='path5'></span>
+                                </i>
+                              </button>
                             </>
                           )}
                           
@@ -431,6 +461,23 @@ const LeadsPage: React.FC = () => {
                               </i>
                               View Job
                             </a>
+                          )}
+                          
+                          {/* Delete button available for all non-converted leads */}
+                          {lead.status !== 'converted' && lead.status !== 'new' && (
+                            <button
+                              className='btn btn-sm btn-danger'
+                              onClick={() => handleDeleteLead(lead.id)}
+                              title='Delete Lead'
+                            >
+                              <i className='ki-duotone ki-trash fs-4'>
+                                <span className='path1'></span>
+                                <span className='path2'></span>
+                                <span className='path3'></span>
+                                <span className='path4'></span>
+                                <span className='path5'></span>
+                              </i>
+                            </button>
                           )}
                         </div>
                       </td>

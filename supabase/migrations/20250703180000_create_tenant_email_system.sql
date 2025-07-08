@@ -428,3 +428,6 @@ COMMENT ON TABLE tenant_email_domains IS 'Custom email domains per tenant verifi
 COMMENT ON TABLE tenant_email_usage IS 'Email usage tracking and rate limiting per tenant';
 COMMENT ON TABLE email_events IS 'Email delivery events from Resend webhooks';
 COMMENT ON TABLE email_queue IS 'Email sending queue with rate limiting and retry logic';
+
+
+supabase domains create --project-ref eskpnhbemnxkxafjbbdx --custom-hostname app.tradeworkspro.com
