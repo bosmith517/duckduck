@@ -14,6 +14,16 @@ export const AuthCallbackPage: React.FC = () => {
 
   const handleAuthCallback = async () => {
     try {
+      // First check if there's already a session (for password recovery)
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
+      
+      if (existingSession) {
+        console.log('Existing session found, likely from password recovery');
+        // For password recovery, Supabase sets the session automatically
+        navigate('/auth/reset-password');
+        return;
+      }
+      
       // Get the hash from URL (Supabase sends auth data in URL hash)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       
