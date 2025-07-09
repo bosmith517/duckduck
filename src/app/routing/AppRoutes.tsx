@@ -33,6 +33,7 @@ import {AcceptInvitationPage} from '../pages/auth/AcceptInvitationPage'
 import {PasswordSetupPage} from '../pages/auth/PasswordSetupPage'
 import {PasswordResetTestPage} from '../pages/test/PasswordResetTestPage'
 import {SimplePasswordResetTest} from '../pages/test/SimplePasswordResetTest'
+import {SupabaseVerifyProxy} from '../pages/auth/SupabaseVerifyProxy'
 
 
 /**
@@ -100,6 +101,7 @@ const AppRoutes: FC = () => {
         <Route path='auth/reset-password' element={<ResetPasswordPage />} />
         <Route path='reset-password' element={<ResetPasswordPage />} />
         <Route path='auth/callback' element={<AuthCallbackPage />} />
+        <Route path='auth/v1/verify' element={<SupabaseVerifyProxy />} />
         <Route path='auth/accept-invitation' element={<AcceptInvitationPage />} />
         <Route path='auth/password-setup' element={<PasswordSetupPage />} />
         
