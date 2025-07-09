@@ -1,9 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { showToast } from '../../utils/toast'
 import { MobileService, PhotoResult } from '../../services/mobileService'
 import { Capacitor } from '@capacitor/core'
+import { CameraPreview } from '@capacitor-community/camera-preview'
+import type { CameraPreviewOptions, CameraPreviewPictureOptions } from '@capacitor-community/camera-preview'
 
 interface PhotoCaptureProps {
   isOpen: boolean
@@ -47,6 +49,17 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
+  // Cleanup camera preview on unmount
+  useEffect(() => {
+    return () => {
+      if (isMobileDevice && Capacitor.isNativePlatform()) {
+        CameraPreview.stop().catch((error: any) => {
+          console.error('Error stopping camera preview on cleanup:', error)
+        })
+      }
+    }
+  }, [isMobileDevice])
+
   const getPhotoTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       'receipt': 'Receipt',
@@ -82,40 +95,58 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       setCameraLoading(true)
       
       // Check if we're on a mobile device with native camera support
-      if (isMobileDevice) {
-        // Use native camera for mobile devices
+      if (isMobileDevice && Capacitor.isNativePlatform()) {
+        // Use camera preview for mobile devices
         try {
-          const photo = await MobileService.takePhoto()
-          
-          // Convert dataUrl to File
-          const response = await fetch(photo.dataUrl)
-          const blob = await response.blob()
-          const file = new File([blob], `photo_${Date.now()}.${photo.format}`, { type: `image/${photo.format}` })
-          
-          // Get location
-          const position = await getLocation()
-          
-          // Add to photos array
-          const newPhoto: CapturedPhoto = {
-            file,
-            preview: photo.dataUrl,
-            description: '',
-            location: position ? {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
-            } : undefined
+          const cameraPreviewOptions: CameraPreviewOptions = {
+            position: 'rear',
+            height: 400,
+            width: window.innerWidth,
+            parent: 'cameraPreview',
+            className: 'cameraPreview',
+            toBack: false
           }
           
-          setPhotos(prev => [...prev, newPhoto])
+          await CameraPreview.start(cameraPreviewOptions)
           setCameraLoading(false)
-          // Don't close camera mode on mobile - allow multiple captures
-          showToast.success(`Photo ${photos.length + 1} captured! Take another or save all.`)
+          setShowCamera(true)
           return
         } catch (error) {
-          console.error('Native camera error:', error)
-          showToast.error('Failed to capture photo')
-          setCameraLoading(false)
-          return
+          console.error('Camera preview error:', error)
+          // Fall back to single photo mode
+          try {
+            const photo = await MobileService.takePhoto()
+            
+            // Convert dataUrl to File
+            const response = await fetch(photo.dataUrl)
+            const blob = await response.blob()
+            const file = new File([blob], `photo_${Date.now()}.${photo.format}`, { type: `image/${photo.format}` })
+            
+            // Get location
+            const position = await getLocation()
+            
+            // Add to photos array
+            const newPhoto: CapturedPhoto = {
+              file,
+              preview: photo.dataUrl,
+              description: '',
+              location: position ? {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              } : undefined
+            }
+            
+            setPhotos(prev => [...prev, newPhoto])
+            setCameraLoading(false)
+            // Don't close camera mode on mobile - allow multiple captures
+            showToast.success(`Photo ${photos.length + 1} captured! Take another or save all.`)
+            return
+          } catch (error) {
+            console.error('Native camera error:', error)
+            showToast.error('Failed to capture photo')
+            setCameraLoading(false)
+            return
+          }
         }
       }
       
@@ -184,7 +215,17 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     }
   }
 
-  const stopCamera = () => {
+  const stopCamera = async () => {
+    // Stop camera preview if using mobile
+    if (isMobileDevice && Capacitor.isNativePlatform() && showCamera) {
+      try {
+        await CameraPreview.stop()
+      } catch (error) {
+        console.error('Error stopping camera preview:', error)
+      }
+    }
+    
+    // Stop browser camera stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
@@ -196,6 +237,45 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   const capturePhoto = async () => {
     console.log('Attempting to capture photo...')
     
+    // Use camera preview capture for mobile
+    if (isMobileDevice && Capacitor.isNativePlatform() && showCamera) {
+      try {
+        const captureOptions: CameraPreviewPictureOptions = {
+          quality: 90
+        }
+        
+        const result = await CameraPreview.capture(captureOptions)
+        const base64 = `data:image/jpeg;base64,${result.value}`
+        
+        // Convert base64 to blob
+        const response = await fetch(base64)
+        const blob = await response.blob()
+        const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' })
+        
+        // Get location
+        const position = await getLocation()
+        
+        const newPhoto: CapturedPhoto = {
+          file,
+          preview: base64,
+          description: '',
+          location: position ? {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          } : undefined
+        }
+        
+        setPhotos(prev => [...prev, newPhoto])
+        showToast.success(`Photo ${photos.length + 1} captured!`)
+        return
+      } catch (error) {
+        console.error('Camera preview capture error:', error)
+        showToast.error('Failed to capture photo')
+        return
+      }
+    }
+    
+    // Browser camera capture logic
     if (!videoRef.current || !canvasRef.current) {
       console.error('Video or canvas ref is null:', { video: !!videoRef.current, canvas: !!canvasRef.current })
       showToast.error('Camera not ready. Please try again.')
@@ -512,8 +592,8 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     }
   }
 
-  const handleClose = () => {
-    stopCamera()
+  const handleClose = async () => {
+    await stopCamera()
     photos.forEach(photo => URL.revokeObjectURL(photo.preview))
     setPhotos([])
     setDescription('')
@@ -524,6 +604,43 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
 
   return (
     <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+      <style>{`
+        .cameraPreview {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+        }
+        
+        #cameraPreview {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+        
+        /* Ensure camera preview is visible on mobile */
+        @media (max-width: 768px) {
+          .modal-dialog {
+            margin: 0;
+            max-width: 100%;
+            height: 100vh;
+          }
+          
+          .modal-content {
+            height: 100%;
+            border-radius: 0;
+          }
+          
+          .modal-body {
+            padding: 0.5rem;
+          }
+          
+          #cameraPreview {
+            height: calc(100vh - 200px) !important;
+            max-height: 500px;
+          }
+        }
+      `}</style>
       <div className="modal-dialog modal-lg">
         <div className="modal-content">
           <div className="modal-header">
@@ -546,25 +663,36 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             {showCamera && (
               <div className="mb-6">
                 <div className="position-relative">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-100 rounded"
-                    style={{ maxHeight: '400px', objectFit: 'cover' }}
-                    onError={(e) => {
-                      console.error('Video element error:', e)
-                      showToast.error('Video display error. Please try again.')
-                    }}
-                    onCanPlay={() => {
-                      console.log('Video can play')
-                    }}
-                    onLoadStart={() => {
-                      console.log('Video load started')
-                    }}
-                  />
-                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                  {/* Camera preview container for mobile */}
+                  {isMobileDevice && Capacitor.isNativePlatform() ? (
+                    <div 
+                      id="cameraPreview" 
+                      className="w-100 rounded overflow-hidden"
+                      style={{ height: '400px', backgroundColor: '#000' }}
+                    />
+                  ) : (
+                    <>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-100 rounded"
+                        style={{ maxHeight: '400px', objectFit: 'cover' }}
+                        onError={(e) => {
+                          console.error('Video element error:', e)
+                          showToast.error('Video display error. Please try again.')
+                        }}
+                        onCanPlay={() => {
+                          console.log('Video can play')
+                        }}
+                        onLoadStart={() => {
+                          console.log('Video load started')
+                        }}
+                      />
+                      <canvas ref={canvasRef} style={{ display: 'none' }} />
+                    </>
+                  )}
                   
                   {/* Photo count badge */}
                   {photos.length > 0 && (
@@ -613,8 +741,8 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                       
                       <button
                         className="btn btn-light btn-lg rounded-circle shadow"
-                        onClick={() => {
-                          stopCamera()
+                        onClick={async () => {
+                          await stopCamera()
                           if (photos.length === 0) {
                             onClose()
                           }

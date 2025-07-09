@@ -45,5 +45,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to take photos for job documentation, receipts, and progress tracking.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to select and upload photos for job documentation.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app saves captured photos to your photo library for backup purposes.</string>
 </dict>
 </plist>
