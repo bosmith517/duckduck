@@ -43,21 +43,7 @@ const {VITE_BASE_URL} = import.meta.env
 const AppRoutes: FC = () => {
   const {currentUser, authLoading} = useSupabaseAuth() // Use the new authLoading state
   
-  // Check for password reset on initial load
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    
-    // Check if this is a password recovery callback
-    const type = hashParams.get('type') || urlParams.get('type');
-    
-    if (type === 'recovery') {
-      console.log('Password recovery detected, redirecting to reset password page');
-      // Just redirect to the reset password page
-      // Let the ResetPasswordPage handle the token processing
-      window.location.href = '/auth/reset-password' + window.location.hash + window.location.search;
-    }
-  }, []);
+  // Removed password reset detection - now handled directly by Supabase redirect
   
   // Only show the main loading screen during the initial auth check
   if (authLoading) {
@@ -108,8 +94,9 @@ const AppRoutes: FC = () => {
         <Route path='homeowner-signup' element={<HomeownerSignupPage />} />
         <Route path='customer-portal' element={<CustomerPortalLandingPage />} />
         
-        {/* Auth routes */}
+        {/* Auth routes - accessible without login */}
         <Route path='auth/reset-password' element={<ResetPasswordPage />} />
+        <Route path='reset-password' element={<ResetPasswordPage />} />
         <Route path='auth/callback' element={<AuthCallbackPage />} />
         <Route path='auth/accept-invitation' element={<AcceptInvitationPage />} />
         <Route path='auth/password-setup' element={<PasswordSetupPage />} />

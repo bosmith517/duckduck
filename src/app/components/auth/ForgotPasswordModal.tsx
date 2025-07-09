@@ -29,8 +29,9 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ show, 
     onSubmit: async (values, { setSubmitting }) => {
       setLoading(true);
       try {
+        // Use Supabase default password reset
         const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-          redirectTo: `${window.location.origin}/auth/reset-password`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         });
 
         if (error) throw error;
@@ -39,7 +40,12 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ show, 
         showToast.success('Password reset email sent! Check your inbox.');
       } catch (error: any) {
         console.error('Password reset error:', error);
-        showToast.error(error.message || 'Failed to send reset email');
+        // Check for rate limiting error
+        if (error.message?.includes('Too many password reset attempts')) {
+          showToast.error(error.message);
+        } else {
+          showToast.error(error.message || 'Failed to send reset email');
+        }
       } finally {
         setLoading(false);
         setSubmitting(false);

@@ -169,6 +169,7 @@ export function AsideMenuMain() {
         <AsideMenuItem to='/settings/notifications' title='Notifications' hasBullet={true} />
         <AsideMenuItem to='/settings/workflow-automation' title='Workflow Automation' hasBullet={true} />
         <AsideMenuItem to='/settings/security' title='Security' hasBullet={true} />
+        <AsideMenuItem to='/settings/password-reset-logs' title='Password Reset Logs' hasBullet={true} />
         <AsideMenuItem to='/settings/integrations' title='Integrations' hasBullet={true} />
       </AsideMenuItemWithSub>
       

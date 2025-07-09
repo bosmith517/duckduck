@@ -41,11 +41,7 @@ export const AuthCallbackPage: React.FC = () => {
         console.log('Session set successfully:', data);
 
         // Check the type of auth callback
-        if (type === 'recovery') {
-          // This is a password reset
-          console.log('Password recovery callback detected');
-          navigate('/auth/reset-password');
-        } else if (type === 'invite') {
+        if (type === 'invite') {
           // This is an invite - user needs to set initial password
           console.log('Invite callback detected - redirecting to password setup');
           navigate('/auth/password-setup');

@@ -21,91 +21,52 @@ const resetPasswordSchema = Yup.object().shape({
 
 export const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isValidToken, setIsValidToken] = useState(true);
+  const [isValidToken, setIsValidToken] = useState(false);
+  const [validating, setValidating] = useState(true);
+  const [tokenData, setTokenData] = useState<{ email: string; userName: string } | null>(null);
+  const token = searchParams.get('token');
 
   useEffect(() => {
-    // First, check if we have tokens in the URL that need to be processed
-    const processTokensIfPresent = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const urlParams = new URLSearchParams(window.location.search);
-      
-      const accessToken = hashParams.get('access_token') || urlParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token') || urlParams.get('refresh_token');
-      const type = hashParams.get('type') || urlParams.get('type');
-      
-      if (type === 'recovery' && accessToken && refreshToken) {
-        console.log('Found recovery tokens in URL, setting session...');
-        
-        try {
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          
-          if (error) {
-            console.error('Error setting session from tokens:', error);
-            setIsValidToken(false);
-            return;
-          }
-          
-          console.log('Session set successfully from recovery tokens');
-          
-          // Clear the URL to prevent reprocessing
-          window.history.replaceState({}, document.title, window.location.pathname);
-          
-          // Now check the session
-          checkSession();
-        } catch (err) {
-          console.error('Error processing recovery tokens:', err);
-          setIsValidToken(false);
-        }
-      } else {
-        // No tokens in URL, just check if we have an existing session
-        checkSession();
-      }
-    };
-    
-    processTokensIfPresent();
-  }, []);
+    // Validate the token from URL
+    if (token) {
+      validateToken();
+    } else {
+      setValidating(false);
+      setIsValidToken(false);
+    }
+  }, [token]);
 
-  const checkSession = async () => {
+  const validateToken = async () => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      console.log('Reset password page - checking session:', session?.user?.email);
-      console.log('Session details:', {
-        user: session?.user?.email,
-        expires_at: session?.expires_at,
-        created_at: session?.user?.created_at,
-        recovery_sent_at: session?.user?.recovery_sent_at,
-        error: error
+      const response = await supabase.functions.invoke('reset-password/validate', {
+        body: { token }
       });
-      
-      if (error) {
-        console.error('Error getting session:', error);
+
+      if (response.error) {
+        console.error('Token validation error:', response.error);
         setIsValidToken(false);
         return;
       }
-      
-      if (!session) {
-        console.log('No session found on reset password page');
-        // Check URL for error messages
-        const urlParams = new URLSearchParams(window.location.search);
-        const errorCode = urlParams.get('error');
-        const errorDescription = urlParams.get('error_description');
-        if (errorCode) {
-          console.error('Auth error in URL:', errorCode, errorDescription);
-        }
-        setIsValidToken(false);
-      } else {
-        console.log('Valid session found for password reset');
+
+      if (response.data?.valid) {
         setIsValidToken(true);
+        setTokenData({
+          email: response.data.email,
+          userName: response.data.userName
+        });
+      } else {
+        setIsValidToken(false);
+        showToast.error(response.data?.error || 'Invalid or expired reset link');
       }
     } catch (err) {
-      console.error('Error checking session:', err);
+      console.error('Error validating token:', err);
       setIsValidToken(false);
+    } finally {
+      setValidating(false);
     }
   };
 
@@ -116,18 +77,30 @@ export const ResetPasswordPage: React.FC = () => {
     },
     validationSchema: resetPasswordSchema,
     onSubmit: async (values, { setSubmitting }) => {
+      if (!token) {
+        showToast.error('Invalid reset link');
+        return;
+      }
+
       setLoading(true);
       try {
-        const { error } = await supabase.auth.updateUser({
-          password: values.newPassword,
+        // Use our custom reset password Edge Function
+        const response = await supabase.functions.invoke('reset-password', {
+          body: {
+            token,
+            newPassword: values.newPassword
+          }
         });
 
-        if (error) throw error;
+        if (response.error) {
+          throw new Error(response.error.message || 'Failed to reset password');
+        }
+
+        if (!response.data?.success) {
+          throw new Error(response.data?.error || 'Failed to reset password');
+        }
 
         showToast.success('Password reset successfully! Please log in with your new password.');
-        
-        // Sign out to ensure clean state
-        await supabase.auth.signOut();
         
         // Redirect to login
         navigate('/auth/login');
@@ -140,6 +113,34 @@ export const ResetPasswordPage: React.FC = () => {
       }
     },
   });
+
+  if (validating) {
+    return (
+      <div className="d-flex flex-column flex-root" style={{ minHeight: '100vh' }}>
+        <div className="d-flex flex-center flex-column flex-lg-row-fluid">
+          <div className="w-100 p-10" style={{ maxWidth: '500px' }}>
+            <div className="text-center mb-10">
+              <img
+                alt="Logo"
+                src="/media/logos/tradeworks-logo.png"
+                className="h-60px mb-5"
+              />
+              <h1 className="text-dark fw-bolder mb-3">Validating Reset Link</h1>
+              <div className="text-gray-500 fw-semibold fs-6">
+                Please wait while we validate your password reset link...
+              </div>
+            </div>
+
+            <div className="d-flex justify-content-center">
+              <span className="spinner-border spinner-border-lg text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isValidToken) {
     return (
@@ -200,8 +201,17 @@ export const ResetPasswordPage: React.FC = () => {
               />
               <h1 className="text-dark fw-bolder mb-3">Create New Password</h1>
               <div className="text-gray-500 fw-semibold fs-6">
-                Please enter your new password below
+                {tokenData?.userName ? (
+                  <>Hi {tokenData.userName}, please enter your new password below.</>
+                ) : (
+                  <>Please enter your new password below</>
+                )}
               </div>
+              {tokenData?.email && (
+                <div className="text-gray-400 fw-semibold fs-7 mt-2">
+                  Account: {tokenData.email}
+                </div>
+              )}
             </div>
 
             <div className="fv-row mb-8">

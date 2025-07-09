@@ -102,6 +102,7 @@ const PrivateRoutes = () => {
   const SubcontractorSignupPage = lazy(() => import('../pages/subcontractor-signup/SubcontractorSignupPage'))
   const WorkflowAutomationPage = lazy(() => import('../pages/settings/WorkflowAutomationPage'))
   const EmailPage = lazy(() => import('../pages/email/EmailPage'))
+  const PasswordResetLogsPage = lazy(() => import('../pages/admin/PasswordResetLogsPage'))
 
   // Note: Onboarding is now handled via modal in MasterLayout
 
@@ -609,6 +610,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <WorkflowAutomationPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='settings/password-reset-logs'
+          element={
+            <SuspensedView>
+              <PasswordResetLogsPage />
             </SuspensedView>
           }
         />
