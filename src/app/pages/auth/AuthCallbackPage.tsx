@@ -49,6 +49,10 @@ export const AuthCallbackPage: React.FC = () => {
           // This is an email confirmation
           console.log('Signup confirmation callback detected');
           navigate('/dashboard');
+        } else if (type === 'recovery') {
+          // This is a password reset
+          console.log('Password recovery callback detected - redirecting to reset password page');
+          navigate('/auth/reset-password');
         } else {
           // Default to dashboard
           console.log('Default auth callback, redirecting to dashboard');

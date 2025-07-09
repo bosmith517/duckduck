@@ -31,6 +31,8 @@ import {ResetPasswordPage} from '../pages/auth/ResetPasswordPage'
 import {AuthCallbackPage} from '../pages/auth/AuthCallbackPage'
 import {AcceptInvitationPage} from '../pages/auth/AcceptInvitationPage'
 import {PasswordSetupPage} from '../pages/auth/PasswordSetupPage'
+import {PasswordResetTestPage} from '../pages/test/PasswordResetTestPage'
+import {SimplePasswordResetTest} from '../pages/test/SimplePasswordResetTest'
 
 
 /**
@@ -101,29 +103,38 @@ const AppRoutes: FC = () => {
         <Route path='auth/accept-invitation' element={<AcceptInvitationPage />} />
         <Route path='auth/password-setup' element={<PasswordSetupPage />} />
         
+        {/* Test routes - accessible without login */}
+        <Route path='test-ui' element={<UITestPage />} />
+        <Route path='test-video' element={<VideoTestPage />} />
+        <Route path='test-signalwire' element={<SignalWireTestPage />} />
+        <Route path='test-signalwire-sync' element={<SignalWireSyncTestPage />} />
+        <Route path='test-database' element={<DatabaseTestPage />} />
+        <Route path='test-tracking-migration' element={<TrackingMigrationPage />} />
+        <Route path='test-tracking-simple' element={<SimpleTrackingTest />} />
+        <Route path='test-password-reset' element={<SimplePasswordResetTest />} />
+        <Route path='automation-demo' element={<AutomationDemoPage />} />
+        
+        {/* Error pages and logout - wrapped in App for consistent layout */}
         <Route element={<App />}>
           <Route path='error/*' element={<ErrorsPage />} />
           <Route path='logout' element={<Logout />} />
-          <Route path='test-ui' element={<UITestPage />} />
-          <Route path='test-video' element={<VideoTestPage />} />
-          <Route path='test-signalwire' element={<SignalWireTestPage />} />
-          <Route path='test-signalwire-sync' element={<SignalWireSyncTestPage />} />
-          <Route path='test-database' element={<DatabaseTestPage />} />
-          <Route path='test-tracking-migration' element={<TrackingMigrationPage />} />
-          <Route path='test-tracking-simple' element={<SimpleTrackingTest />} />
-          <Route path='automation-demo' element={<AutomationDemoPage />} />
-          {currentUser ? (
-            <>
-              <Route path='/*' element={<PrivateRoutes />} />
-              <Route path='auth/*' element={<Navigate to='/dashboard' />} />
-            </>
-          ) : (
-            <>
-              <Route path='auth/*' element={<AuthPage />} />
-              <Route path='*' element={<Navigate to='/auth/login' />} />
-            </>
-          )}
         </Route>
+        
+        {/* Auth and private routes - wrapped in App for providers */}
+        {currentUser ? (
+          <Route element={<App />}>
+            <Route path='/*' element={<PrivateRoutes />} />
+            <Route path='auth/*' element={<Navigate to='/dashboard' />} />
+          </Route>
+        ) : (
+          <Route element={<App />}>
+            <Route path='auth/*' element={<AuthPage />} />
+            {/* Removed the catch-all redirect that was interfering with public routes */}
+          </Route>
+        )}
+        
+        {/* Final catch-all for truly unmatched routes */}
+        <Route path='*' element={<Navigate to='/' />} />
       </Routes>
     </BrowserRouter>
   )
