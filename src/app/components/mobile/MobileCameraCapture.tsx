@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MobileService, PhotoResult } from '../../services/mobileService';
+import { permissionsService } from '../../services/permissionsService';
+import PermissionsPrompt from './PermissionsPrompt';
 
 interface MobileCameraCaptureProps {
   onPhotoTaken: (photo: PhotoResult) => void;
@@ -16,6 +18,16 @@ export const MobileCameraCapture: React.FC<MobileCameraCaptureProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    checkCameraPermission();
+  }, []);
+
+  const checkCameraPermission = async () => {
+    const permission = await permissionsService.checkCameraPermission();
+    setHasPermission(permission);
+  };
 
   const handleTakePhoto = async () => {
     try {
@@ -55,6 +67,19 @@ export const MobileCameraCapture: React.FC<MobileCameraCaptureProps> = ({
     await MobileService.hapticFeedback('light');
     onCancel();
   };
+
+  const handlePermissionsGranted = () => {
+    setHasPermission(true);
+  };
+
+  if (hasPermission === false) {
+    return (
+      <PermissionsPrompt 
+        requiredPermissions={['camera']}
+        onPermissionsGranted={handlePermissionsGranted}
+      />
+    );
+  }
 
   return (
     <div className="mobile-camera-capture">
@@ -240,3 +265,5 @@ export const MobileCameraCapture: React.FC<MobileCameraCaptureProps> = ({
     </div>
   );
 };
+
+export default MobileCameraCapture;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { MobileLayout } from '../../components/mobile/MobileLayout';
-import { MobileLocationTracker } from '../../components/mobile/MobileLocationTracker';
-import { MobileCameraCapture } from '../../components/mobile/MobileCameraCapture';
+import MobileLayout from '../../components/mobile/MobileLayout';
+import MobileLocationTracker from '../../components/mobile/MobileLocationTracker';
+import MobileCameraCapture from '../../components/mobile/MobileCameraCapture';
 import { MobileService, LocationData, PhotoResult } from '../../services/mobileService';
 import { supabase } from '../../../supabaseClient';
 

@@ -111,8 +111,8 @@ const PrivateRoutes = () => {
 
   // Mobile Components
   const MyDayDashboard = lazy(() => import('../components/mobile/MyDayDashboard'))
-  const MobileCameraCapture = lazy(() => import('../components/mobile/MobileCameraCapture'))
-  const MobileLocationTracker = lazy(() => import('../components/mobile/MobileLocationTracker'))
+  const MobileCameraPage = lazy(() => import('../pages/mobile/MobileCameraPage'))
+  const MobileLocationPage = lazy(() => import('../pages/mobile/MobileLocationPage'))
 
   // Note: Onboarding is now handled via modal in MasterLayout
 
@@ -699,7 +699,7 @@ const PrivateRoutes = () => {
           path='mobile/camera'
           element={
             <SuspensedView>
-              <MobileCameraCapture />
+              <MobileCameraPage />
             </SuspensedView>
           }
         />
@@ -707,7 +707,7 @@ const PrivateRoutes = () => {
           path='mobile/location'
           element={
             <SuspensedView>
-              <MobileLocationTracker />
+              <MobileLocationPage />
             </SuspensedView>
           }
         />

@@ -2,7 +2,13 @@ import React, { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 
-const MobileLayout: React.FC = () => {
+interface MobileLayoutProps {
+  title?: string;
+  showBackButton?: boolean;
+  children?: React.ReactNode;
+}
+
+const MobileLayout: React.FC<MobileLayoutProps> = ({ title, showBackButton, children }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { currentUser } = useSupabaseAuth()
@@ -19,7 +25,17 @@ const MobileLayout: React.FC = () => {
     <div className="d-flex flex-column vh-100">
       {/* Mobile Header */}
       <div className="mobile-header bg-primary text-white p-3 d-flex align-items-center justify-content-between">
-        <h1 className="h5 mb-0">TradeWorks Pro</h1>
+        <div className="d-flex align-items-center gap-3">
+          {showBackButton && (
+            <button 
+              className="btn btn-sm btn-link text-white p-0"
+              onClick={() => navigate(-1)}
+            >
+              <i className="bi bi-arrow-left fs-5"></i>
+            </button>
+          )}
+          <h1 className="h5 mb-0">{title || 'TradeWorks Pro'}</h1>
+        </div>
         <div className="d-flex align-items-center gap-2">
           <span className="small">{currentUser?.email}</span>
           <button 
@@ -33,7 +49,7 @@ const MobileLayout: React.FC = () => {
       
       {/* Content Area */}
       <div className="flex-grow-1 overflow-auto">
-        <Outlet />
+        {children || <Outlet />}
       </div>
       
       {/* Mobile Bottom Navigation */}

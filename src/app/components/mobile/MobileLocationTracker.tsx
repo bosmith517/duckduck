@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MobileService, LocationData } from '../../services/mobileService';
 import { supabase } from '../../../supabaseClient';
+import { permissionsService } from '../../services/permissionsService';
+import PermissionsPrompt from './PermissionsPrompt';
 
 interface MobileLocationTrackerProps {
   technicianId: string;
@@ -18,13 +20,18 @@ export const MobileLocationTracker: React.FC<MobileLocationTrackerProps> = ({
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accuracy, setAccuracy] = useState<'high' | 'medium' | 'low'>('medium');
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   
   const locationBuffer = useRef<LocationData[]>([]);
   const lastSyncTime = useRef<number>(0);
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (isActive && !isTracking) {
+    checkLocationPermission();
+  }, []);
+
+  useEffect(() => {
+    if (isActive && !isTracking && hasPermission) {
       startTracking();
     } else if (!isActive && isTracking) {
       stopTracking();
@@ -33,7 +40,12 @@ export const MobileLocationTracker: React.FC<MobileLocationTrackerProps> = ({
     return () => {
       stopTracking();
     };
-  }, [isActive]);
+  }, [isActive, hasPermission]);
+
+  const checkLocationPermission = async () => {
+    const permission = await permissionsService.checkLocationPermission();
+    setHasPermission(permission);
+  };
 
   const startTracking = async () => {
     try {
@@ -165,6 +177,19 @@ export const MobileLocationTracker: React.FC<MobileLocationTrackerProps> = ({
   const formatCoordinates = (lat: number, lng: number) => {
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   };
+
+  const handlePermissionsGranted = () => {
+    setHasPermission(true);
+  };
+
+  if (hasPermission === false) {
+    return (
+      <PermissionsPrompt 
+        requiredPermissions={['location']}
+        onPermissionsGranted={handlePermissionsGranted}
+      />
+    );
+  }
 
   return (
     <div className="mobile-location-tracker">
@@ -330,3 +355,5 @@ export const MobileLocationTracker: React.FC<MobileLocationTrackerProps> = ({
     </div>
   );
 };
+
+export default MobileLocationTracker;

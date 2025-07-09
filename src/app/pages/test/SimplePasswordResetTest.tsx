@@ -30,7 +30,7 @@ export const SimplePasswordResetTest: React.FC = () => {
           success: true, 
           message: 'Password reset email sent! Check your inbox.',
           redirectUrl: `${window.location.origin}/auth/callback`,
-          supabaseUrl: supabaseUrl
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL
         });
       }
     } catch (err: any) {
@@ -106,8 +106,8 @@ export const SimplePasswordResetTest: React.FC = () => {
         <ul>
           <li>Current Origin: {window.location.origin}</li>
           <li>Expected Callback: {window.location.origin}/auth/callback</li>
-          <li>Supabase URL: {supabaseUrl || 'NOT SET'}</li>
-          <li>Has Anon Key: {supabaseAnonKey ? 'Yes' : 'No'}</li>
+          <li>Supabase URL: {import.meta.env.VITE_SUPABASE_URL || 'NOT SET'}</li>
+          <li>Has Anon Key: {import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Yes' : 'No'}</li>
         </ul>
         
         <h4 style={{ marginTop: '20px' }}>Check Console for Logs</h4>
