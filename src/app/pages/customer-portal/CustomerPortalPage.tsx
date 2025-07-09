@@ -182,6 +182,7 @@ const CustomerPortalPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals'>('dashboard')
   const [tenantPhone, setTenantPhone] = useState<string | null>(null)
   const [tenantInfo, setTenantInfo] = useState<any>(null)
+  const [tenantBranding, setTenantBranding] = useState<any>(null)
   
   // Mock technician data for demonstration
   const mockTechnician = {
@@ -215,6 +216,42 @@ const CustomerPortalPage: React.FC = () => {
   const mapRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
   const realtimeChannelRef = useRef<any>(null)
+  
+  // Apply branding styles when loaded
+  useEffect(() => {
+    if (tenantBranding?.primary_color) {
+      document.documentElement.style.setProperty('--bs-primary', tenantBranding.primary_color)
+      document.documentElement.style.setProperty('--bs-primary-rgb', hexToRgb(tenantBranding.primary_color))
+    }
+    if (tenantBranding?.secondary_color) {
+      document.documentElement.style.setProperty('--bs-secondary', tenantBranding.secondary_color)
+      document.documentElement.style.setProperty('--bs-secondary-rgb', hexToRgb(tenantBranding.secondary_color))
+    }
+    
+    // Update page title
+    if (tenantBranding?.white_label_enabled && tenantBranding?.company_name) {
+      document.title = `${tenantBranding.company_name} - Customer Portal`
+    }
+    
+    // Update favicon
+    if (tenantBranding?.favicon_url) {
+      const favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement
+      if (favicon) {
+        favicon.href = tenantBranding.favicon_url
+      }
+    }
+  }, [tenantBranding])
+  
+  const hexToRgb = (hex: string): string => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    if (result) {
+      const r = parseInt(result[1], 16)
+      const g = parseInt(result[2], 16)
+      const b = parseInt(result[3], 16)
+      return `${r}, ${g}, ${b}`
+    }
+    return '0, 123, 255' // Default primary color RGB
+  }
 
   // Load initial data based on access method
   useEffect(() => {
@@ -277,6 +314,51 @@ const CustomerPortalPage: React.FC = () => {
       }
 
       setCustomer(transformedCustomer)
+      
+      // Load tenant branding
+      if (job.tenant_id) {
+        const { data: brandingData, error: brandingError } = await supabase
+          .from('tenant_branding')
+          .select('*')
+          .eq('tenant_id', job.tenant_id)
+          .single()
+          
+        if (!brandingError && brandingData) {
+          setTenantBranding(brandingData)
+        } else {
+          // Fallback to tenant business_info
+          const { data: tenantFallback } = await supabase
+            .from('tenants')
+            .select('company_name, business_info')
+            .eq('id', job.tenant_id)
+            .single()
+            
+          if (tenantFallback?.business_info?.branding_settings) {
+            setTenantBranding({
+              company_name: tenantFallback.company_name,
+              ...tenantFallback.business_info.branding_settings
+            })
+          } else if (tenantFallback) {
+            setTenantBranding({
+              company_name: tenantFallback.company_name,
+              white_label_enabled: false
+            })
+          }
+        }
+        
+        // Load tenant phone info
+        const { data: tenantData } = await supabase
+          .from('v_tenant_phone_overview')
+          .select('*')
+          .eq('tenant_id', job.tenant_id)
+          .single()
+          
+        if (tenantData) {
+          setTenantInfo(tenantData)
+          const phoneNumber = tenantData.signalwire_number || tenantData.business_contact_phone || tenantData.selected_phone_during_onboarding
+          setTenantPhone(phoneNumber)
+        }
+      }
 
       // Set current job
       if (job) {
@@ -431,6 +513,36 @@ const CustomerPortalPage: React.FC = () => {
           // Set phone number from the view - prioritize signalwire_number, then business_contact_phone, then selected_phone_during_onboarding
           const phoneNumber = tenantData.signalwire_number || tenantData.business_contact_phone || tenantData.selected_phone_during_onboarding
           setTenantPhone(phoneNumber)
+        }
+        
+        // Load tenant branding
+        const { data: brandingData, error: brandingError } = await supabase
+          .from('tenant_branding')
+          .select('*')
+          .eq('tenant_id', customerData.tenant_id)
+          .single()
+          
+        if (!brandingError && brandingData) {
+          setTenantBranding(brandingData)
+        } else {
+          // Fallback to tenant business_info
+          const { data: tenantFallback } = await supabase
+            .from('tenants')
+            .select('company_name, business_info')
+            .eq('id', customerData.tenant_id)
+            .single()
+            
+          if (tenantFallback?.business_info?.branding_settings) {
+            setTenantBranding({
+              company_name: tenantFallback.company_name,
+              ...tenantFallback.business_info.branding_settings
+            })
+          } else if (tenantFallback) {
+            setTenantBranding({
+              company_name: tenantFallback.company_name,
+              white_label_enabled: false
+            })
+          }
         }
       }
 
@@ -737,16 +849,40 @@ const CustomerPortalPage: React.FC = () => {
 
   return (
     <div className="min-vh-100 bg-light">
-      {/* Header with TradeWorks Pro Branding */}
+      {/* Header with Dynamic Branding */}
       <div className="bg-white shadow-sm border-bottom">
         <div className="container py-3">
           <div className="d-flex justify-content-between align-items-center">
             <div className="d-flex align-items-center">
-              <img src="/assets/media/logos/tradeworks-logo.png" alt={tenantInfo?.company_name || 'Customer Portal'} className="h-40px me-3" />
+              {tenantBranding?.logo_url ? (
+                <img 
+                  src={tenantBranding.logo_url} 
+                  alt={tenantBranding.company_name || 'Customer Portal'} 
+                  className="h-40px me-3" 
+                  style={{ objectFit: 'contain' }}
+                />
+              ) : (
+                <div 
+                  className="d-flex align-items-center justify-content-center me-3" 
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '8px',
+                    backgroundColor: tenantBranding?.primary_color || '#007bff'
+                  }}
+                >
+                  <i className="bi bi-tools text-white fs-5"></i>
+                </div>
+              )}
               <div>
-                <h5 className="mb-0 text-dark">Customer Portal</h5>
+                <h5 className="mb-0 text-dark">
+                  {tenantBranding?.white_label_enabled && tenantBranding?.company_name 
+                    ? tenantBranding.company_name 
+                    : 'Customer Portal'}
+                </h5>
                 <span className="text-muted fs-7">
-                  {tenantInfo?.company_name ? `Powered by ${tenantInfo.company_name}` : 'Customer Service Portal'}
+                  {tenantBranding?.tagline || 
+                   (tenantBranding?.white_label_enabled ? 'Service Portal' : 'Powered by TradeWorks Pro')}
                 </span>
               </div>
             </div>

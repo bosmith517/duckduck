@@ -44,7 +44,10 @@ import {SupabaseVerifyProxy} from '../pages/auth/SupabaseVerifyProxy'
 const {VITE_BASE_URL} = import.meta.env
 
 const AppRoutes: FC = () => {
-  const {currentUser, authLoading} = useSupabaseAuth() // Use the new authLoading state
+  const {currentUser, authLoading, user} = useSupabaseAuth() // Use the new authLoading state
+  
+  // Debug logging
+  console.log('AppRoutes - authLoading:', authLoading, 'currentUser:', currentUser, 'user:', user)
   
   // Removed password reset detection - now handled directly by Supabase redirect
   
@@ -123,7 +126,7 @@ const AppRoutes: FC = () => {
         </Route>
         
         {/* Auth and private routes - wrapped in App for providers */}
-        {currentUser ? (
+        {user ? (
           <Route element={<App />}>
             <Route path='/*' element={<PrivateRoutes />} />
             <Route path='auth/*' element={<Navigate to='/dashboard' />} />

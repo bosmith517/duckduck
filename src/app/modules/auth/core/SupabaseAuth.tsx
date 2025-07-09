@@ -39,7 +39,7 @@ const initSupabaseAuthContextPropsState = {
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextProps>(initSupabaseAuthContextPropsState)
 
-const useSupabaseAuth = () => {
+export const useSupabaseAuth = () => {
   return useContext(SupabaseAuthContext)
 }
 
@@ -53,6 +53,18 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
 
   useEffect(() => {
     setAuthLoading(true)
+    
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      
+      if (session?.user) {
+        loadUserProfile(session.user.id)
+      } else {
+        setAuthLoading(false)
+      }
+    })
 
     // This listener sets the session/user and loads user profile/tenant data
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -314,10 +326,4 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
   )
 }
 
-const SupabaseAuthInit: FC<WithChildren> = ({children}) => {
-  const { authLoading } = useSupabaseAuth()
-
-  return authLoading ? <TradeWorksSplashScreen /> : <>{children}</>
-}
-
-export {SupabaseAuthProvider, SupabaseAuthInit, useSupabaseAuth}
+export {SupabaseAuthProvider}

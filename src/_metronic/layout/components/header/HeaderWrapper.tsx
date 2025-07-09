@@ -7,11 +7,13 @@ import {Header} from './Header'
 import {DefaultTitle} from './page-title/DefaultTitle'
 import {Topbar} from './Topbar'
 import {useSupabaseAuth} from '../../../../app/modules/auth/core/SupabaseAuth'
+import {useBranding} from '../../../../app/contexts/BrandingContext'
 
 export function HeaderWrapper() {
   const {config, classes, attributes} = useLayout()
   const {header, aside} = config
   const {signOut, currentUser} = useSupabaseAuth()
+  const {branding} = useBranding()
 
   return (
     <div
@@ -40,13 +42,36 @@ export function HeaderWrapper() {
         <div className='header-logo me-5 me-md-10 flex-grow-1 flex-lg-grow-0'>
           <Link to={currentUser ? '/dashboard' : '/'} className='d-flex align-items-center text-decoration-none'>
             <div className='d-flex align-items-center'>
-              <div className='bg-primary rounded-circle d-flex align-items-center justify-content-center me-3' style={{width: '32px', height: '32px'}}>
-                <i className='bi bi-tools text-white fs-5'></i>
-              </div>
-              <div className='d-flex flex-column'>
-                <span className='text-dark fw-bold fs-4 lh-1'>TradeWorks</span>
-                <span className='text-muted fs-7 lh-1'>Pro</span>
-              </div>
+              {branding?.logo_url ? (
+                <img 
+                  src={branding.logo_url} 
+                  alt={branding.company_name} 
+                  className='me-3'
+                  style={{height: '32px', width: 'auto', objectFit: 'contain'}}
+                />
+              ) : (
+                <div 
+                  className='rounded-circle d-flex align-items-center justify-content-center me-3' 
+                  style={{
+                    width: '32px', 
+                    height: '32px',
+                    backgroundColor: branding?.primary_color || '#007bff'
+                  }}
+                >
+                  <i className='bi bi-tools text-white fs-5'></i>
+                </div>
+              )}
+              {branding?.white_label_enabled ? (
+                <div className='d-flex flex-column'>
+                  <span className='text-dark fw-bold fs-4 lh-1'>{branding.company_name}</span>
+                  {branding.tagline && <span className='text-muted fs-7 lh-1'>{branding.tagline}</span>}
+                </div>
+              ) : (
+                <div className='d-flex flex-column'>
+                  <span className='text-dark fw-bold fs-4 lh-1'>TradeWorks</span>
+                  <span className='text-muted fs-7 lh-1'>Pro</span>
+                </div>
+              )}
             </div>
           </Link>
         </div>

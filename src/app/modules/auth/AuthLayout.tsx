@@ -1,8 +1,10 @@
 import {useEffect} from 'react'
 import {Outlet, Link} from 'react-router-dom'
 import {toAbsoluteUrl} from '../../../_metronic/helpers'
+import {useBranding} from '../../contexts/BrandingContext'
 
 const AuthLayout = () => {
+  const {branding} = useBranding()
   useEffect(() => {
     document.body.style.backgroundImage = `none`
     const root = document.getElementById('root')
@@ -63,15 +65,26 @@ const AuthLayout = () => {
           {/* begin::Logo */}
           <Link to='/' className='mb-12'>
             <div className='d-flex align-items-center'>
-              <div className='symbol symbol-60px me-3'>
-                <span className='symbol-label bg-primary'>
-                  <i className='ki-duotone ki-technology-4 fs-2x text-white'>
-                    <span className='path1'></span>
-                    <span className='path2'></span>
-                  </i>
-                </span>
-              </div>
-              <span className='text-white fs-2x fw-bold'>TradeWorks Pro</span>
+              {branding?.logo_url ? (
+                <img 
+                  src={branding.logo_url} 
+                  alt={branding.company_name} 
+                  className='me-3'
+                  style={{height: '60px', width: 'auto', objectFit: 'contain'}}
+                />
+              ) : (
+                <div className='symbol symbol-60px me-3'>
+                  <span className='symbol-label' style={{backgroundColor: branding?.primary_color || '#007bff'}}>
+                    <i className='ki-duotone ki-technology-4 fs-2x text-white'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                  </span>
+                </div>
+              )}
+              <span className='text-white fs-2x fw-bold'>
+                {branding?.white_label_enabled ? branding.company_name : 'TradeWorks Pro'}
+              </span>
             </div>
           </Link>
           {/* end::Logo */}
@@ -93,21 +106,39 @@ const AuthLayout = () => {
 
           {/* begin::Title */}
           <h1 className='text-white fs-2qx fw-bolder text-center mb-7'>
-            Transform Your Customer Experience
+            {branding?.white_label_enabled && branding?.tagline 
+              ? branding.tagline 
+              : 'Transform Your Customer Experience'}
           </h1>
           {/* end::Title */}
 
           {/* begin::Text */}
           <div className='text-white fs-base text-center'>
-            TradeWorks Pro provides{' '}
-            <span className='text-warning fw-bold'>
-              service companies
-            </span>
-            {' '}with powerful customer portals, <br /> real-time tracking, AI-powered recommendations, and{' '}
-            <span className='text-warning fw-bold'>
-              seamless communication tools
-            </span>
-            {' '}<br /> to delight customers and grow your business.
+            {branding?.white_label_enabled ? (
+              <>
+                {branding.company_name} provides{' '}
+                <span className='text-warning fw-bold'>
+                  exceptional service
+                </span>
+                {' '}with powerful tools and{' '}
+                <span className='text-warning fw-bold'>
+                  seamless communication
+                </span>
+                {' '}<br /> to deliver outstanding customer experiences.
+              </>
+            ) : (
+              <>
+                TradeWorks Pro provides{' '}
+                <span className='text-warning fw-bold'>
+                  service companies
+                </span>
+                {' '}with powerful customer portals, <br /> real-time tracking, AI-powered recommendations, and{' '}
+                <span className='text-warning fw-bold'>
+                  seamless communication tools
+                </span>
+                {' '}<br /> to delight customers and grow your business.
+              </>
+            )}
           </div>
           {/* end::Text */}
         </div>
