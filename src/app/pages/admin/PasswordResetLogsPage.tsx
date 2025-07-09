@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PageTitle } from '../../../_metronic/layout/core';
 import { supabase } from '../../../supabaseClient';
-import { format } from 'date-fns';
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth';
 import { showToast } from '../../utils/toast';
 
@@ -220,20 +219,36 @@ const PasswordResetLogsPage: React.FC = () => {
                       <td>
                         <div className="d-flex flex-column">
                           <span className="text-gray-800 mb-1">
-                            {format(new Date(request.requested_at), 'MMM dd, yyyy')}
+                            {new Date(request.requested_at).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                            })}
                           </span>
                           <span className="text-gray-600 fs-7">
-                            {format(new Date(request.requested_at), 'h:mm a')}
+                            {new Date(request.requested_at).toLocaleTimeString('en-US', { 
+                              hour: 'numeric', 
+                              minute: '2-digit',
+                              hour12: true 
+                            })}
                           </span>
                         </div>
                       </td>
                       <td>
                         <div className="d-flex flex-column">
                           <span className="text-gray-800 mb-1">
-                            {format(new Date(request.expires_at), 'MMM dd, yyyy')}
+                            {new Date(request.expires_at).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                            })}
                           </span>
                           <span className="text-gray-600 fs-7">
-                            {format(new Date(request.expires_at), 'h:mm a')}
+                            {new Date(request.expires_at).toLocaleTimeString('en-US', { 
+                              hour: 'numeric', 
+                              minute: '2-digit',
+                              hour12: true 
+                            })}
                           </span>
                         </div>
                       </td>

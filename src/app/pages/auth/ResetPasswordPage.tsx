@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { supabase } from '../../../supabaseClient';
 import clsx from 'clsx';
 import { showToast } from '../../utils/toast';
+import { USE_CUSTOM_PASSWORD_RESET } from '../../../config/passwordReset.config';
 
 const resetPasswordSchema = Yup.object().shape({
   newPassword: Yup.string()
@@ -31,14 +32,44 @@ export const ResetPasswordPage: React.FC = () => {
   const token = searchParams.get('token');
 
   useEffect(() => {
-    // Validate the token from URL
-    if (token) {
+    if (USE_CUSTOM_PASSWORD_RESET && token) {
+      // Validate token for custom system
       validateToken();
+    } else if (!USE_CUSTOM_PASSWORD_RESET) {
+      // Check session for Supabase default system
+      checkSession();
     } else {
+      // No token provided for custom system
       setValidating(false);
       setIsValidToken(false);
     }
   }, [token]);
+
+  const checkSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('Reset password page - checking session:', session?.user?.email);
+      
+      if (error) {
+        console.error('Error getting session:', error);
+        setIsValidToken(false);
+        return;
+      }
+      
+      if (!session) {
+        console.log('No session found on reset password page');
+        setIsValidToken(false);
+      } else {
+        console.log('Valid session found for password reset');
+        setIsValidToken(true);
+      }
+    } catch (err) {
+      console.error('Error checking session:', err);
+      setIsValidToken(false);
+    } finally {
+      setValidating(false);
+    }
+  };
 
   const validateToken = async () => {
     try {
@@ -77,32 +108,37 @@ export const ResetPasswordPage: React.FC = () => {
     },
     validationSchema: resetPasswordSchema,
     onSubmit: async (values, { setSubmitting }) => {
-      if (!token) {
-        showToast.error('Invalid reset link');
-        return;
-      }
-
       setLoading(true);
       try {
-        // Use our custom reset password Edge Function
-        const response = await supabase.functions.invoke('reset-password', {
-          body: {
-            token,
-            newPassword: values.newPassword
+        if (USE_CUSTOM_PASSWORD_RESET && token) {
+          // Use custom reset password Edge Function
+          const response = await supabase.functions.invoke('reset-password', {
+            body: {
+              token,
+              newPassword: values.newPassword
+            }
+          });
+
+          if (response.error) {
+            throw new Error(response.error.message || 'Failed to reset password');
           }
-        });
 
-        if (response.error) {
-          throw new Error(response.error.message || 'Failed to reset password');
-        }
+          if (!response.data?.success) {
+            throw new Error(response.data?.error || 'Failed to reset password');
+          }
+        } else {
+          // Use Supabase default
+          const { error } = await supabase.auth.updateUser({
+            password: values.newPassword,
+          });
 
-        if (!response.data?.success) {
-          throw new Error(response.data?.error || 'Failed to reset password');
+          if (error) throw error;
+
+          // Sign out to ensure clean state
+          await supabase.auth.signOut();
         }
 
         showToast.success('Password reset successfully! Please log in with your new password.');
-        
-        // Redirect to login
         navigate('/auth/login');
       } catch (error: any) {
         console.error('Password reset error:', error);
@@ -113,6 +149,7 @@ export const ResetPasswordPage: React.FC = () => {
       }
     },
   });
+
 
   if (validating) {
     return (
@@ -201,13 +238,13 @@ export const ResetPasswordPage: React.FC = () => {
               />
               <h1 className="text-dark fw-bolder mb-3">Create New Password</h1>
               <div className="text-gray-500 fw-semibold fs-6">
-                {tokenData?.userName ? (
+                {USE_CUSTOM_PASSWORD_RESET && tokenData?.userName ? (
                   <>Hi {tokenData.userName}, please enter your new password below.</>
                 ) : (
                   <>Please enter your new password below</>
                 )}
               </div>
-              {tokenData?.email && (
+              {USE_CUSTOM_PASSWORD_RESET && tokenData?.email && (
                 <div className="text-gray-400 fw-semibold fs-7 mt-2">
                   Account: {tokenData.email}
                 </div>

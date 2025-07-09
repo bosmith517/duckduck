@@ -5,6 +5,7 @@ import * as Yup from 'yup';
 import { supabase } from '../../../supabaseClient';
 import clsx from 'clsx';
 import { showToast } from '../../utils/toast';
+import { USE_CUSTOM_PASSWORD_RESET } from '../../../config/passwordReset.config';
 
 interface ForgotPasswordModalProps {
   show: boolean;
@@ -29,12 +30,29 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ show, 
     onSubmit: async (values, { setSubmitting }) => {
       setLoading(true);
       try {
-        // Use Supabase default password reset
-        const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        });
+        if (USE_CUSTOM_PASSWORD_RESET) {
+          // Use custom password reset Edge Function
+          const response = await supabase.functions.invoke('request-password-reset', {
+            body: {
+              email: values.email
+            }
+          });
 
-        if (error) throw error;
+          if (response.error) {
+            throw new Error(response.error.message || 'Failed to send reset email');
+          }
+
+          if (!response.data?.success) {
+            throw new Error(response.data?.error || 'Failed to send reset email');
+          }
+        } else {
+          // Use Supabase default password reset
+          const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          });
+
+          if (error) throw error;
+        }
 
         setEmailSent(true);
         showToast.success('Password reset email sent! Check your inbox.');
