@@ -74,8 +74,8 @@ export class ClientPortalService {
         .from('jobs')
         .select(`
           *,
-          accounts:account_id(name, phone, email),
-          contacts:contact_id(first_name, last_name, phone, email)
+          account:accounts!account_id(id, name, phone, email),
+          contact:contacts!contact_id(id, first_name, last_name, phone, email)
         `)
         .eq('id', jobId)
         .single()
@@ -87,15 +87,22 @@ export class ClientPortalService {
 
       // Determine customer ID and details (prefer contact over account)
       const customerId = job.contact_id || job.account_id
-      const customerName = job.contacts?.first_name 
-        ? `${job.contacts.first_name} ${job.contacts.last_name || ''}`.trim()
-        : job.accounts?.name || 'Valued Customer'
+      const customerName = job.contact?.first_name 
+        ? `${job.contact.first_name} ${job.contact.last_name || ''}`.trim()
+        : job.account?.name || 'Valued Customer'
       
-      const customerPhone = job.contacts?.phone || job.accounts?.phone
-      const customerEmail = job.contacts?.email || job.accounts?.email
+      const customerPhone = job.contact?.phone || job.account?.phone
+      const customerEmail = job.contact?.email || job.account?.email
 
       if (!customerId || !customerPhone) {
-        console.error('Missing customer information for portal generation')
+        console.error('Missing customer information for portal generation:', {
+          customerId,
+          customerPhone,
+          hasContact: !!job.contact,
+          hasAccount: !!job.account,
+          contactPhone: job.contact?.phone,
+          accountPhone: job.account?.phone
+        })
         return false
       }
 

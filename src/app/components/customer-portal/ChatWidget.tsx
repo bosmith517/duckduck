@@ -202,7 +202,7 @@ export const ChatWidget: React.FC = () => {
               <h6 className="mb-2">Quick Contact</h6>
               <div className="d-flex gap-2">
                 <a 
-                  href="tel:+1234567890" 
+                  href="tel:1234567890" 
                   className="btn btn-sm btn-light-success"
                   title="Call Us"
                 >
@@ -212,7 +212,7 @@ export const ChatWidget: React.FC = () => {
                   </i>
                 </a>
                 <a 
-                  href="sms:+1234567890" 
+                  href="sms:1234567890" 
                   className="btn btn-sm btn-light-primary"
                   title="Text Us"
                 >

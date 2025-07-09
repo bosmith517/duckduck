@@ -9,6 +9,7 @@ import { AddressInput } from '../../../components/shared/AddressInput'
 import { FormattedAddress } from '../../../utils/addressUtils'
 import { useSupabaseAuth } from '../../../modules/auth/core/SupabaseAuth'
 import { supabase } from '../../../../supabaseClient'
+import { showToast } from '../../../utils/toast'
 
 interface ClientCustomer {
   id: string
@@ -89,27 +90,23 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
         
         const submitData = {
           title: values.title,
-          account_id: isIndividualCustomer ? undefined : values.clientCustomerId,
-          contact_id: isIndividualCustomer ? values.clientCustomerId : undefined,
-          description: values.description || undefined,
+          account_id: isIndividualCustomer ? null : values.clientCustomerId,
+          contact_id: isIndividualCustomer ? values.clientCustomerId : null,
+          description: values.description || null,
           status: values.status,
           priority: values.priority,
-          start_date: values.start_date || undefined,
-          due_date: values.due_date || undefined,
-          estimated_hours: values.estimated_hours ? Number(values.estimated_hours) : undefined,
-          actual_hours: values.actual_hours ? Number(values.actual_hours) : undefined,
-          estimated_cost: values.estimated_cost ? Number(values.estimated_cost) : undefined,
-          actual_cost: values.actual_cost ? Number(values.actual_cost) : undefined,
-          location_address: values.location_address || undefined,
-          location_city: values.location_city || undefined,
-          location_state: values.location_state || undefined,
-          location_zip: values.location_zip || undefined,
-          notes: values.notes || undefined,
+          start_date: values.start_date || null,
+          due_date: values.due_date || null,
+          estimated_hours: values.estimated_hours ? Number(values.estimated_hours) : null,
+          actual_hours: values.actual_hours ? Number(values.actual_hours) : null,
+          estimated_cost: values.estimated_cost ? Number(values.estimated_cost) : null,
+          actual_cost: values.actual_cost ? Number(values.actual_cost) : null,
+          location_address: values.location_address || null,
+          location_city: values.location_city || null,
+          location_state: values.location_state || null,
+          location_zip: values.location_zip || null,
+          notes: values.notes || null,
         }
-        
-        console.log('Submitting job data:', submitData)
-        console.log('Selected client:', selectedClient)
-        console.log('Is individual customer:', isIndividualCustomer)
         
         await onSave(submitData)
       } catch (error) {
@@ -163,7 +160,7 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
       // Load business accounts
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
-        .select('id, name, type')
+        .select('id, name')
         .eq('tenant_id', userProfile?.tenant_id)
         .order('name')
 
@@ -197,6 +194,9 @@ export const JobForm: React.FC<JobFormProps> = ({ job, accounts, contacts, onSav
       setAllClientCustomers(combined)
     } catch (error) {
       console.error('Error loading clients and customers:', error)
+      if (error instanceof Error) {
+        showToast.error(`Failed to load clients: ${error.message}`)
+      }
     }
   }
 

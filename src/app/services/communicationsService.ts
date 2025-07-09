@@ -342,14 +342,26 @@ class CommunicationsService {
 
   // Utility methods
   formatPhoneNumber(number: string): string {
-    // Format +1234567890 to (123) 456-7890
+    // Format phone numbers to (XXX) XXX-XXXX
     const cleaned = number.replace(/\D/g, '')
+    
+    // Handle 11-digit numbers starting with 1 (remove country code)
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
       const areaCode = cleaned.slice(1, 4)
       const exchange = cleaned.slice(4, 7)
       const number_part = cleaned.slice(7)
       return `(${areaCode}) ${exchange}-${number_part}`
     }
+    
+    // Handle 10-digit numbers
+    if (cleaned.length === 10) {
+      const areaCode = cleaned.slice(0, 3)
+      const exchange = cleaned.slice(3, 6)
+      const number_part = cleaned.slice(6)
+      return `(${areaCode}) ${exchange}-${number_part}`
+    }
+    
+    // Return original if not a valid US phone number
     return number
   }
 

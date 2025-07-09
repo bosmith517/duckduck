@@ -12,7 +12,7 @@ const ContactTechnicianModal: React.FC<ContactTechnicianModalProps> = ({
   isOpen,
   onClose,
   technicianName = 'Your Technician',
-  technicianPhone = '+15551234567',
+  technicianPhone = '5551234567',
   jobId
 }) => {
   const [messageType, setMessageType] = useState<'call' | 'text' | 'chat'>('call')

@@ -7,9 +7,11 @@ import { ContactsList } from './components/ContactsList'
 import { QuickAddClient } from '../../components/clients/QuickAddClient'
 import { CustomerWorkflowModal } from '../../components/workflows/CustomerWorkflowModal'
 import { Job } from '../../../supabaseClient'
+import { useLocation } from 'react-router-dom'
 
 const ContactsPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
+  const location = useLocation()
   const [contacts, setContacts] = useState<Contact[]>([])
   const [accounts, setAccounts] = useState<Pick<Account, 'id' | 'name'>[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,6 +28,20 @@ const ContactsPage: React.FC = () => {
       fetchAccounts()
     }
   }, [userProfile?.tenant_id])
+
+  // Handle URL parameter for editing
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const editId = params.get('edit')
+    
+    if (editId && contacts.length > 0) {
+      const contactToEdit = contacts.find(c => c.id === editId)
+      if (contactToEdit) {
+        setEditingContact(contactToEdit)
+        setShowForm(true)
+      }
+    }
+  }, [location.search, contacts])
 
   const fetchContacts = async () => {
     if (!userProfile?.tenant_id) return

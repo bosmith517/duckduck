@@ -57,24 +57,12 @@ const AppRoutes: FC = () => {
   // Detect if on mobile device
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
-  // Log PWA detection for debugging
+  // Add PWA class to body if needed
   useEffect(() => {
-    console.log('🔍 Mobile Detection Debug:', {
-      isPWA,
-      isMobile,
-      userAgent: navigator.userAgent,
-      displayMode: window.matchMedia('(display-mode: standalone)').matches,
-      standalone: (window.navigator as any).standalone,
-      referrer: document.referrer,
-      redirectTarget: (isPWA || isMobile) ? '/mobile/my-day' : '/dashboard'
-    });
-    
     if (isPWA) {
-      console.log('🚀 Running as PWA - Mobile experience enabled');
-      // Add a class to body for PWA-specific styling
       document.body.classList.add('is-pwa');
     }
-  }, [isPWA, isMobile]);
+  }, [isPWA]);
   
   // Removed password reset detection - now handled directly by Supabase redirect
   

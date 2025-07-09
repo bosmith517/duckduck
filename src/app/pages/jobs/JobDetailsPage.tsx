@@ -103,8 +103,8 @@ const JobDetailsPage: React.FC = () => {
         .from('jobs')
         .select(`
           *,
-          account:accounts(id, name),
-          contact:contacts(id, first_name, last_name)
+          account:accounts(id, name, phone, email),
+          contact:contacts(id, first_name, last_name, phone, email)
         `)
         .eq('id', id)
         .single()
@@ -165,23 +165,47 @@ const JobDetailsPage: React.FC = () => {
   }
 
   const handleUpdateJob = async (jobData: Partial<Job>) => {
-    if (!job?.id) return
+    if (!job?.id || !userProfile?.tenant_id) {
+      console.error('Missing job ID or tenant ID', { jobId: job?.id, tenantId: userProfile?.tenant_id })
+      showToast.error('Unable to update job - missing required information')
+      return
+    }
 
     try {
+      // Ensure tenant_id is included for RLS and clean up undefined values
+      const updateData = Object.entries({
+        ...jobData,
+        tenant_id: userProfile.tenant_id,
+        updated_at: new Date().toISOString()
+      }).reduce((acc, [key, value]) => {
+        // Only include defined values (convert undefined to null for Supabase)
+        if (value !== undefined) {
+          acc[key] = value
+        }
+        return acc
+      }, {} as any)
+      
       const { data, error } = await supabase
         .from('jobs')
-        .update(jobData)
+        .update(updateData)
         .eq('id', job.id)
+        .eq('tenant_id', userProfile.tenant_id) // Add tenant_id to the WHERE clause for RLS
         .select(`
           *,
-          account:accounts(id, name),
-          contact:contacts(id, first_name, last_name)
+          account:accounts(id, name, phone, email),
+          contact:contacts(id, first_name, last_name, phone, email)
         `)
         .single()
 
       if (error) {
         console.error('Error updating job:', error)
-        showToast.error('Failed to update job')
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        showToast.error(`Failed to update job: ${error.message || 'Unknown error'}`)
         return
       }
 
@@ -348,7 +372,6 @@ const JobDetailsPage: React.FC = () => {
       if (token) {
         const existingPortalUrl = `${window.location.origin}/portal/${token.token}`
         setPortalUrl(existingPortalUrl)
-        console.log('Existing portal found:', existingPortalUrl)
       }
     } catch (error) {
       console.warn('Failed to check existing portal (non-critical):', error)

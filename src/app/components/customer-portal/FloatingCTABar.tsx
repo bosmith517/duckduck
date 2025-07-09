@@ -38,13 +38,14 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
       <div className="d-none d-lg-block">
         <div 
           className={`position-fixed bg-white shadow-lg border rounded-3 transition-all duration-300 ${
-            isExpanded ? 'w-400px' : 'w-60px'
+            isExpanded ? 'w-350px' : 'w-60px'
           }`}
           style={{ 
             bottom: '30px', 
-            right: '30px', 
+            right: '20px', 
             zIndex: 1050,
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            maxWidth: 'calc(100vw - 40px)'
           }}
         >
           {!isExpanded ? (
@@ -195,19 +196,19 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
         <div 
           className="position-fixed bg-white border-top shadow-lg w-100"
           style={{ 
-            bottom: '70px', /* Above mobile nav */
+            bottom: '60px', /* Above mobile nav */
             left: '0',
             right: '0',
             zIndex: 1040
           }}
         >
-          <div className="container-fluid p-3">
+          <div className="container-fluid px-2 py-2">
             <div className="row g-2">
               {/* Emergency Call */}
               {tenantPhone && (
                 <div className="col-6">
                   <button
-                    className="btn btn-danger w-100 d-flex align-items-center justify-content-center"
+                    className="btn btn-danger btn-sm w-100 d-flex align-items-center justify-content-center"
                     onClick={() => window.open(`tel:${tenantPhone}`, '_self')}
                   >
                     <i className="ki-duotone ki-phone fs-5 me-1">
@@ -223,7 +224,7 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
               <div className="col-6">
                 {currentJob ? (
                   <button
-                    className="btn btn-primary w-100 d-flex align-items-center justify-content-center"
+                    className="btn btn-primary btn-sm w-100 d-flex align-items-center justify-content-center"
                     onClick={onContactTechnician}
                   >
                     <i className="ki-duotone ki-message-text-2 fs-5 me-1">
@@ -235,7 +236,7 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
                   </button>
                 ) : hasUnpaidInvoices ? (
                   <button
-                    className="btn btn-success w-100 d-flex align-items-center justify-content-center position-relative"
+                    className="btn btn-success btn-sm w-100 d-flex align-items-center justify-content-center position-relative"
                     onClick={onPayInvoice}
                   >
                     <i className="ki-duotone ki-credit-cart fs-5 me-1">
@@ -249,7 +250,7 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
                   </button>
                 ) : (
                   <button
-                    className="btn btn-warning w-100 d-flex align-items-center justify-content-center"
+                    className="btn btn-warning btn-sm w-100 d-flex align-items-center justify-content-center"
                     onClick={onScheduleService}
                   >
                     <i className="ki-duotone ki-calendar-add fs-5 me-1">
@@ -266,17 +267,17 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
             {currentJob && (
               <div className="mt-2 p-2 bg-light-primary rounded">
                 <div className="d-flex align-items-center justify-content-between">
-                  <div className="d-flex align-items-center">
+                  <div className="d-flex align-items-center flex-grow-1 text-truncate">
                     <div className={`badge badge-sm ${
                       currentJob.status === 'In Progress' ? 'badge-success' :
                       currentJob.status === 'Scheduled' ? 'badge-primary' :
                       'badge-warning'
-                    } me-2`}>
+                    } me-2 flex-shrink-0`}>
                       {currentJob.status}
                     </div>
-                    <div className="fw-semibold fs-7">{currentJob.title}</div>
+                    <div className="fw-semibold fs-8 text-truncate">{currentJob.title}</div>
                   </div>
-                  <div className="text-muted fs-8">#{currentJob.id?.slice(-6)}</div>
+                  <div className="text-muted fs-9 flex-shrink-0 ms-2">#{currentJob.id?.slice(-6)}</div>
                 </div>
               </div>
             )}

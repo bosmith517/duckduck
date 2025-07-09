@@ -19,14 +19,6 @@ const PrivateRoutes = () => {
   // Detect if on mobile device
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
-  // Debug logging
-  console.log('🔍 PrivateRoutes Mobile Detection:', {
-    isPWA,
-    isMobile,
-    shouldRedirectToMobile: isPWA || isMobile,
-    currentPath: window.location.pathname
-  });
-  
   // Redirect to login if not authenticated
   if (!currentUser) {
     return <Navigate to='/auth/login' replace />

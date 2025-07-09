@@ -851,14 +851,14 @@ const CustomerPortalPage: React.FC = () => {
     <div className="min-vh-100 bg-light">
       {/* Header with Dynamic Branding */}
       <div className="bg-white shadow-sm border-bottom">
-        <div className="container py-3">
-          <div className="d-flex justify-content-between align-items-center">
+        <div className="container-fluid py-2 py-lg-3">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div className="d-flex align-items-center">
               {tenantBranding?.logo_url ? (
                 <img 
                   src={tenantBranding.logo_url} 
                   alt={tenantBranding.company_name || 'Customer Portal'} 
-                  className="h-40px me-3" 
+                  className="h-30px h-lg-40px me-2 me-lg-3" 
                   style={{ objectFit: 'contain' }}
                 />
               ) : (
@@ -875,20 +875,20 @@ const CustomerPortalPage: React.FC = () => {
                 </div>
               )}
               <div>
-                <h5 className="mb-0 text-dark">
+                <h5 className="mb-0 text-dark fs-6 fs-lg-5">
                   {tenantBranding?.white_label_enabled && tenantBranding?.company_name 
                     ? tenantBranding.company_name 
                     : 'Customer Portal'}
                 </h5>
-                <span className="text-muted fs-7">
+                <span className="text-muted fs-8 fs-lg-7 d-none d-sm-block">
                   {tenantBranding?.tagline || 
                    (tenantBranding?.white_label_enabled ? 'Service Portal' : 'Powered by TradeWorks Pro')}
                 </span>
               </div>
             </div>
-            <div className="d-flex align-items-center gap-3">
+            <div className="d-flex align-items-center gap-2 ms-auto">
               <button 
-                className="btn btn-sm btn-light-primary"
+                className="btn btn-sm btn-light-primary d-none d-sm-inline-flex"
                 onClick={() => tenantPhone && window.open(`tel:${tenantPhone}`, '_self')}
               >
                 <i className="ki-duotone ki-phone fs-5 me-1">
@@ -898,7 +898,7 @@ const CustomerPortalPage: React.FC = () => {
                 Call Us
               </button>
               <button 
-                className="btn btn-sm btn-light-success"
+                className="btn btn-sm btn-light-success d-flex align-items-center"
                 onClick={() => setShowSchedulingModal(true)}
               >
                 <i className="ki-duotone ki-calendar-add fs-5 me-1">
@@ -935,17 +935,34 @@ const CustomerPortalPage: React.FC = () => {
       />
 
       {/* Main Content with Navigation Offset */}
-      <div className="py-6" style={{ marginLeft: 'max(240px, 0px)' }}>
+      <div className="py-6 portal-main-wrapper">
         <style>{`
-          @media (max-width: 991.98px) {
-            .main-content { margin-left: 0 !important; padding-bottom: 100px !important; }
+          .portal-main-wrapper {
+            margin-left: 240px;
           }
+          
+          @media (max-width: 991.98px) {
+            .portal-main-wrapper { 
+              margin-left: 0 !important; 
+              padding-bottom: 120px !important;
+              padding-top: 1rem !important;
+            }
+            .main-content { 
+              padding-left: 0.75rem !important;
+              padding-right: 0.75rem !important;
+            }
+          }
+          
           .main-content {
             max-width: 1200px;
             margin-left: auto;
             margin-right: auto;
             padding-left: 1rem;
             padding-right: 1rem;
+          }
+          
+          .bg-gradient-dark {
+            background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.4));
           }
         `}</style>
         
@@ -1091,7 +1108,7 @@ const CustomerPortalPage: React.FC = () => {
                 >
                   <div className="accordion-body p-0">
                     {/* Sticky Street View Card */}
-                    <div className="sticky-top bg-white shadow-sm" style={{ zIndex: 10 }}>
+                    <div className="sticky-lg-top bg-white shadow-sm" style={{ zIndex: 10 }}>
                       <div className="card border-0 rounded-0">
                         <div className="card-header">
                           <h5 className="card-title mb-0">
@@ -1129,11 +1146,11 @@ const CustomerPortalPage: React.FC = () => {
                             />
                           ) : (
                             /* Property Information */
-                            <div>
+                            <div className="position-relative">
                     {/* Street View Image */}
                     <div className="position-relative">
                       {propertyData ? (
-                        <div className="w-100 rounded-top bg-light position-relative" style={{ height: '300px' }}>
+                        <div className="w-100 rounded-top bg-light position-relative" style={{ height: '250px' }}>
                           {/* Try to load Street View image */}
                           {propertyData.streetViewUrl ? (
                             <img
@@ -1161,21 +1178,22 @@ const CustomerPortalPage: React.FC = () => {
                             </div>
                           </div>
                           
-                          <div className="position-absolute bottom-0 start-0 end-0 bg-gradient-dark p-3">
-                            <h4 className="text-white fw-bold mb-1">{propertyData.address}</h4>
-                            <div className="text-light fs-6">
-                              <i className="ki-duotone ki-home-2 fs-6 me-1">
+                          <div className="position-absolute bottom-0 start-0 end-0 bg-gradient-dark p-2 p-lg-3">
+                            <h4 className="text-white fw-bold mb-1 fs-6 fs-lg-4">{propertyData.address}</h4>
+                            <div className="text-light fs-7 fs-lg-6">
+                              <i className="ki-duotone ki-home-2 fs-7 fs-lg-6 me-1">
                                 <span className="path1"></span>
                                 <span className="path2"></span>
                               </i>
-                              {propertyData.propertyType} • {propertyData.yearBuilt ? `Built ${propertyData.yearBuilt}` : 'Residential Property'}
+                              <span className="d-none d-sm-inline">{propertyData.propertyType} • </span>
+                              <span>{propertyData.yearBuilt ? `Built ${propertyData.yearBuilt}` : 'Residential'}</span>
                             </div>
                           </div>
                         </div>
                       ) : (
                         <div 
                           className="d-flex align-items-center justify-content-center bg-light"
-                          style={{ height: '300px' }}
+                          style={{ height: '250px' }}
                         >
                           <div className="text-center text-muted">
                             <i className="ki-duotone ki-home fs-5x mb-3">
@@ -1187,12 +1205,12 @@ const CustomerPortalPage: React.FC = () => {
                         </div>
                       )}
                       {!showTracking && trackingToken && (
-                        <div className="position-absolute top-50 start-50 translate-middle">
-                          <div className="bg-white bg-opacity-90 rounded-3 p-4 shadow text-center">
-                            <div className="spinner-border text-primary mb-2" role="status">
+                        <div className="position-absolute top-50 start-50 translate-middle" style={{ zIndex: 5 }}>
+                          <div className="bg-white bg-opacity-90 rounded-3 p-3 p-lg-4 shadow text-center">
+                            <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
                               <span className="visually-hidden">Loading...</span>
                             </div>
-                            <p className="mb-0 fw-bold">Activating tracking...</p>
+                            <p className="mb-0 fw-bold fs-7 fs-lg-6">Activating tracking...</p>
                           </div>
                         </div>
                       )}

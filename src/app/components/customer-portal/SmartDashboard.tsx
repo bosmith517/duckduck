@@ -64,13 +64,13 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
   const lastService = getLastServiceSummary()
 
   return (
-    <div className="row g-6 mb-8">
+    <div className="row g-3 g-lg-6 mb-5 mb-lg-8">
       {/* Welcome Header */}
       <div className="col-12">
         <div className="card card-flush h-lg-100">
-          <div className="card-body">
-            <div className="row align-items-center">
-              <div className="col-md-8">
+          <div className="card-body p-4 p-lg-6">
+            <div className="row align-items-center g-3">
+              <div className="col-12 col-md-8">
                 <h1 className="text-dark mb-3">
                   Welcome back, {customer.first_name || customer.name}! 👋
                 </h1>
@@ -78,8 +78,8 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
                   Your home at {[customer.address_line1, customer.city].filter(Boolean).join(', ')}
                 </p>
               </div>
-              <div className="col-md-4 text-end">
-                <div className="symbol symbol-100px">
+              <div className="col-12 col-md-4 text-center text-md-end">
+                <div className="symbol symbol-70px symbol-lg-100px">
                   <span className="symbol-label bg-light-primary">
                     <i className="ki-duotone ki-home-2 fs-2x text-primary">
                       <span className="path1"></span>
@@ -95,9 +95,9 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
 
       {/* Next Service Card */}
       {nextService && (
-        <div className="col-xl-6">
+        <div className="col-12 col-xl-6">
           <div className="card card-flush h-lg-100 bg-primary">
-            <div className="card-body text-white">
+            <div className="card-body text-white p-4 p-lg-6">
               <div className="d-flex align-items-center mb-4">
                 <i className="ki-duotone ki-calendar-2 fs-2x me-3">
                   <span className="path1"></span>
@@ -106,11 +106,11 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
                   <span className="path4"></span>
                   <span className="path5"></span>
                 </i>
-                <h3 className="text-white mb-0">Your Next Service</h3>
+                <h3 className="text-white mb-0 fs-5 fs-lg-3">Your Next Service</h3>
               </div>
               
               <div className="mb-4">
-                <h4 className="text-white fw-bold mb-2">{nextService.service}</h4>
+                <h4 className="text-white fw-bold mb-2 fs-6 fs-lg-4">{nextService.service}</h4>
                 <div className="d-flex align-items-center mb-2">
                   <i className="ki-duotone ki-clock fs-5 me-2">
                     <span className="path1"></span>
@@ -145,27 +145,27 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
                 </div>
               )}
 
-              <div className="d-flex gap-3">
+              <div className="d-flex gap-2 gap-lg-3 flex-wrap">
                 <button 
-                  className="btn btn-light btn-sm"
+                  className="btn btn-light btn-sm flex-fill flex-lg-grow-0"
                   onClick={() => {
                     if (onContactTechnician) {
                       onContactTechnician()
                     } else {
                       // Fallback - open phone call
-                      window.open('tel:+15551234567', '_self')
+                      window.open('tel:5551234567', '_self')
                     }
                   }}
                 >
-                  <i className="ki-duotone ki-message-text-2 fs-5 me-1">
+                  <i className="ki-duotone ki-message-text-2 fs-6 fs-lg-5 me-1">
                     <span className="path1"></span>
                     <span className="path2"></span>
                     <span className="path3"></span>
                   </i>
-                  Contact Tech
+                  <span className="d-none d-sm-inline">Contact </span>Tech
                 </button>
                 <button 
-                  className="btn btn-light-warning btn-sm"
+                  className="btn btn-light-warning btn-sm flex-fill flex-lg-grow-0"
                   onClick={() => {
                     if (onRescheduleJob) {
                       onRescheduleJob()
@@ -174,11 +174,11 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
                     }
                   }}
                 >
-                  <i className="ki-duotone ki-calendar-edit fs-5 me-1">
+                  <i className="ki-duotone ki-calendar-edit fs-6 fs-lg-5 me-1">
                     <span className="path1"></span>
                     <span className="path2"></span>
                   </i>
-                  Reschedule
+                  <span className="d-none d-sm-inline">Re</span>schedule
                 </button>
               </div>
             </div>
@@ -229,33 +229,33 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
 
       {/* Last Service Summary */}
       {lastService && !hasOutstandingBalance() && (
-        <div className="col-xl-6">
+        <div className="col-12 col-xl-6">
           <div className="card card-flush h-lg-100">
-            <div className="card-body">
+            <div className="card-body p-4 p-lg-6">
               <div className="d-flex align-items-center mb-4">
                 <i className="ki-duotone ki-check-circle fs-2x text-success me-3">
                   <span className="path1"></span>
                   <span className="path2"></span>
                 </i>
-                <h3 className="text-dark mb-0">Last Service</h3>
+                <h3 className="text-dark mb-0 fs-5 fs-lg-3">Last Service</h3>
               </div>
               
               <div className="mb-4">
-                <h5 className="text-dark fw-bold mb-2">{lastService.service}</h5>
+                <h5 className="text-dark fw-bold mb-2 fs-6 fs-lg-5">{lastService.service}</h5>
                 <div className="d-flex align-items-center mb-2">
-                  <i className="ki-duotone ki-calendar fs-6 me-2 text-muted">
+                  <i className="ki-duotone ki-calendar fs-7 fs-lg-6 me-2 text-muted">
                     <span className="path1"></span>
                     <span className="path2"></span>
                   </i>
-                  <span className="text-muted fs-6">{lastService.date}</span>
+                  <span className="text-muted fs-7 fs-lg-6">{lastService.date}</span>
                 </div>
                 <div className="d-flex align-items-center mb-3">
-                  <i className="ki-duotone ki-profile-circle fs-6 me-2 text-muted">
+                  <i className="ki-duotone ki-profile-circle fs-7 fs-lg-6 me-2 text-muted">
                     <span className="path1"></span>
                     <span className="path2"></span>
                     <span className="path3"></span>
                   </i>
-                  <span className="text-muted fs-6">Technician: {lastService.technician}</span>
+                  <span className="text-muted fs-7 fs-lg-6">Technician: {lastService.technician}</span>
                 </div>
               </div>
 

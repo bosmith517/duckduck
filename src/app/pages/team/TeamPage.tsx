@@ -7,6 +7,7 @@ import RoleAssignmentModal from '../../components/team/RoleAssignmentModal'
 import FixOrphanedUsers from '../../components/team/FixOrphanedUsers'
 import { AdminPasswordReset, BulkPasswordResetModal } from '../../components/team/AdminPasswordReset'
 import { teamMemberService, TeamMember as TeamMemberType, TeamMemberInvite } from '../../services/teamMemberService'
+import { communicationsService } from '../../services/communicationsService'
 
 interface TeamMember {
   id: string
@@ -557,7 +558,7 @@ const TeamPage: React.FC = () => {
                         <td>
                           <div className='d-flex flex-column'>
                             <span className='text-dark fw-bold fs-6'>{member.email}</span>
-                            <span className='text-muted fw-semibold fs-7'>{member.phone}</span>
+                            <span className='text-muted fw-semibold fs-7'>{member.phone ? communicationsService.formatPhoneNumber(member.phone) : ''}</span>
                           </div>
                         </td>
                         <td>
@@ -947,7 +948,7 @@ const TeamPage: React.FC = () => {
                   </div>
                   <div className="col-md-6">
                     <label className="form-label text-muted">Phone</label>
-                    <p className="fw-bold">{selectedMember.phone}</p>
+                    <p className="fw-bold">{selectedMember.phone ? communicationsService.formatPhoneNumber(selectedMember.phone) : 'Not provided'}</p>
                   </div>
                 </div>
                 
