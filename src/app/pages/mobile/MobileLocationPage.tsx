@@ -3,6 +3,7 @@ import MobileLayout from '../../components/mobile/MobileLayout';
 import MobileLocationTracker from '../../components/mobile/MobileLocationTracker';
 import { LocationData } from '../../services/mobileService';
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth';
+import { permissionsService } from '../../services/permissionsService';
 
 const MobileLocationPage: React.FC = () => {
   const { currentUser } = useSupabaseAuth();
@@ -13,7 +14,19 @@ const MobileLocationPage: React.FC = () => {
     setLocationHistory(prev => [...prev, location]);
   };
 
-  const toggleTracking = () => {
+  const toggleTracking = async () => {
+    if (!isTracking) {
+      // Check permission first when starting tracking
+      const hasPermission = await permissionsService.checkLocationPermission();
+      if (!hasPermission) {
+        // Request permission if not granted
+        const granted = await permissionsService.requestLocationPermission();
+        if (!granted) {
+          alert('Location permission is required for tracking. Please enable it in your device settings.');
+          return;
+        }
+      }
+    }
     setIsTracking(prev => !prev);
   };
 

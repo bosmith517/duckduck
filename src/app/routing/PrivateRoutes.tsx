@@ -16,6 +16,9 @@ const PrivateRoutes = () => {
                 (window.navigator as any).standalone === true ||
                 document.referrer.includes('android-app://');
   
+  // Detect if on mobile device
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
   // Redirect to login if not authenticated
   if (!currentUser) {
     return <Navigate to='/auth/login' replace />
@@ -123,7 +126,7 @@ const PrivateRoutes = () => {
         <Route element={<ProtectedLayout />}>
         {/* Redirect to Dashboard after success login/registartion */}
         <Route path='auth/*' element={<Navigate to='/' />} />
-        <Route index element={<DashboardWrapper />} />
+        <Route index element={(isPWA || isMobile) ? <Navigate to='/mobile/my-day' /> : <DashboardWrapper />} />
         
           {/* Main Dashboard - accessible via index route */}
           <Route path='dashboard' element={<DashboardWrapper />} />

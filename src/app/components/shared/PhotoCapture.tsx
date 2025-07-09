@@ -2,6 +2,8 @@ import React, { useState, useRef, useCallback } from 'react'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { showToast } from '../../utils/toast'
+import { MobileService, PhotoResult } from '../../services/mobileService'
+import { Capacitor } from '@capacitor/core'
 
 interface PhotoCaptureProps {
   isOpen: boolean
@@ -78,6 +80,44 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       console.log('Starting camera...')
       setCameraLoading(true)
       
+      // Check if we're on a mobile device with native camera support
+      if (Capacitor.isNativePlatform() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Use native camera for mobile devices
+        try {
+          const photo = await MobileService.takePhoto()
+          
+          // Convert dataUrl to File
+          const response = await fetch(photo.dataUrl)
+          const blob = await response.blob()
+          const file = new File([blob], `photo_${Date.now()}.${photo.format}`, { type: `image/${photo.format}` })
+          
+          // Get location
+          const position = await getLocation()
+          
+          // Add to photos array
+          const newPhoto: CapturedPhoto = {
+            file,
+            preview: photo.dataUrl,
+            description: '',
+            location: position ? {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            } : undefined
+          }
+          
+          setPhotos(prev => [...prev, newPhoto])
+          setCameraLoading(false)
+          setShowCamera(false)
+          return
+        } catch (error) {
+          console.error('Native camera error:', error)
+          showToast.error('Failed to capture photo')
+          setCameraLoading(false)
+          return
+        }
+      }
+      
+      // Fall back to browser camera for desktop
       // First try with environment camera, fallback to any available camera
       let constraints = {
         video: { 
@@ -637,42 +677,108 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                     </button>
                   </div>
                   <div className="col-12">
-                    <label htmlFor="camera-batch-input" className="btn btn-success w-100 py-4 mb-0">
-                      <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
-                        <span className="path1"></span>
-                        <span className="path2"></span>
-                      </i>
-                      <div className="fw-bold">Quick Camera (iPhone)</div>
-                      <small className="text-white-75">Take multiple photos quickly</small>
-                    </label>
-                    <input
-                      id="camera-batch-input"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      capture="environment"
-                      style={{ display: 'none' }}
-                      onChange={handleFileSelect}
-                    />
+                    {(Capacitor.isNativePlatform() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) ? (
+                      <button
+                        className="btn btn-success w-100 py-4"
+                        onClick={startCamera}
+                        disabled={cameraLoading}
+                      >
+                        <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
+                          <span className="path1"></span>
+                          <span className="path2"></span>
+                        </i>
+                        <div className="fw-bold">Quick Camera</div>
+                        <small className="text-white-75">Take photos using native camera</small>
+                      </button>
+                    ) : (
+                      <>
+                        <label htmlFor="camera-batch-input" className="btn btn-success w-100 py-4 mb-0">
+                          <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
+                            <span className="path1"></span>
+                            <span className="path2"></span>
+                          </i>
+                          <div className="fw-bold">Quick Camera</div>
+                          <small className="text-white-75">Take multiple photos quickly</small>
+                        </label>
+                        <input
+                          id="camera-batch-input"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          capture="environment"
+                          style={{ display: 'none' }}
+                          onChange={handleFileSelect}
+                        />
+                      </>
+                    )}
                   </div>
                   <div className="col-12">
-                    <label htmlFor="gallery-input" className="btn btn-light-primary w-100 py-4 mb-0">
-                      <i className="ki-duotone ki-folder-up fs-2x mb-2 text-primary">
-                        <span className="path1"></span>
-                        <span className="path2"></span>
-                      </i>
-                      <div className="fw-bold">Choose from Gallery</div>
-                      <small className="text-primary">Select multiple photos at once</small>
-                    </label>
-                    <input
-                      id="gallery-input"
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      style={{ display: 'none' }}
-                      onChange={handleFileSelect}
-                    />
+                    {(Capacitor.isNativePlatform() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) ? (
+                      <button
+                        className="btn btn-light-primary w-100 py-4"
+                        onClick={async () => {
+                          try {
+                            setCameraLoading(true)
+                            const photo = await MobileService.selectPhoto()
+                            
+                            // Convert dataUrl to File
+                            const response = await fetch(photo.dataUrl)
+                            const blob = await response.blob()
+                            const file = new File([blob], `photo_${Date.now()}.${photo.format}`, { type: `image/${photo.format}` })
+                            
+                            // Get location
+                            const position = await getLocation()
+                            
+                            // Add to photos array
+                            const newPhoto: CapturedPhoto = {
+                              file,
+                              preview: photo.dataUrl,
+                              description: '',
+                              location: position ? {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude
+                              } : undefined
+                            }
+                            
+                            setPhotos(prev => [...prev, newPhoto])
+                            showToast.success('Photo selected successfully')
+                          } catch (error) {
+                            console.error('Gallery selection error:', error)
+                            showToast.error('Failed to select photo')
+                          } finally {
+                            setCameraLoading(false)
+                          }
+                        }}
+                        disabled={cameraLoading}
+                      >
+                        <i className="ki-duotone ki-folder-up fs-2x mb-2 text-primary">
+                          <span className="path1"></span>
+                          <span className="path2"></span>
+                        </i>
+                        <div className="fw-bold">Choose from Gallery</div>
+                        <small className="text-primary">Select photos from your device</small>
+                      </button>
+                    ) : (
+                      <>
+                        <label htmlFor="gallery-input" className="btn btn-light-primary w-100 py-4 mb-0">
+                          <i className="ki-duotone ki-folder-up fs-2x mb-2 text-primary">
+                            <span className="path1"></span>
+                            <span className="path2"></span>
+                          </i>
+                          <div className="fw-bold">Choose from Gallery</div>
+                          <small className="text-primary">Select multiple photos at once</small>
+                        </label>
+                        <input
+                          id="gallery-input"
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          style={{ display: 'none' }}
+                          onChange={handleFileSelect}
+                        />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

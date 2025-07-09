@@ -144,7 +144,7 @@ const AppRoutes: FC = () => {
         {user ? (
           <Route element={<App />}>
             <Route path='/*' element={<PrivateRoutes />} />
-            <Route path='auth/*' element={<Navigate to='/dashboard' />} />
+            <Route path='auth/*' element={<Navigate to={(isPWA || isMobile) ? '/mobile/my-day' : '/dashboard'} />} />
           </Route>
         ) : (
           <Route element={<App />}>
