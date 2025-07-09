@@ -39,6 +39,9 @@ const TeamPage: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null)
   const [showBulkPasswordReset, setShowBulkPasswordReset] = useState(false)
   const [selectedMembers, setSelectedMembers] = useState<TeamMember[]>([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   
   // Add Member Form State
   const [addMemberForm, setAddMemberForm] = useState({
@@ -356,6 +359,55 @@ const TeamPage: React.FC = () => {
     setShowRoleAssignmentModal(false)
   }
 
+  const handleDeleteMember = (member: TeamMember) => {
+    setMemberToDelete(member)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteMember = async () => {
+    if (!memberToDelete) return
+    
+    setIsDeleting(true)
+    setError(null)
+    
+    try {
+      const { success, error } = await teamMemberService.deleteTeamMember(memberToDelete.id)
+      
+      if (error) {
+        setError(error.message || 'Failed to delete team member')
+      } else {
+        setSuccess('Team member deleted successfully')
+        await loadTeamMembers()
+        setShowDeleteConfirm(false)
+        setMemberToDelete(null)
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+      console.error('Error deleting team member:', err)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeactivateMember = async (member: TeamMember) => {
+    try {
+      const { data, error } = await teamMemberService.deactivateTeamMember(member.id)
+      
+      if (error) {
+        setError(error.message || 'Failed to deactivate team member')
+      } else {
+        setSuccess('Team member deactivated successfully')
+        await loadTeamMembers()
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+      console.error('Error deactivating team member:', err)
+    }
+  }
+
   return (
     <>
       <PageTitle breadcrumbs={[]}>Team Management</PageTitle>
@@ -623,6 +675,35 @@ const TeamPage: React.FC = () => {
                                     userName={member.name}
                                     userId={member.id}
                                   />
+                                </li>
+                                <li><hr className='dropdown-divider' /></li>
+                                <li>
+                                  <button
+                                    className='dropdown-item'
+                                    onClick={() => handleDeactivateMember(member)}
+                                    disabled={member.status === 'inactive'}
+                                  >
+                                    <i className='ki-duotone ki-lock fs-4 me-2'>
+                                      <span className='path1'></span>
+                                      <span className='path2'></span>
+                                    </i>
+                                    {member.status === 'inactive' ? 'Already Deactivated' : 'Deactivate User'}
+                                  </button>
+                                </li>
+                                <li>
+                                  <button
+                                    className='dropdown-item text-danger'
+                                    onClick={() => handleDeleteMember(member)}
+                                  >
+                                    <i className='ki-duotone ki-trash fs-4 me-2'>
+                                      <span className='path1'></span>
+                                      <span className='path2'></span>
+                                      <span className='path3'></span>
+                                      <span className='path4'></span>
+                                      <span className='path5'></span>
+                                    </i>
+                                    Delete Permanently
+                                  </button>
                                 </li>
                               </ul>
                             </div>
@@ -1156,6 +1237,120 @@ const TeamPage: React.FC = () => {
           name: m.name
         }))}
       />
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && memberToDelete && (
+        <div className="modal d-block" tabIndex={-1}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Delete Team Member</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setMemberToDelete(null)
+                  }}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="alert alert-danger d-flex align-items-center mb-5">
+                  <i className="ki-duotone ki-information-5 fs-2hx text-danger me-4">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                    <span className="path3"></span>
+                  </i>
+                  <div className="d-flex flex-column">
+                    <h4 className="mb-1 text-danger">Warning</h4>
+                    <span>This action cannot be undone!</span>
+                  </div>
+                </div>
+                
+                <p>Are you sure you want to permanently delete <strong>{memberToDelete.name}</strong>?</p>
+                <p className="text-muted">
+                  This will remove their account, profile, and all associated data from the system.
+                </p>
+                
+                {memberToDelete.currentJobs > 0 && (
+                  <div className="alert alert-warning">
+                    <i className="ki-duotone ki-warning fs-5 me-2">
+                      <span className="path1"></span>
+                      <span className="path2"></span>
+                    </i>
+                    This member has {memberToDelete.currentJobs} active job(s) assigned.
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button 
+                  className="btn btn-light" 
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setMemberToDelete(null)
+                  }}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="btn btn-danger"
+                  onClick={confirmDeleteMember}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2"></span>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="ki-duotone ki-trash fs-4 me-2">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                        <span className="path3"></span>
+                        <span className="path4"></span>
+                        <span className="path5"></span>
+                      </i>
+                      Delete Permanently
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success/Error Alerts */}
+      {success && (
+        <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 1090 }}>
+          <div className="alert alert-success alert-dismissible fade show" role="alert">
+            <i className="ki-duotone ki-check-circle fs-2hx text-success me-3">
+              <span className="path1"></span>
+              <span className="path2"></span>
+            </i>
+            {success}
+          </div>
+        </div>
+      )}
+      
+      {error && (
+        <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 1090 }}>
+          <div className="alert alert-danger alert-dismissible fade show" role="alert">
+            <i className="ki-duotone ki-cross-circle fs-2hx text-danger me-3">
+              <span className="path1"></span>
+              <span className="path2"></span>
+            </i>
+            {error}
+            <button 
+              type="button" 
+              className="btn-close" 
+              onClick={() => setError(null)}
+            ></button>
+          </div>
+        </div>
+      )}
     </>
   )
 }

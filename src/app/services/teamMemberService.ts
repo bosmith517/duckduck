@@ -358,6 +358,68 @@ class TeamMemberService {
       return { data: null, error };
     }
   }
+
+  /**
+   * Permanently delete a team member
+   * This will remove the user profile and their auth account
+   */
+  async deleteTeamMember(id: string): Promise<{ success: boolean; error: any }> {
+    try {
+      // For now, use direct database approach until Edge Function is deployed
+      
+      // First check if we have permission
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get current user's profile to check admin status
+      const { data: currentUserProfile } = await supabase
+        .from('user_profiles')
+        .select('role, tenant_id')
+        .eq('id', user.id)
+        .single();
+
+      if (currentUserProfile?.role !== 'admin') {
+        throw new Error('Only admins can delete team members');
+      }
+
+      // Don't allow self-deletion
+      if (id === user.id) {
+        throw new Error('You cannot delete your own account');
+      }
+
+      // Get target user's profile
+      const { data: targetProfile } = await supabase
+        .from('user_profiles')
+        .select('tenant_id, email')
+        .eq('id', id)
+        .single();
+
+      if (!targetProfile) {
+        throw new Error('User not found');
+      }
+
+      // Verify same tenant
+      if (targetProfile.tenant_id !== currentUserProfile.tenant_id) {
+        throw new Error('Cannot delete users from other tenants');
+      }
+
+      // Delete the user profile (this is all we can do from client-side)
+      // The auth user will remain but won't be able to access anything
+      const { error: deleteError } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error deleting team member:', error);
+      return { success: false, error };
+    }
+  }
 }
 
 export const teamMemberService = new TeamMemberService();

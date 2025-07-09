@@ -128,13 +128,21 @@ export const ResetPasswordPage: React.FC = () => {
           }
         } else {
           // Use Supabase default
-          const { error } = await supabase.auth.updateUser({
+          console.log('Updating password for current session...');
+          
+          const { data, error } = await supabase.auth.updateUser({
             password: values.newPassword,
           });
 
-          if (error) throw error;
+          if (error) {
+            console.error('Password update error:', error);
+            throw error;
+          }
+          
+          console.log('Password updated successfully:', data);
 
           // Sign out to ensure clean state
+          console.log('Signing out to ensure clean login...');
           await supabase.auth.signOut();
         }
 

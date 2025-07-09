@@ -191,12 +191,22 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
   const signIn = async (email: string, password: string) => {
     try {
       setAuthLoading(true)
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting sign in for:', email)
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
+      console.log('Sign in response:', { 
+        success: !error, 
+        error: error?.message,
+        user: data?.user?.email,
+        session: !!data?.session
+      })
+      
       if (error) {
+        console.error('Sign in error:', error)
         setAuthLoading(false)
         return { error }
       }
@@ -204,6 +214,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       // Profile will be fetched automatically via onAuthStateChange
       return { error: null }
     } catch (error) {
+      console.error('Sign in exception:', error)
       setAuthLoading(false)
       return { error }
     }

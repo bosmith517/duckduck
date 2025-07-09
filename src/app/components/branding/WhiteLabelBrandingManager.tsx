@@ -49,16 +49,16 @@ const WhiteLabelBrandingManager: React.FC = () => {
     if (!userProfile?.tenant_id) return
 
     try {
+      // First try to get from tenant_branding table
       const { data, error } = await supabase
         .from('tenant_branding')
         .select('*')
         .eq('tenant_id', userProfile.tenant_id)
         .single()
 
-      // Handle table not found error (PGRST116) or no data found (PGRST116)
+      // Handle table not found error or no data found
       if (error && error.code !== 'PGRST116') {
-        console.warn('tenant_branding table not found, using defaults:', error)
-        // Table doesn't exist, proceed with tenant defaults
+        console.warn('Error fetching tenant_branding:', error)
       }
 
       if (data) {
