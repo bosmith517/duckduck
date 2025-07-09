@@ -41,6 +41,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   const [showCamera, setShowCamera] = useState(false)
   const [cameraLoading, setCameraLoading] = useState(false)
   const [description, setDescription] = useState('')
+  const [isMobileDevice] = useState(() => Capacitor.isNativePlatform() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -81,7 +82,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       setCameraLoading(true)
       
       // Check if we're on a mobile device with native camera support
-      if (Capacitor.isNativePlatform() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      if (isMobileDevice) {
         // Use native camera for mobile devices
         try {
           const photo = await MobileService.takePhoto()
@@ -107,7 +108,8 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
           
           setPhotos(prev => [...prev, newPhoto])
           setCameraLoading(false)
-          setShowCamera(false)
+          // Don't close camera mode on mobile - allow multiple captures
+          showToast.success(`Photo ${photos.length + 1} captured! Take another or save all.`)
           return
         } catch (error) {
           console.error('Native camera error:', error)
@@ -642,17 +644,26 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             {/* Photo Capture Options */}
             {!showCamera && (
               <div>
-                <div className="alert alert-primary d-flex align-items-center mb-4">
-                  <i className="ki-duotone ki-camera fs-2x text-primary me-3">
-                    <span className="path1"></span>
-                    <span className="path2"></span>
-                  </i>
-                  <div>
-                    <strong>📱 iPhone Bulk Photo Capture:</strong> Use "Quick Camera" for fastest multiple photo taking, or select multiple photos from your gallery at once.
+                {isMobileDevice && photos.length === 0 && (
+                  <div className="alert alert-primary d-flex align-items-center mb-4">
+                    <i className="bi bi-camera-fill fs-3 text-primary me-3"></i>
+                    <div>
+                      <strong>Take Multiple Photos:</strong> Capture photos one by one and save them all together when done.
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="row g-3 mb-6">
+                  {/* Show mobile camera interface when photos exist */}
+                  {isMobileDevice && photos.length > 0 && (
+                    <div className="col-12">
+                      <div className="alert alert-success">
+                        <i className="bi bi-check-circle me-2"></i>
+                        {photos.length} photo{photos.length > 1 ? 's' : ''} captured. Take more or save all.
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="col-12">
                     <button
                       className="btn btn-primary w-100 py-4"
@@ -670,50 +681,18 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                             <span className="path1"></span>
                             <span className="path2"></span>
                           </i>
-                          <div className="fw-bold">Take Multiple Photos</div>
-                          <small className="text-white-75">Use camera to take several photos in a row</small>
+                          <div className="fw-bold">
+                            {photos.length === 0 ? 'Take First Photo' : `Take Another Photo (${photos.length} taken)`}
+                          </div>
+                          <small className="text-white-75">
+                            {isMobileDevice ? 'Tap to open camera' : 'Use camera to capture photos'}
+                          </small>
                         </>
                       )}
                     </button>
                   </div>
                   <div className="col-12">
-                    {(Capacitor.isNativePlatform() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) ? (
-                      <button
-                        className="btn btn-success w-100 py-4"
-                        onClick={startCamera}
-                        disabled={cameraLoading}
-                      >
-                        <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
-                          <span className="path1"></span>
-                          <span className="path2"></span>
-                        </i>
-                        <div className="fw-bold">Quick Camera</div>
-                        <small className="text-white-75">Take photos using native camera</small>
-                      </button>
-                    ) : (
-                      <>
-                        <label htmlFor="camera-batch-input" className="btn btn-success w-100 py-4 mb-0">
-                          <i className="ki-duotone ki-camera fs-2x mb-2 text-white">
-                            <span className="path1"></span>
-                            <span className="path2"></span>
-                          </i>
-                          <div className="fw-bold">Quick Camera</div>
-                          <small className="text-white-75">Take multiple photos quickly</small>
-                        </label>
-                        <input
-                          id="camera-batch-input"
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          capture="environment"
-                          style={{ display: 'none' }}
-                          onChange={handleFileSelect}
-                        />
-                      </>
-                    )}
-                  </div>
-                  <div className="col-12">
-                    {(Capacitor.isNativePlatform() || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) ? (
+                    {isMobileDevice ? (
                       <button
                         className="btn btn-light-primary w-100 py-4"
                         onClick={async () => {
@@ -787,17 +766,32 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             {/* Captured Photos */}
             {photos.length > 0 && (
               <div>
-                <h6 className="mb-4">Captured Photos ({photos.length})</h6>
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h6 className="mb-0">Captured Photos ({photos.length})</h6>
+                  {isMobileDevice && photos.length > 0 && (
+                    <button 
+                      className="btn btn-sm btn-success"
+                      onClick={() => {
+                        // Scroll to save button
+                        const modal = document.querySelector('.modal-footer')
+                        modal?.scrollIntoView({ behavior: 'smooth' })
+                      }}
+                    >
+                      <i className="bi bi-check-circle me-1"></i>
+                      Ready to Save
+                    </button>
+                  )}
+                </div>
                 <div className="row g-3">
                   {photos.map((photo, index) => (
-                    <div key={index} className="col-md-6">
+                    <div key={index} className={isMobileDevice ? "col-6" : "col-md-6"}>
                       <div className="card">
                         <div className="position-relative">
                           <img
                             src={photo.preview}
                             alt={`Photo ${index + 1}`}
                             className="card-img-top"
-                            style={{ height: '200px', objectFit: 'cover' }}
+                            style={{ height: isMobileDevice ? '150px' : '200px', objectFit: 'cover' }}
                           />
                           <button
                             className="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"

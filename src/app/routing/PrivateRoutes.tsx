@@ -19,6 +19,14 @@ const PrivateRoutes = () => {
   // Detect if on mobile device
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
+  // Debug logging
+  console.log('🔍 PrivateRoutes Mobile Detection:', {
+    isPWA,
+    isMobile,
+    shouldRedirectToMobile: isPWA || isMobile,
+    currentPath: window.location.pathname
+  });
+  
   // Redirect to login if not authenticated
   if (!currentUser) {
     return <Navigate to='/auth/login' replace />
@@ -113,7 +121,7 @@ const PrivateRoutes = () => {
   const PasswordResetLogsPage = lazy(() => import('../pages/admin/PasswordResetLogsPage'))
 
   // Mobile Components
-  const MyDayDashboard = lazy(() => import('../components/mobile/MyDayDashboard'))
+  const MobileMyDayPage = lazy(() => import('../pages/mobile/MobileMyDayPage'))
   const MobileCameraPage = lazy(() => import('../pages/mobile/MobileCameraPage'))
   const MobileLocationPage = lazy(() => import('../pages/mobile/MobileLocationPage'))
 
@@ -694,7 +702,7 @@ const PrivateRoutes = () => {
           path='mobile/my-day'
           element={
             <SuspensedView>
-              <MyDayDashboard />
+              <MobileMyDayPage />
             </SuspensedView>
           }
         />

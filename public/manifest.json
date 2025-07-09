@@ -2,7 +2,8 @@
   "name": "TradeWorks Pro",
   "short_name": "TradeWorks",
   "description": "Professional Field Service Management Platform",
-  "start_url": "/",
+  "start_url": "/mobile/my-day?source=pwa",
+"scope": "/mobile/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
@@ -98,6 +99,19 @@
   ],
   "prefer_related_applications": false,
   "shortcuts": [
+    {
+      "name": "My Day",
+      "short_name": "My Day",
+      "description": "View today's jobs and tasks",
+      "url": "/mobile/my-day",
+      "icons": [
+        {
+          "src": "/icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
     {
       "name": "Customer Portal",
       "short_name": "Portal",

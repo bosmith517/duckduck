@@ -59,8 +59,17 @@ export const MyDayDashboard: React.FC = () => {
           if (result.state === 'granted') {
             getCurrentLocation()
           } else if (result.state === 'prompt') {
-            // Show our custom prompt after a short delay
-            setTimeout(() => setShowLocationPrompt(true), 1000)
+            // Show our custom prompt after a short delay for mobile/PWA users
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+            const isPWA = window.matchMedia('(display-mode: standalone)').matches
+            
+            if (isMobile || isPWA) {
+              // Show immediately for mobile users
+              setShowLocationPrompt(true)
+            } else {
+              // Show after delay for desktop users
+              setTimeout(() => setShowLocationPrompt(true), 1000)
+            }
           }
         } catch (error) {
           console.warn('Error checking permissions:', error)

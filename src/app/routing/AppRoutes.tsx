@@ -34,6 +34,8 @@ import {PasswordSetupPage} from '../pages/auth/PasswordSetupPage'
 import {PasswordResetTestPage} from '../pages/test/PasswordResetTestPage'
 import {SimplePasswordResetTest} from '../pages/test/SimplePasswordResetTest'
 import {SupabaseVerifyProxy} from '../pages/auth/SupabaseVerifyProxy'
+import MobileRedirectTest from '../pages/test/MobileRedirectTest'
+import PwaStartPage from '../pages/PwaStartPage'
 
 
 /**
@@ -57,12 +59,22 @@ const AppRoutes: FC = () => {
   
   // Log PWA detection for debugging
   useEffect(() => {
+    console.log('🔍 Mobile Detection Debug:', {
+      isPWA,
+      isMobile,
+      userAgent: navigator.userAgent,
+      displayMode: window.matchMedia('(display-mode: standalone)').matches,
+      standalone: (window.navigator as any).standalone,
+      referrer: document.referrer,
+      redirectTarget: (isPWA || isMobile) ? '/mobile/my-day' : '/dashboard'
+    });
+    
     if (isPWA) {
       console.log('🚀 Running as PWA - Mobile experience enabled');
       // Add a class to body for PWA-specific styling
       document.body.classList.add('is-pwa');
     }
-  }, [isPWA]);
+  }, [isPWA, isMobile]);
   
   // Removed password reset detection - now handled directly by Supabase redirect
   
@@ -109,7 +121,11 @@ const AppRoutes: FC = () => {
         <Route path='portal/:token' element={<CustomerPortalPage />} />
         
         {/* Marketing routes - always accessible */}
-        <Route path='/' element={<Navigate to='/auth/login' />} />
+        <Route path='/' element={
+          new URLSearchParams(window.location.search).get('source') === 'pwa' 
+            ? <PwaStartPage /> 
+            : <Navigate to='/auth/login' />
+        } />
         <Route path='home' element={<LandingPage />} />
         <Route path='signup' element={<SignupPage />} />
         <Route path='homeowner-signup' element={<HomeownerSignupPage />} />
@@ -133,6 +149,7 @@ const AppRoutes: FC = () => {
         <Route path='test-tracking-simple' element={<SimpleTrackingTest />} />
         <Route path='test-password-reset' element={<SimplePasswordResetTest />} />
         <Route path='automation-demo' element={<AutomationDemoPage />} />
+        <Route path='test-mobile-redirect' element={<MobileRedirectTest />} />
         
         {/* Error pages and logout - wrapped in App for consistent layout */}
         <Route element={<App />}>
