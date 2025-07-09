@@ -1,0 +1,208 @@
+/* Mobile PWA Optimization - Safe Version */
+
+/* Mobile-specific adjustments that don't break the layout */
+@media (max-width: 768px) {
+  /* Reduce padding on mobile */
+  .content {
+    padding: 10px !important;
+  }
+  
+  /* Make cards full width on mobile */
+  .card {
+    margin-left: -10px;
+    margin-right: -10px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  
+  /* Optimize header for mobile */
+  .header {
+    padding: 10px !important;
+  }
+  
+  .header-fixed .wrapper {
+    padding-top: 60px !important;
+  }
+  
+  /* Simplify toolbar on mobile */
+  .toolbar {
+    padding: 5px 10px !important;
+    min-height: auto !important;
+  }
+  
+  /* Hide sidebar on mobile by default */
+  .aside {
+    display: none !important;
+  }
+  
+  /* Make forms mobile-friendly */
+  .form-control, 
+  .form-select {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+    padding: 12px !important;
+  }
+  
+  /* Larger touch targets */
+  .btn {
+    min-height: 44px;
+    padding: 10px 20px !important;
+  }
+  
+  /* Stack form groups on mobile */
+  .row > [class*='col-'] {
+    margin-bottom: 15px;
+  }
+  
+  /* Mobile-friendly tables */
+  .table-responsive {
+    border: none;
+  }
+  
+  .table {
+    font-size: 14px;
+  }
+  
+  /* Optimize modals for mobile */
+  .modal-dialog {
+    margin: 10px;
+    max-width: calc(100% - 20px);
+  }
+  
+  .modal-content {
+    border-radius: 10px;
+  }
+}
+
+/* PWA-specific enhancements */
+@media (display-mode: standalone) {
+  /* Add safe area padding for modern phones */
+  .wrapper {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Adjust header for PWA */
+  .header {
+    top: env(safe-area-inset-top);
+  }
+  
+  /* Prevent overscroll bounce */
+  body {
+    overscroll-behavior-y: contain;
+  }
+  
+  /* Hide scrollbars for cleaner look */
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.2);
+    border-radius: 2px;
+  }
+}
+
+/* Mobile Dashboard Specific */
+.my-day-dashboard {
+  padding: 0 !important;
+}
+
+.my-day-dashboard .job-card {
+  margin-bottom: 10px;
+  border-left: 4px solid var(--bs-primary);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.my-day-dashboard .job-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Mobile Navigation Enhancement */
+.mobile-quick-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid var(--bs-gray-300);
+  padding: 10px;
+  display: none;
+  z-index: 1050;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+  .mobile-quick-nav {
+    display: flex;
+    justify-content: space-around;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+  
+  /* Add padding to content to account for bottom nav */
+  .wrapper .content {
+    padding-bottom: 80px !important;
+  }
+}
+
+.mobile-quick-nav .nav-item {
+  flex: 1;
+  text-align: center;
+  padding: 5px;
+}
+
+.mobile-quick-nav .nav-item a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--bs-gray-600);
+  text-decoration: none;
+  font-size: 11px;
+}
+
+.mobile-quick-nav .nav-item a i {
+  font-size: 20px;
+  margin-bottom: 3px;
+}
+
+.mobile-quick-nav .nav-item a.active {
+  color: var(--bs-primary);
+}
+
+/* Mobile Camera Interface */
+.mobile-camera-capture {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-camera-capture .camera-preview {
+  flex: 1;
+  background: black;
+  position: relative;
+}
+
+.mobile-camera-capture .camera-controls {
+  background: rgba(0,0,0,0.8);
+  padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+
+/* Performance optimizations */
+@media (max-width: 768px) {
+  /* Disable animations on mobile for better performance */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  /* Optimize images */
+  img {
+    content-visibility: auto;
+  }
+}

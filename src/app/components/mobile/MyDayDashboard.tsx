@@ -35,33 +35,77 @@ export const MyDayDashboard: React.FC = () => {
   const [showJobDetails, setShowJobDetails] = useState(false)
   const [showPhotoCapture, setShowPhotoCapture] = useState(false)
   const [photoJobId, setPhotoJobId] = useState<string | null>(null)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [locationPermissionStatus, setLocationPermissionStatus] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking')
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false)
+
+  // Check location permission status
+  useEffect(() => {
+    const checkLocationPermission = async () => {
+      if ('permissions' in navigator) {
+        try {
+          const result = await navigator.permissions.query({ name: 'geolocation' })
+          setLocationPermissionStatus(result.state as any)
+          
+          // Listen for permission changes
+          result.addEventListener('change', () => {
+            setLocationPermissionStatus(result.state as any)
+            if (result.state === 'granted') {
+              getCurrentLocation()
+            }
+          })
+          
+          // If permission is already granted, get location
+          if (result.state === 'granted') {
+            getCurrentLocation()
+          } else if (result.state === 'prompt') {
+            // Show our custom prompt after a short delay
+            setTimeout(() => setShowLocationPrompt(true), 1000)
+          }
+        } catch (error) {
+          console.warn('Error checking permissions:', error)
+          // Try to get location anyway
+          setShowLocationPrompt(true)
+        }
+      } else {
+        // Browser doesn't support permissions API, show prompt
+        setShowLocationPrompt(true)
+      }
+    }
+    
+    checkLocationPermission()
+  }, [])
 
   useEffect(() => {
     if (userProfile?.id) {
       fetchTodayJobs()
-      getCurrentLocation()
-      
-      // Set up periodic location updates if any job is on route or in progress
-      const hasActiveJobs = todayJobs.some(job => 
-        job.status === 'on_route' || job.status === 'in_progress'
+    }
+  }, [userProfile?.id])
+  
+  // Set up location tracking for active jobs
+  useEffect(() => {
+    // Only set up tracking if we have location permission
+    if (locationPermissionStatus !== 'granted') return
+    
+    const hasActiveJobs = todayJobs.some(job => 
+      job.status === 'on_route' || job.status === 'in_progress'
+    )
+    
+    if (hasActiveJobs && navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          setCurrentLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          })
+        },
+        (error) => console.warn('Location watch error:', error),
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
       )
       
-      if (hasActiveJobs && navigator.geolocation) {
-        const watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            setCurrentLocation({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            })
-          },
-          (error) => console.warn('Location watch error:', error),
-          { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
-        )
-        
-        return () => navigator.geolocation.clearWatch(watchId)
-      }
+      return () => navigator.geolocation.clearWatch(watchId)
     }
-  }, [userProfile?.id, todayJobs.length])
+  }, [todayJobs.length, locationPermissionStatus])
 
   const fetchTodayJobs = async () => {
     if (!userProfile?.tenant_id) return
@@ -261,15 +305,50 @@ export const MyDayDashboard: React.FC = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setCurrentLocation({
+          const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude
-          })
+          }
+          setCurrentLocation(location)
+          
+          // Store in localStorage for persistence
+          localStorage.setItem('lastKnownLocation', JSON.stringify({
+            ...location,
+            timestamp: new Date().toISOString()
+          }))
+          
+          // Update location permission status
+          setLocationPermissionStatus('granted')
         },
         (error) => {
-          console.warn('Location access denied:', error)
+          console.warn('Location error:', error)
+          if (error.code === error.PERMISSION_DENIED) {
+            setLocationPermissionStatus('denied')
+            setShowLocationPrompt(false)
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            alert('Location information is unavailable. Please check your device settings.')
+          } else if (error.code === error.TIMEOUT) {
+            alert('Location request timed out. Please try again.')
+          }
+          
+          // Try to use last known location
+          const lastLocation = localStorage.getItem('lastKnownLocation')
+          if (lastLocation) {
+            const parsed = JSON.parse(lastLocation)
+            const hourAgo = new Date(Date.now() - 60 * 60 * 1000)
+            if (new Date(parsed.timestamp) > hourAgo) {
+              setCurrentLocation({ lat: parsed.lat, lng: parsed.lng })
+            }
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
       )
+    } else {
+      alert('Geolocation is not supported by your device')
     }
   }
 
@@ -418,27 +497,134 @@ export const MyDayDashboard: React.FC = () => {
   }
 
   return (
-    <div className="container-fluid p-0">
-      {/* Header */}
-      <div className="bg-primary text-white p-4 mb-4">
+    <div className="container-fluid p-0" style={{ paddingBottom: '80px' }}>
+      {/* Location Permission Prompt */}
+      {showLocationPrompt && locationPermissionStatus !== 'granted' && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center" style={{ zIndex: 1050 }}>
+          <div className="bg-white rounded-3 p-4 mx-3" style={{ maxWidth: '400px' }}>
+            <div className="text-center mb-4">
+              <i className="bi bi-geo-alt-fill text-primary" style={{ fontSize: '3rem' }}></i>
+            </div>
+            <h5 className="text-center mb-3">Enable Location Services</h5>
+            <p className="text-muted text-center mb-4">
+              TradeWorks Pro needs your location to:
+            </p>
+            <ul className="text-muted mb-4">
+              <li>Provide turn-by-turn navigation to job sites</li>
+              <li>Track your arrival for customer notifications</li>
+              <li>Log job locations for accurate records</li>
+              <li>Calculate travel time between jobs</li>
+            </ul>
+            <div className="d-grid gap-2">
+              <button 
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowLocationPrompt(false)
+                  getCurrentLocation()
+                }}
+              >
+                <i className="bi bi-check-circle me-2"></i>
+                Enable Location
+              </button>
+              <button 
+                className="btn btn-light"
+                onClick={() => setShowLocationPrompt(false)}
+              >
+                Not Now
+              </button>
+            </div>
+            {locationPermissionStatus === 'denied' && (
+              <div className="alert alert-warning mt-3 small">
+                <i className="bi bi-exclamation-triangle me-2"></i>
+                Location is blocked. Go to your browser settings to enable it.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Header with Menu */}
+      <div className="bg-primary text-white p-3 mb-4 position-sticky top-0" style={{ zIndex: 100 }}>
         <div className="d-flex justify-content-between align-items-center">
           <div>
-            <h3 className="mb-1">My Day</h3>
-            <div className="text-white-50">
+            <h4 className="mb-0 d-flex align-items-center">
+              <button 
+                className="btn btn-sm btn-link text-white p-0 me-3"
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+              >
+                <i className="bi bi-list fs-3"></i>
+              </button>
+              My Day
+            </h4>
+            <div className="text-white-50 small ms-5">
               {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
+                weekday: 'short', 
+                month: 'short', 
                 day: 'numeric' 
               })}
             </div>
           </div>
           <div className="text-end">
-            <div className="h4 mb-0">{todayJobs.length}</div>
-            <div className="text-white-50 small">Jobs Today</div>
+            <div className="h5 mb-0">{todayJobs.length}</div>
+            <div className="text-white-50 small">Jobs</div>
           </div>
         </div>
       </div>
+
+      {/* Mobile Slide Menu */}
+      {showMobileMenu && (
+        <div 
+          className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50" 
+          style={{ zIndex: 1040 }}
+          onClick={() => setShowMobileMenu(false)}
+        >
+          <div 
+            className="bg-white h-100" 
+            style={{ width: '280px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-primary text-white">
+              <h5 className="mb-0">{userProfile?.first_name} {userProfile?.last_name}</h5>
+              <small>{userProfile?.email}</small>
+            </div>
+            <div className="p-3">
+              <a href="/dashboard" className="d-block p-3 text-decoration-none text-dark hover-bg-light">
+                <i className="bi bi-speedometer2 me-3"></i> Dashboard
+              </a>
+              <a href="/jobs" className="d-block p-3 text-decoration-none text-dark hover-bg-light">
+                <i className="bi bi-briefcase me-3"></i> All Jobs
+              </a>
+              <a href="/mobile/camera" className="d-block p-3 text-decoration-none text-dark hover-bg-light">
+                <i className="bi bi-camera me-3"></i> Camera
+              </a>
+              <a href="/communications/call-center" className="d-block p-3 text-decoration-none text-dark hover-bg-light">
+                <i className="bi bi-telephone me-3"></i> Phone
+              </a>
+              <hr />
+              <a href="/profile/account" className="d-block p-3 text-decoration-none text-dark hover-bg-light">
+                <i className="bi bi-person me-3"></i> Profile
+              </a>
+              <a href="/logout" className="d-block p-3 text-decoration-none text-danger hover-bg-light">
+                <i className="bi bi-box-arrow-right me-3"></i> Logout
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Location Status Banner */}
+      {locationPermissionStatus === 'denied' && (
+        <div className="alert alert-warning mx-3 mb-3 d-flex align-items-center">
+          <i className="bi bi-geo-slash me-2"></i>
+          <div className="flex-grow-1">Location disabled - Navigation won't work</div>
+          <button 
+            className="btn btn-sm btn-warning"
+            onClick={() => setShowLocationPrompt(true)}
+          >
+            Fix
+          </button>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="row g-3 mb-4 px-3">
@@ -531,7 +717,14 @@ export const MyDayDashboard: React.FC = () => {
                   <div className="col-4">
                     <button 
                       className="btn btn-light-primary btn-sm w-100"
-                      onClick={() => openDirections(job.customer.address)}
+                      onClick={() => {
+                        if (locationPermissionStatus === 'granted') {
+                          openDirections(job.customer.address)
+                        } else {
+                          setShowLocationPrompt(true)
+                        }
+                      }}
+                      disabled={locationPermissionStatus === 'denied'}
                     >
                       <KTIcon iconName="geolocation" className="fs-6 me-1" />
                       Directions
@@ -568,7 +761,13 @@ export const MyDayDashboard: React.FC = () => {
                   {job.status === 'scheduled' && (
                     <button 
                       className="btn btn-warning btn-sm flex-fill"
-                      onClick={() => updateJobStatus(job.id, 'on_route')}
+                      onClick={() => {
+                        if (locationPermissionStatus === 'granted') {
+                          updateJobStatus(job.id, 'on_route')
+                        } else {
+                          setShowLocationPrompt(true)
+                        }
+                      }}
                     >
                       On My Way
                     </button>
@@ -702,6 +901,80 @@ export const MyDayDashboard: React.FC = () => {
           title="Add Job Photo"
         />
       )}
+
+      {/* Floating Action Button */}
+      <div className="position-fixed" style={{ bottom: '90px', right: '20px', zIndex: 1000 }}>
+        <div className="dropdown dropup">
+          <button 
+            className="btn btn-primary rounded-circle shadow-lg"
+            style={{ width: '56px', height: '56px' }}
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            <i className="bi bi-plus fs-3"></i>
+          </button>
+          <ul className="dropdown-menu dropdown-menu-end">
+            <li>
+              <a 
+                className="dropdown-item" 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  window.location.href = '/leads/new'
+                }}
+              >
+                <i className="bi bi-person-plus me-2"></i>
+                New Lead
+              </a>
+            </li>
+            <li>
+              <a 
+                className="dropdown-item" 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  window.location.href = '/jobs/new'
+                }}
+              >
+                <i className="bi bi-briefcase-fill me-2"></i>
+                New Job
+              </a>
+            </li>
+            <li>
+              <a 
+                className="dropdown-item" 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  window.location.href = '/mobile/camera'
+                }}
+              >
+                <i className="bi bi-camera-fill me-2"></i>
+                Take Photo
+              </a>
+            </li>
+            <li><hr className="dropdown-divider" /></li>
+            <li>
+              <a 
+                className="dropdown-item" 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (locationPermissionStatus !== 'granted') {
+                    setShowLocationPrompt(true)
+                  } else {
+                    getCurrentLocation()
+                    alert('Location updated successfully!')
+                  }
+                }}
+              >
+                <i className="bi bi-geo-alt-fill me-2"></i>
+                Update Location
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
   )
 }

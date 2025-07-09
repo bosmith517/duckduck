@@ -100,7 +100,7 @@ const TeamPage: React.FC = () => {
       const { data, error } = await teamMemberService.getTeamMembers()
       
       if (error) {
-        console.error('Error loading team members:', error)
+        console.error('Error loading team members')
         setError('Failed to load team members')
       } else if (data && data.length > 0) {
         // Convert database format to component format
@@ -139,7 +139,7 @@ const TeamPage: React.FC = () => {
         setTeamMembers([])
       }
     } catch (err) {
-      console.error('Error in loadTeamMembers:', err)
+      console.error('Error in loadTeamMembers')
       setError('Failed to load team members')
     } finally {
       setIsLoadingMembers(false)

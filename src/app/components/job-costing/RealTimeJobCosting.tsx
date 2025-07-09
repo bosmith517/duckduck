@@ -120,14 +120,14 @@ const RealTimeJobCosting: React.FC = () => {
         .order('created_at', { ascending: false })
 
       if (costsError) throw costsError
-      console.log('Job costs fetched:', costsData)
+      // Job costs fetched
       setJobCosts(costsData || [])
 
       // Calculate profitability
       calculateJobProfitability(jobsData || [], costsData || [])
 
     } catch (error) {
-      console.error('Error fetching job costing data:', error)
+      // Error fetching job costing data
     } finally {
       setLoading(false)
     }
@@ -228,7 +228,7 @@ const RealTimeJobCosting: React.FC = () => {
       fetchData()
 
     } catch (error) {
-      console.error('Error adding job cost:', error)
+      // Error adding job cost
       alert('Failed to add cost')
     } finally {
       setAddingCost(false)

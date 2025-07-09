@@ -42,7 +42,7 @@ export async function requestPassword(email: string) {
     ? `${window.location.origin}/auth/callback`
     : 'https://app.tradeworkspro.com/auth/callback';
   
-  console.log('Sending password reset email with redirect URL:', redirectUrl);
+  // Password reset email will be sent with redirect URL
   
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: redirectUrl,

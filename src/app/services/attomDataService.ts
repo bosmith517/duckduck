@@ -167,7 +167,7 @@ class AttomDataService {
     tenantId?: string
   ): Promise<any> {
     try {
-      console.log(`🌐 Calling Supabase Edge Function for property lookup: ${address}`)
+      // Calling Supabase Edge Function for property lookup
 
       // Check if we have the required parameters
       if (!address || !tenantId) {
@@ -183,11 +183,10 @@ class AttomDataService {
         }
       })
 
-      // Log the full response for debugging
-      console.log('🔍 Edge Function Response:', { data, error })
+      // Edge Function response received
 
       if (error) {
-        console.error('❌ Error calling Attom property data function:', error)
+        // Error calling Attom property data function
         
         // Check if it's a function not found error
         if (error.message?.includes('Function not found') || error.message?.includes('404')) {
@@ -198,18 +197,18 @@ class AttomDataService {
       }
 
       if (data?.success && data?.property) {
-        console.log('✅ Successfully got property data from Edge Function')
+        // Successfully got property data from Edge Function
         return data.property
       }
 
       if (data?.error) {
-        console.error('❌ Edge Function returned error:', data.error)
+        // Edge Function returned error
         throw new Error(`Attom API error: ${data.error}`)
       }
 
       throw new Error('No property data returned from Edge Function')
     } catch (error) {
-      console.error('💥 Error in comprehensive property lookup:', error)
+      // Error in comprehensive property lookup
       throw error
     }
   }
@@ -260,7 +259,7 @@ class AttomDataService {
 
       return data
     } catch (error) {
-      console.error('Error fetching stored property data:', error)
+      // Error fetching stored property data
       // Re-throw with better error message if it's a database structure issue
       if ((error as any)?.message?.includes('table not found') || (error as any)?.message?.includes('relation') || (error as any)?.message?.includes('permission denied')) {
         throw error
@@ -282,12 +281,7 @@ class AttomDataService {
                         propertyData.attom_sync_status !== 'success'
     
     if (isIncomplete) {
-      console.log('🔄 Property data incomplete, forcing refresh:', {
-        hasPropertyType: !!propertyData.property_type,
-        hasYearBuilt: !!propertyData.year_built,
-        hasSquareFootage: !!propertyData.square_footage,
-        syncStatus: propertyData.attom_sync_status
-      })
+      // Property data incomplete, forcing refresh
       return true
     }
     
@@ -313,7 +307,7 @@ class AttomDataService {
         const existingData = await this.getStoredPropertyData(address, tenantId)
         
         if (existingData && !this.needsRefresh(existingData)) {
-          console.log('📋 Using recent property data from database:', existingData)
+          // Using recent property data from database
           return existingData
         }
         
@@ -323,25 +317,25 @@ class AttomDataService {
           const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
           
           if (lastAttempt > oneDayAgo) {
-            console.log('⚠️ Skipping Attom API call due to recent error:', existingData.attom_error_message)
+            // Skipping Attom API call due to recent error
             return existingData
           }
         }
       }
 
       // Fetch fresh data from Attom API
-      console.log('🌐 Fetching fresh property data from Attom API...')
+      // Fetching fresh property data from Attom API
       const freshData = await this.getComprehensivePropertyData(address, city, state, tenantId)
       
       return freshData
     } catch (error) {
-      console.error('Error in smart property lookup:', error)
+      // Error in smart property lookup
       
       // Return any existing data as fallback, even if stale
       if (tenantId) {
         const fallbackData = await this.getStoredPropertyData(address, tenantId)
         if (fallbackData) {
-          console.log('📋 Returning stale data as fallback due to error')
+          // Returning stale data as fallback due to error
           return fallbackData
         }
       }
@@ -356,7 +350,7 @@ class AttomDataService {
    */
   async bulkUpdateProperties(tenantId: string, limit: number = 50): Promise<void> {
     try {
-      console.log(`🔄 Starting bulk property update for tenant ${tenantId} (limit: ${limit})`)
+      // Starting bulk property update for tenant
       
       // Get properties that need refresh
       const { data: properties, error } = await supabase
@@ -374,11 +368,11 @@ class AttomDataService {
       }
 
       if (!properties || properties.length === 0) {
-        console.log('✅ No properties need updating')
+        // No properties need updating
         return
       }
 
-      console.log(`📊 Found ${properties.length} properties to update`)
+      // Found properties to update
 
       // Process in batches to avoid rate limits
       const batchSize = 5
@@ -394,9 +388,9 @@ class AttomDataService {
                 property.state,
                 tenantId
               )
-              console.log(`✅ Updated: ${property.address}`)
+              // Updated property
             } catch (error) {
-              console.error(`❌ Failed to update ${property.address}:`, error)
+              // Failed to update property
             }
           })
         )
@@ -407,9 +401,9 @@ class AttomDataService {
         }
       }
 
-      console.log('🎉 Bulk update completed')
+      // Bulk update completed
     } catch (error) {
-      console.error('Error in bulk property update:', error)
+      // Error in bulk property update
       throw error
     }
   }
@@ -431,14 +425,14 @@ class AttomDataService {
       if (error) throw error
 
       if (data?.success && data?.photos) {
-        console.log(`📸 Found ${data.photos.length} photos for property`)
+        // Found photos for property
         return data.photos
       }
 
-      console.log('📸 No photos found for property')
+      // No photos found for property
       return []
     } catch (error) {
-      console.error('Error getting property photos:', error)
+      // Error getting property photos
       return []
     }
   }

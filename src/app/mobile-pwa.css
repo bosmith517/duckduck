@@ -1,0 +1,127 @@
+/* Mobile PWA Specific Styles */
+
+/* When running as PWA, hide desktop navigation */
+body.is-pwa .header,
+body.is-pwa .aside,
+body.is-pwa .toolbar,
+body.is-pwa .footer {
+  display: none !important;
+}
+
+/* Mobile layout specific styles */
+body.mobile-layout {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+body.mobile-layout .wrapper {
+  padding: 0 !important;
+}
+
+/* Mobile header styles */
+.mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  height: 60px;
+  -webkit-app-region: drag; /* Allow dragging on iOS PWA */
+}
+
+.mobile-header button {
+  -webkit-app-region: no-drag; /* Buttons should be clickable */
+}
+
+/* Mobile navigation styles */
+.mobile-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 1000;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  padding-bottom: env(safe-area-inset-bottom); /* iPhone X+ safe area */
+}
+
+.mobile-nav button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 4px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.mobile-nav button i {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.mobile-nav button.btn-primary {
+  color: var(--bs-primary) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.mobile-nav button.btn-light {
+  color: var(--bs-gray-600) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+/* PWA-specific adjustments */
+@media (display-mode: standalone) {
+  /* Add padding for iOS status bar */
+  .mobile-header {
+    padding-top: env(safe-area-inset-top);
+    height: calc(60px + env(safe-area-inset-top));
+  }
+  
+  /* Ensure content doesn't go under notches */
+  .mobile-layout {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Hide scrollbars in PWA mode for cleaner look */
+body.is-pwa ::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Prevent pull-to-refresh on iOS PWA */
+body.is-pwa {
+  overscroll-behavior-y: contain;
+}
+
+/* Mobile-optimized content spacing */
+body.is-pwa .content {
+  padding: 0 !important;
+}
+
+body.is-pwa .card {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  margin-bottom: 8px;
+}
+
+/* Mobile form adjustments */
+body.is-pwa input,
+body.is-pwa select,
+body.is-pwa textarea {
+  font-size: 16px !important; /* Prevent zoom on iOS */
+}
+
+/* Loading states for mobile */
+.mobile-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: var(--bs-light);
+}
+
+.mobile-loading .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  border-width: 0.3rem;
+}

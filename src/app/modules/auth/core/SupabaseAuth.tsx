@@ -76,7 +76,6 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       // Handle password recovery flow
       if (event === 'PASSWORD_RECOVERY') {
         // Password recovery event detected
-        console.log('PASSWORD_RECOVERY event detected')
         setAuthLoading(false)
         // Don't auto-redirect to prevent loops
         return
@@ -111,7 +110,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
         .maybeSingle() // Use maybeSingle to handle missing profiles gracefully
 
       if (profileError) {
-        console.error('Error loading user profile:', profileError)
+        console.error('Error loading user profile')
         setAuthLoading(false)
         return
       }
@@ -126,7 +125,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
           .rpc('ensure_user_profile')
         
         if (ensureError) {
-          console.error('Error ensuring user profile:', ensureError)
+          console.error('Error ensuring user profile')
           setAuthLoading(false)
           return
         }
@@ -140,7 +139,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
             .maybeSingle()
           
           if (retryError || !newProfile) {
-            console.error('Error loading profile after creation:', retryError)
+            console.error('Error loading profile after creation')
             setAuthLoading(false)
             return
           }
@@ -149,7 +148,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
           finalTenantId = newProfile.tenant_id
           setUserProfile(newProfile)
         } else {
-          console.error('Could not create user profile:', ensureResult?.message)
+          console.error('Could not create user profile')
           if (ensureResult?.error === 'pending_invitation') {
             // Redirect to a page that handles invitation acceptance
             window.location.href = '/auth/accept-invitation'
@@ -171,7 +170,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
           .single()
 
         if (tenantError) {
-          console.error('Error loading tenant:', tenantError)
+          console.error('Error loading tenant')
         } else {
           setTenant(tenantData)
         }
@@ -194,7 +193,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       setCurrentUser(userModel)
 
     } catch (error) {
-      console.error('Error loading user profile:', error)
+      console.error('Error loading user profile')
     } finally {
       setAuthLoading(false)
     }
@@ -203,22 +202,14 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
   const signIn = async (email: string, password: string) => {
     try {
       setAuthLoading(true)
-      console.log('Attempting sign in for:', email)
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      console.log('Sign in response:', { 
-        success: !error, 
-        error: error?.message,
-        user: data?.user?.email,
-        session: !!data?.session
-      })
-      
       if (error) {
-        console.error('Sign in error:', error)
+        console.error('Sign in error')
         setAuthLoading(false)
         return { error }
       }
@@ -226,7 +217,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       // Profile will be fetched automatically via onAuthStateChange
       return { error: null }
     } catch (error) {
-      console.error('Sign in exception:', error)
+      console.error('Sign in exception')
       setAuthLoading(false)
       return { error }
     }
@@ -250,7 +241,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       })
 
       if (authError) {
-        console.error('Auth signup error:', authError)
+        console.error('Auth signup error')
         setAuthLoading(false)
         return { error: authError }
       }
@@ -274,7 +265,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       })
 
       if (setupError || !setupData?.success) {
-        console.error('Profile setup error:', setupError)
+        console.error('Profile setup error')
         setAuthLoading(false)
         return { error: setupError || new Error('Failed to set up user profile') }
       }
@@ -284,7 +275,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       return { error: null }
       
     } catch (error) {
-      console.error('Error in signUp:', error)
+      console.error('Error in signUp')
       setAuthLoading(false)
       return { error }
     }
@@ -300,7 +291,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       setSession(null)
       setUser(null)
     } catch (error) {
-      console.error('Error signing out:', error)
+      console.error('Error signing out')
     } finally {
       setAuthLoading(false)
     }

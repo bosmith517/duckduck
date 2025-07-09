@@ -107,7 +107,6 @@ class EmailService {
     }
 
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`
-    console.log('🔗 Calling Edge Function:', url)
     
     const options: RequestInit = {
       method,

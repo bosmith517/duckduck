@@ -70,7 +70,7 @@ const ProfileHeader: React.FC = () => {
       window.location.reload()
 
     } catch (error) {
-      console.error('Error uploading avatar:', error)
+      console.error('Error uploading avatar')
       showToast.dismiss(loadingToast)
       showToast.error('Failed to upload avatar. Please try again.')
     } finally {

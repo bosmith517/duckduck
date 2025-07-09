@@ -32,7 +32,7 @@ export const useAuthCallback = () => {
 
   const handleAuthTokens = async (accessToken: string, refreshToken: string, type: string | null) => {
     try {
-      console.log('Processing auth tokens from URL...', { type });
+      // Processing auth tokens from URL
 
       // Set the session
       const { data, error } = await supabase.auth.setSession({
@@ -41,12 +41,12 @@ export const useAuthCallback = () => {
       });
 
       if (error) {
-        console.error('Error setting session:', error);
+        console.error('Error setting session');
         navigate('/auth/login');
         return;
       }
 
-      console.log('Session set successfully');
+      // Session set successfully
 
       // Clear the hash from URL to prevent reprocessing
       window.history.replaceState(null, '', window.location.pathname);
@@ -54,7 +54,6 @@ export const useAuthCallback = () => {
       // Navigate based on type
       if (type === 'recovery') {
         // Don't navigate here - let AppRoutes handle it
-        console.log('Recovery session set by useAuthCallback');
       } else if (type === 'invite') {
         navigate('/auth/password-setup');
       } else if (type === 'magiclink') {
@@ -67,7 +66,7 @@ export const useAuthCallback = () => {
         navigate('/dashboard');
       }
     } catch (error) {
-      console.error('Error processing auth callback:', error);
+      console.error('Error processing auth callback');
       navigate('/auth/login');
     }
   };

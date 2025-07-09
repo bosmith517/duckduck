@@ -1,0 +1,35 @@
+{
+  "generated": "2025-01-09T00:00:00.000Z",
+  "sourceImage": "/media/logos/tradeworks-logo.png",
+  "note": "Icons need to be generated using sharp or an online tool",
+  "requiredIcons": {
+    "pwa": [
+      { "size": "72x72", "path": "/icons/icon-72x72.png" },
+      { "size": "96x96", "path": "/icons/icon-96x96.png" },
+      { "size": "128x128", "path": "/icons/icon-128x128.png" },
+      { "size": "144x144", "path": "/icons/icon-144x144.png" },
+      { "size": "152x152", "path": "/icons/icon-152x152.png" },
+      { "size": "192x192", "path": "/icons/icon-192x192.png" },
+      { "size": "384x384", "path": "/icons/icon-384x384.png" },
+      { "size": "512x512", "path": "/icons/icon-512x512.png" }
+    ],
+    "ios": [
+      { "size": "180x180", "path": "/icons/apple-touch-icon.png" }
+    ],
+    "android": [
+      { "size": "192x192", "path": "/icons/icon-192x192.png" },
+      { "size": "512x512", "path": "/icons/icon-512x512.png" }
+    ],
+    "favicon": [
+      { "size": "16x16", "path": "/icons/favicon-16x16.png" },
+      { "size": "32x32", "path": "/icons/favicon-32x32.png" }
+    ]
+  },
+  "instructions": [
+    "1. Install sharp: npm install --save-dev sharp",
+    "2. Run: node scripts/generate-app-icons.cjs",
+    "3. Or use an online tool like https://realfavicongenerator.net/",
+    "4. Upload public/media/logos/tradeworks-logo.png",
+    "5. Download and extract icons to public/icons/"
+  ]
+}

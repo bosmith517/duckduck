@@ -14,24 +14,24 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   showAsDropdown = false,
   maxHeight = '400px'
 }) => {
-  const { currentUser } = useSupabaseAuth()
+  const { user, userProfile } = useSupabaseAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'read'>('all')
 
   useEffect(() => {
-    if (currentUser?.id) {
+    if (user?.id) {
       loadNotifications()
       loadUnreadCount()
     }
-  }, [currentUser?.id, activeFilter])
+  }, [user?.id, activeFilter])
 
   const loadNotifications = async () => {
     setLoading(true)
     try {
       const userNotifications = await NotificationService.getNotifications(
-        String(userId || currentUser?.id || '')
+        userId || user?.id || ''
       )
       
       let filteredNotifications = userNotifications
@@ -52,7 +52,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const loadUnreadCount = async () => {
     try {
       const count = await NotificationService.getUnreadCount(
-        String(userId || currentUser?.id || '')
+        userId || user?.id || ''
       )
       setUnreadCount(count)
     } catch (error) {

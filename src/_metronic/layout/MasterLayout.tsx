@@ -23,6 +23,8 @@ import { WebRTCSoftphoneDialer } from '../../app/components/communications'
 import { SoftphoneProvider, useSoftphoneContext } from '../../app/contexts/SoftphoneContext'
 import OnboardingModal from '../../app/components/onboarding/OnboardingModal'
 import { useOnboardingModal } from '../../app/hooks/useOnboardingModal'
+import MobileBottomNav from '../../app/components/mobile/MobileBottomNav'
+import { useMobileDetect } from '../../app/hooks/useMobileDetect'
 
 const MasterLayout: FC<WithChildren> = ({children}) => {
   const {classes} = useLayout()
@@ -38,11 +40,9 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
   // Onboarding modal state
   const { showOnboarding, hasCheckedOnboarding, closeOnboarding, completeOnboarding } = useOnboardingModal()
   
-  // Debug onboarding modal state
-  useEffect(() => {
-    console.log('MasterLayout: onboarding state changed', { showOnboarding, hasCheckedOnboarding })
-  }, [showOnboarding, hasCheckedOnboarding])
-
+  // Mobile detection
+  const { isMobile, isPWA } = useMobileDetect()
+  
   useEffect(() => {
     setTimeout(() => {
         ToggleComponent.reinitialization();
@@ -167,6 +167,9 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
       
       {/* Global WebRTC Softphone Dialer */}
       <WebRTCSoftphoneDialer isVisible={isVisible} onClose={hideDialer} />
+      
+      {/* Mobile Bottom Navigation - Only show on mobile screens */}
+      {isMobile && <MobileBottomNav />}
     </PageDataProvider>
   )
 }

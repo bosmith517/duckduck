@@ -62,7 +62,7 @@ export const PasswordSetupPage: React.FC = () => {
           navigate('/dashboard')
         }, 2000)
       } catch (err: any) {
-        console.error('Error setting password:', err)
+        // Error handled via UI
         setError(err.message || 'Failed to set password')
       } finally {
         setLoading(false)

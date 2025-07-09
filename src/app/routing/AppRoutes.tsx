@@ -46,8 +46,23 @@ const {VITE_BASE_URL} = import.meta.env
 const AppRoutes: FC = () => {
   const {currentUser, authLoading, user} = useSupabaseAuth() // Use the new authLoading state
   
-  // Debug logging
-  console.log('AppRoutes - authLoading:', authLoading, 'currentUser:', currentUser, 'user:', user)
+  // Detect if running as installed PWA
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                (window.navigator as any).standalone === true ||
+                document.referrer.includes('android-app://') ||
+                new URLSearchParams(window.location.search).get('source') === 'pwa';
+  
+  // Detect if on mobile device
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
+  // Log PWA detection for debugging
+  useEffect(() => {
+    if (isPWA) {
+      console.log('🚀 Running as PWA - Mobile experience enabled');
+      // Add a class to body for PWA-specific styling
+      document.body.classList.add('is-pwa');
+    }
+  }, [isPWA]);
   
   // Removed password reset detection - now handled directly by Supabase redirect
   
@@ -94,7 +109,7 @@ const AppRoutes: FC = () => {
         <Route path='portal/:token' element={<CustomerPortalPage />} />
         
         {/* Marketing routes - always accessible */}
-        <Route path='/' element={<LandingPage />} />
+        <Route path='/' element={<Navigate to='/auth/login' />} />
         <Route path='home' element={<LandingPage />} />
         <Route path='signup' element={<SignupPage />} />
         <Route path='homeowner-signup' element={<HomeownerSignupPage />} />
@@ -139,7 +154,7 @@ const AppRoutes: FC = () => {
         )}
         
         {/* Final catch-all for truly unmatched routes */}
-        <Route path='*' element={<Navigate to='/' />} />
+        <Route path='*' element={<Navigate to='/auth/login' />} />
       </Routes>
     </BrowserRouter>
   )

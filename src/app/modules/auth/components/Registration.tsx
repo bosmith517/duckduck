@@ -67,7 +67,7 @@ export function Registration() {
         }
         // If successful, the auth state will be updated automatically
       } catch (error) {
-        console.error(error)
+        console.error('Registration error occurred')
         setStatus('An unexpected error occurred')
         setSubmitting(false)
         setLoading(false)

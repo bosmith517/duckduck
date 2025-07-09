@@ -23,6 +23,7 @@ import './_metronic/assets/keenicons/solid/style.css'
 import './_metronic/assets/sass/style.scss'
 import './app/override-splash.css'
 import './app/tradeworks-branding.css'
+// import './app/mobile-pwa-safe.css' // Disabled - causing issues
 import {AppRoutes} from './app/routing/AppRoutes'
 import {SupabaseAuthProvider} from './app/modules/auth/core/SupabaseAuth'
 import {setupAxios} from './app/modules/auth'
@@ -105,5 +106,37 @@ if (container) {
   // Also run on DOM content loaded
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', removeSplashScreen)
+  }
+  
+  // Register Service Worker for PWA functionality
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('TradeWorks Pro: Service Worker registered successfully:', registration.scope)
+          
+          // Check for updates periodically
+          setInterval(() => {
+            registration.update()
+          }, 60 * 60 * 1000) // Check every hour
+          
+          // Handle updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // New update available
+                  console.log('TradeWorks Pro: New version available! Refresh to update.')
+                  // You could show a notification to the user here
+                }
+              })
+            }
+          })
+        })
+        .catch((error) => {
+          console.error('TradeWorks Pro: Service Worker registration failed:', error)
+        })
+    })
   }
 }

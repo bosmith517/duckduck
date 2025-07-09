@@ -54,13 +54,13 @@ class CommunicationsService {
       })
 
       if (error) {
-        console.error('Error starting outbound call:', error)
+        console.error('Error starting outbound call')
         throw error
       }
 
       return data?.call
     } catch (error) {
-      console.error('Error in startOutboundCall:', error)
+      console.error('Error in startOutboundCall')
       throw error
     }
   }
@@ -78,13 +78,13 @@ class CommunicationsService {
         .eq('id', callId)
 
       if (error) {
-        console.error('Error answering inbound call:', error)
+        console.error('Error answering inbound call')
         throw error
       }
 
       // TODO: Integrate with relay service API to actually answer the call
     } catch (error) {
-      console.error('Error in answerInboundCall:', error)
+      console.error('Error in answerInboundCall')
       throw error
     }
   }
@@ -102,13 +102,13 @@ class CommunicationsService {
         .eq('id', callId)
 
       if (error) {
-        console.error('Error rejecting inbound call:', error)
+        console.error('Error rejecting inbound call')
         throw error
       }
 
       // TODO: Integrate with relay service API to actually reject the call
     } catch (error) {
-      console.error('Error in rejectInboundCall:', error)
+      console.error('Error in rejectInboundCall')
       throw error
     }
   }
@@ -144,7 +144,7 @@ class CommunicationsService {
         .eq('id', callId)
 
       if (error) {
-        console.error('Error hanging up call:', error)
+        console.error('Error hanging up call')
         throw error
       }
 

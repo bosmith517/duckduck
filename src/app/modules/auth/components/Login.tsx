@@ -51,7 +51,7 @@ export function Login() {
         }
         // If successful, the auth state will be updated automatically
       } catch (error) {
-        console.error(error)
+        console.error('Login error occurred')
         setStatus('An unexpected error occurred')
         setSubmitting(false)
         setLoading(false)

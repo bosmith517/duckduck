@@ -39,7 +39,7 @@ const loadMapbox = async () => {
 // Street View utility function with Attom fallback
 const getStreetViewUrl = async (address: string, attomRawData?: any): Promise<string> => {
   const googleApiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY
-  console.log('🔑 Google API Key available:', !!googleApiKey, 'Environment:', import.meta.env.MODE)
+  // Check if Google API key is available
   
   if (googleApiKey) {
     return `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${encodeURIComponent(address)}&key=${googleApiKey}`
@@ -48,7 +48,7 @@ const getStreetViewUrl = async (address: string, attomRawData?: any): Promise<st
   // Fallback to Attom property photos from existing data
   const attomPhotos = attomRawData?.propertyPhotos
   if (attomPhotos && attomPhotos.length > 0) {
-    console.log('📸 Using Attom photo as street view fallback')
+    // Using Attom photo as street view fallback
     return attomPhotos[0].url
   }
   
@@ -62,15 +62,15 @@ const getStreetViewUrl = async (address: string, attomRawData?: any): Promise<st
       
       const photos = await attomDataService.getPropertyPhotos(streetAddress, city, state)
       if (photos.length > 0) {
-        console.log('📸 Using fresh Attom photo as street view fallback')
+        // Using fresh Attom photo as street view fallback
         return photos[0]
       }
     }
   } catch (error) {
-    console.error('Failed to get Attom photos:', error)
+    // Failed to get Attom photos
   }
   
-  console.warn('⚠️ No street view available - using placeholder')
+  // No street view available - using placeholder
   return 'https://via.placeholder.com/600x400/f0f0f0/999?text=Street+View+Unavailable'
 }
 

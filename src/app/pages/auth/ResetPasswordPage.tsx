@@ -48,23 +48,20 @@ export const ResetPasswordPage: React.FC = () => {
   const checkSession = async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
-      console.log('Reset password page - checking session:', session?.user?.email);
       
       if (error) {
-        console.error('Error getting session:', error);
+        console.error('Error getting session');
         setIsValidToken(false);
         return;
       }
       
       if (!session) {
-        console.log('No session found on reset password page');
         setIsValidToken(false);
       } else {
-        console.log('Valid session found for password reset');
         setIsValidToken(true);
       }
     } catch (err) {
-      console.error('Error checking session:', err);
+      console.error('Error checking session');
       setIsValidToken(false);
     } finally {
       setValidating(false);
@@ -78,7 +75,7 @@ export const ResetPasswordPage: React.FC = () => {
       });
 
       if (response.error) {
-        console.error('Token validation error:', response.error);
+        console.error('Token validation error');
         setIsValidToken(false);
         return;
       }
@@ -94,7 +91,7 @@ export const ResetPasswordPage: React.FC = () => {
         showToast.error(response.data?.error || 'Invalid or expired reset link');
       }
     } catch (err) {
-      console.error('Error validating token:', err);
+      console.error('Error validating token');
       setIsValidToken(false);
     } finally {
       setValidating(false);
@@ -128,28 +125,23 @@ export const ResetPasswordPage: React.FC = () => {
           }
         } else {
           // Use Supabase default
-          console.log('Updating password for current session...');
-          
           const { data, error } = await supabase.auth.updateUser({
             password: values.newPassword,
           });
 
           if (error) {
-            console.error('Password update error:', error);
+            console.error('Password update error');
             throw error;
           }
-          
-          console.log('Password updated successfully:', data);
 
           // Sign out to ensure clean state
-          console.log('Signing out to ensure clean login...');
           await supabase.auth.signOut();
         }
 
         showToast.success('Password reset successfully! Please log in with your new password.');
         navigate('/auth/login');
       } catch (error: any) {
-        console.error('Password reset error:', error);
+        console.error('Password reset error');
         showToast.error(error.message || 'Failed to reset password');
       } finally {
         setLoading(false);

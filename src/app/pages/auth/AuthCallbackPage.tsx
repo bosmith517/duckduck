@@ -18,7 +18,6 @@ export const AuthCallbackPage: React.FC = () => {
       const { data: { session: existingSession } } = await supabase.auth.getSession();
       
       if (existingSession) {
-        console.log('Existing session found, likely from password recovery');
         // For password recovery, Supabase sets the session automatically
         navigate('/auth/reset-password');
         return;
@@ -32,7 +31,7 @@ export const AuthCallbackPage: React.FC = () => {
       const refreshToken = hashParams.get('refresh_token');
       const type = hashParams.get('type');
       
-      console.log('Auth callback params:', { accessToken, refreshToken, type });
+      // Processing auth callback params
 
       if (accessToken && refreshToken) {
         // Set the session using the tokens from the URL
@@ -42,30 +41,26 @@ export const AuthCallbackPage: React.FC = () => {
         });
 
         if (error) {
-          console.error('Error setting session:', error);
+          console.error('Error setting session');
           setError(error.message);
           setLoading(false);
           return;
         }
 
-        console.log('Session set successfully:', data);
+        // Session set successfully
 
         // Check the type of auth callback
         if (type === 'invite') {
           // This is an invite - user needs to set initial password
-          console.log('Invite callback detected - redirecting to password setup');
           navigate('/auth/password-setup');
         } else if (type === 'signup') {
           // This is an email confirmation
-          console.log('Signup confirmation callback detected');
           navigate('/dashboard');
         } else if (type === 'recovery') {
           // This is a password reset
-          console.log('Password recovery callback detected - redirecting to reset password page');
           navigate('/auth/reset-password');
         } else {
           // Default to dashboard
-          console.log('Default auth callback, redirecting to dashboard');
           navigate('/dashboard');
         }
       } else {
@@ -74,7 +69,7 @@ export const AuthCallbackPage: React.FC = () => {
         const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
         
         if (errorParam) {
-          console.error('Auth callback error:', errorParam, errorDescription);
+          console.error('Auth callback error');
           setError(errorDescription || errorParam);
         } else {
           console.error('No auth tokens found in callback');
@@ -83,7 +78,7 @@ export const AuthCallbackPage: React.FC = () => {
         setLoading(false);
       }
     } catch (err: any) {
-      console.error('Auth callback error:', err);
+      console.error('Auth callback error');
       setError(err.message || 'Authentication failed');
       setLoading(false);
     }

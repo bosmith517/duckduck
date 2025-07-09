@@ -11,6 +11,11 @@ import ProtectedLayout from '../components/onboarding/ProtectedLayout'
 const PrivateRoutes = () => {
   const { currentUser } = useSupabaseAuth()
   
+  // Detect if running as installed PWA
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                (window.navigator as any).standalone === true ||
+                document.referrer.includes('android-app://');
+  
   // Redirect to login if not authenticated
   if (!currentUser) {
     return <Navigate to='/auth/login' replace />
@@ -103,6 +108,11 @@ const PrivateRoutes = () => {
   const WorkflowAutomationPage = lazy(() => import('../pages/settings/WorkflowAutomationPage'))
   const EmailPage = lazy(() => import('../pages/email/EmailPage'))
   const PasswordResetLogsPage = lazy(() => import('../pages/admin/PasswordResetLogsPage'))
+
+  // Mobile Components
+  const MyDayDashboard = lazy(() => import('../components/mobile/MyDayDashboard'))
+  const MobileCameraCapture = lazy(() => import('../components/mobile/MobileCameraCapture'))
+  const MobileLocationTracker = lazy(() => import('../components/mobile/MobileLocationTracker'))
 
   // Note: Onboarding is now handled via modal in MasterLayout
 
@@ -674,6 +684,30 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <MobileTrackingPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='mobile/my-day'
+          element={
+            <SuspensedView>
+              <MyDayDashboard />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='mobile/camera'
+          element={
+            <SuspensedView>
+              <MobileCameraCapture />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='mobile/location'
+          element={
+            <SuspensedView>
+              <MobileLocationTracker />
             </SuspensedView>
           }
         />

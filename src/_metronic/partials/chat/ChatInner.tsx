@@ -59,7 +59,6 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
     const initializeChannels = async () => {
       // Guard Clause: Do not run if we don't have the user's profile and tenant_id yet.
       if (!userProfile?.tenant_id) {
-        console.log("Waiting for user profile to initialize channels...");
         return;
       }
 
@@ -84,7 +83,6 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
 
         // Step 3: If it does NOT exist, create it.
         if (!generalChannelExists) {
-          console.log("General channel not found, creating it now...");
           const { data: newChannel, error: createError } = await supabase
             .from('chat_channels')
             .insert({
@@ -103,7 +101,6 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
             channelsList = [newChannel, ...channelsList];
           }
         } else {
-          console.log("General channel already exists.");
         }
 
         // Update the state with all channels
@@ -143,7 +140,6 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
       return;
     }
 
-    console.log(`Setting up subscription for channel: ${selectedChannel.id}`);
 
     const channel = supabase.channel(`room-for-channel-${selectedChannel.id}`);
 
@@ -157,7 +153,6 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
           filter: `channel_id=eq.${selectedChannel.id}`,
         },
         (payload) => {
-          console.log('New message received!', payload.new);
           // Add the new message to the local state to update the UI
           setMessages(currentMessages => [...currentMessages, payload.new as ChatMessage]);
           
@@ -170,7 +165,6 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
       )
       .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed!');
         }
         if (status === 'CHANNEL_ERROR') {
           console.warn('Chat subscription error (non-critical):', err);
@@ -180,14 +174,12 @@ const ChatInner: FC<Props> = ({isDrawer = false}) => {
           console.warn('Chat subscription timed out, will retry automatically');
         }
         if (status === 'CLOSED') {
-          console.log('Chat subscription closed');
         }
       });
 
     // This cleanup function is CRITICAL. It will run whenever the component
     // unmounts or when the `selectedChannelId` changes, preventing duplicate listeners.
     return () => {
-      console.log(`Tearing down subscription for channel: ${selectedChannel.id}`);
       supabase.removeChannel(channel);
     };
 

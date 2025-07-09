@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { WorkflowAutomationService, WorkflowRule, WorkflowExecution } from '../../services/workflowAutomationService'
 import { KTIcon } from '../../../_metronic/helpers'
+import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 
 interface WorkflowAutomationManagerProps {
   tenantId?: string
 }
 
 export const WorkflowAutomationManager: React.FC<WorkflowAutomationManagerProps> = ({
-  tenantId
+  tenantId: propTenantId
 }) => {
+  const { userProfile } = useSupabaseAuth()
+  const tenantId = propTenantId || userProfile?.tenant_id
+  
   const [activeTab, setActiveTab] = useState<'rules' | 'executions' | 'templates'>('rules')
   const [rules, setRules] = useState<WorkflowRule[]>([])
   const [executions, setExecutions] = useState<WorkflowExecution[]>([])
@@ -23,10 +27,15 @@ export const WorkflowAutomationManager: React.FC<WorkflowAutomationManagerProps>
   }, [activeTab, tenantId])
 
   const loadData = async () => {
+    if (!tenantId) {
+      // Don't try to load data if we don't have a tenantId yet
+      return
+    }
+    
     setLoading(true)
     try {
       if (activeTab === 'rules') {
-        const rulesData = await WorkflowAutomationService.getWorkflowRules(tenantId || '')
+        const rulesData = await WorkflowAutomationService.getWorkflowRules(tenantId)
         setRules(rulesData)
       } else if (activeTab === 'templates') {
         const templatesData = WorkflowAutomationService.getWorkflowTemplates()

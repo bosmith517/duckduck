@@ -70,7 +70,7 @@ class TeamMemberService {
 
       return { data, error };
     } catch (error) {
-      console.error('TeamMemberService error:', error);
+      console.error('TeamMemberService error occurred');
       return { data: null, error };
     }
   }
@@ -110,7 +110,7 @@ class TeamMemberService {
         existingTenant: data.existing_tenant
       };
     } catch (error) {
-      console.error('Error checking email availability:', error);
+      console.error('Error checking email availability');
       return {
         canAdd: false,
         reason: 'Error checking email availability'
@@ -154,7 +154,7 @@ class TeamMemberService {
         .single();
 
       if (fetchError) {
-        console.error('Error fetching created profile:', fetchError);
+        console.error('Error fetching created profile');
         // Return a basic object since the invitation was sent successfully
         return {
           data: {
@@ -173,7 +173,7 @@ class TeamMemberService {
 
       return { data: profileData, error: null };
     } catch (error) {
-      console.error('Error creating team member:', error);
+      console.error('Error creating team member');
       return { data: null, error };
     }
   }
@@ -209,7 +209,7 @@ class TeamMemberService {
 
       return { data: result, error: null };
     } catch (error) {
-      console.error('Error sending team member invitation:', error);
+      console.error('Error sending team member invitation');
       return { data: null, error };
     }
   }
@@ -416,7 +416,7 @@ class TeamMemberService {
 
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error deleting team member:', error);
+      console.error('Error deleting team member');
       return { success: false, error };
     }
   }

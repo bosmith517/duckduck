@@ -25,7 +25,6 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
     // Only run when we have a tenant loaded
     if (!tenant) return
     
-    console.log('OnboardingGuard: tenant loaded', { tenant, isOnboardingCompleted })
     
     if (!isOnboardingCompleted) {
       // Check if user has temporarily skipped onboarding
@@ -36,18 +35,15 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
         const now = Date.now()
         
         if (now < expiry) {
-          console.log('OnboardingGuard: Skip period active, setting expiry')
           setSkipExpiry(expiry)
           return
         } else {
           // Skip period expired, remove from storage
-          console.log('OnboardingGuard: Skip period expired, removing from storage')
           localStorage.removeItem('onboarding_skip')
         }
       }
       
       // Show onboarding prompt
-      console.log('OnboardingGuard: Showing onboarding prompt')
       setShowOnboardingPrompt(true)
     }
   }, [isOnboardingCompleted, tenant])
@@ -70,8 +66,6 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
   // Listen for Quick Setup and Continue Setup button clicks
   useEffect(() => {
     const handleOpenModal = () => {
-      console.log('OnboardingGuard: Received openOnboardingModal event')
-      console.log('OnboardingGuard: Opening modal, current state:', { showLocalOnboardingModal, showOnboardingPrompt, skipExpiry })
       // Always open the modal when explicitly requested via buttons
       setShowLocalOnboardingModal(true)
       // Also clear any skip period and prompt state
@@ -81,10 +75,8 @@ const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
     }
 
     window.addEventListener('openOnboardingModal', handleOpenModal)
-    console.log('OnboardingGuard: Event listener added for openOnboardingModal')
     return () => {
       window.removeEventListener('openOnboardingModal', handleOpenModal)
-      console.log('OnboardingGuard: Event listener removed for openOnboardingModal')
     }
   }, [showLocalOnboardingModal, showOnboardingPrompt, skipExpiry])
 

@@ -57,7 +57,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ show, 
         setEmailSent(true);
         showToast.success('Password reset email sent! Check your inbox.');
       } catch (error: any) {
-        console.error('Password reset error:', error);
+        console.error('Password reset error');
         // Check for rate limiting error
         if (error.message?.includes('Too many password reset attempts')) {
           showToast.error(error.message);

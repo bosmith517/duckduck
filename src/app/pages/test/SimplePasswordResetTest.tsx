@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-// Create a direct Supabase client for testing
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const testSupabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from '../../../supabaseClient';
 
 export const SimplePasswordResetTest: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -17,10 +12,9 @@ export const SimplePasswordResetTest: React.FC = () => {
     
     try {
       console.log('Testing password reset for:', email);
-      console.log('Supabase URL:', supabaseUrl);
       console.log('Redirect URL:', `${window.location.origin}/auth/callback`);
       
-      const { data, error } = await testSupabase.auth.resetPasswordForEmail(email, {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/callback`,
       });
       

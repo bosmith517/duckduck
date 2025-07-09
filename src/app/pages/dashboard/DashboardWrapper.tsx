@@ -32,17 +32,17 @@ const DashboardPage = () => {
   const showQuickSetup = !tenant?.onboarding_completed
 
   const handleQuickSetup = () => {
-    console.log('DashboardWrapper: Quick Setup button clicked')
+    // Quick Setup button clicked
     // Signal OnboardingGuard to open its local modal (same as sidebar)
     window.dispatchEvent(new CustomEvent('openOnboardingModal'))
-    console.log('DashboardWrapper: openOnboardingModal event dispatched')
+    // openOnboardingModal event dispatched
   }
 
   // TEMPORARY: Function to create subproject
   const handleCreateSubproject = async () => {
     if (!tenant) return
     
-    console.log('Creating subproject for tenant:', tenant.id)
+    // Creating subproject for tenant
     try {
       const { data, error } = await supabase.functions.invoke('create-signalwire-subproject', {
         body: {

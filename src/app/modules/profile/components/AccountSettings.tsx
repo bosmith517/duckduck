@@ -85,7 +85,7 @@ export const AccountSettings: React.FC = () => {
         showToast.success('Account information updated successfully!')
 
       } catch (error: any) {
-        console.error('Error updating account:', error)
+        // Error handled via toast notification
         showToast.dismiss(loadingToast)
         showToast.error(error.message || 'Failed to update account information')
       } finally {
@@ -117,7 +117,7 @@ export const AccountSettings: React.FC = () => {
         passwordFormik.resetForm()
 
       } catch (error: any) {
-        console.error('Error updating password:', error)
+        // Error handled via toast notification
         showToast.dismiss(loadingToast)
         showToast.error(error.message || 'Failed to update password')
       } finally {
