@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, {FC, useState, useEffect, createContext, useContext, Dispatch, SetStateAction} from 'react'
-import {LayoutSplashScreen} from '../../../../_metronic/layout/core'
+// import {LayoutSplashScreen} from '../../../../_metronic/layout/core'
 import TradeWorksSplashScreen from '../../../components/branding/TradeWorksSplashScreen'
 import {UserModel} from './_models'
 import {WithChildren} from '../../../../_metronic/helpers'

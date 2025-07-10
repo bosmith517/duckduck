@@ -333,8 +333,9 @@ serve(async (req) => {
     const { error: tenantUpdateError } = await supabaseAdmin
       .from('tenants')
       .update({
-        signalwire_project_id: subprojectId,
-        signalwire_api_token: subprojectApiToken,
+        signalwire_subproject_id: subprojectId,
+        signalwire_subproject_token: subprojectApiToken,
+        signalwire_subproject_space: spaceUrl,
         primary_phone_number: purchasedPhoneNumber,
         onboarding_completed: true,
         updated_at: new Date().toISOString()

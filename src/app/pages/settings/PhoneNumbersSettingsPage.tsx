@@ -38,6 +38,24 @@ interface AvailableNumber {
   }
 }
 
+// Helper function to format phone numbers for display
+const formatPhoneForDisplay = (phoneNumber: string): string => {
+  // Remove any non-digits
+  const cleaned = phoneNumber.replace(/\D/g, '')
+  
+  // Handle different formats
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    // Format: 1XXXXXXXXXX -> (XXX) XXX-XXXX
+    return `(${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`
+  } else if (cleaned.length === 10) {
+    // Format: XXXXXXXXXX -> (XXX) XXX-XXXX
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+  }
+  
+  // Return original if can't format
+  return phoneNumber
+}
+
 const PhoneNumbersSettingsPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([])
@@ -213,34 +231,32 @@ const PhoneNumbersSettingsPage: React.FC = () => {
 
       if (error) throw error
 
-      // Mock data for demonstration
-      const mockAreaCode = searchParams.areacode || '555'
-      const mockAvailable: AvailableNumber[] = [
-        {
-          number: `+1${mockAreaCode}5551234`,
-          friendly_name: `(${mockAreaCode}) 555-1234`,
-          type: 'local',
-          monthly_cost: 1.00,
-          capabilities: { voice: true, sms: true, fax: false }
-        },
-        {
-          number: `+1${mockAreaCode}5555678`,
-          friendly_name: `(${mockAreaCode}) 555-5678`,
-          type: 'local',
-          monthly_cost: 1.00,
-          capabilities: { voice: true, sms: true, fax: false }
-        },
-        {
-          number: `+1${mockAreaCode}5559012`,
-          friendly_name: `(${mockAreaCode}) 555-9012`,
-          type: 'local',
-          monthly_cost: 1.00,
-          capabilities: { voice: true, sms: true, fax: false }
-        }
-      ]
-
-      setAvailableNumbers(result?.numbers || mockAvailable)
-      showToast.success(`Found ${mockAvailable.length} available numbers`)
+      // Check the actual response structure
+      console.log('Search result:', result)
+      
+      // The edge function returns data in a structured object
+      const availableNumbers = result?.available_numbers || []
+      
+      if (availableNumbers.length > 0) {
+        // Transform the response to match our AvailableNumber interface
+        const transformedNumbers: AvailableNumber[] = availableNumbers.map((num: any) => ({
+          number: num.phone_number || num.number || num.e164,
+          friendly_name: num.friendly_name || formatPhoneForDisplay(num.phone_number || num.number || num.e164),
+          type: num.type || num.number_type || 'local',
+          monthly_cost: num.monthly_cost || num.monthly_recurring_buy_price || 1.00,
+          capabilities: {
+            voice: num.capabilities?.voice !== false,
+            sms: num.capabilities?.sms !== false,
+            fax: num.capabilities?.fax !== false
+          }
+        }))
+        
+        setAvailableNumbers(transformedNumbers)
+        showToast.success(`Found ${transformedNumbers.length} available numbers`)
+      } else {
+        setAvailableNumbers([])
+        showToast.info('No numbers found matching your criteria')
+      }
     } catch (error: any) {
       showToast.error(error.message || 'Failed to search for numbers')
     } finally {
@@ -254,7 +270,8 @@ const PhoneNumbersSettingsPage: React.FC = () => {
       const { data: result, error } = await supabase.functions.invoke('purchase-phone-number', {
         body: {
           phoneNumber: number.number,
-          friendlyName: number.friendly_name
+          friendlyName: number.friendly_name,
+          tenantId: userProfile?.tenant_id
         }
       })
 

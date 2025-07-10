@@ -93,6 +93,8 @@ const PrivateRoutes = () => {
   const TrackingMigrationPage = lazy(() => import('../pages/test/TrackingMigrationPage'))
   const UITestPage = lazy(() => import('../pages/test/UITestPage'))
   const VideoTestPage = lazy(() => import('../pages/test/VideoTestPage'))
+  const SignalWireDebugPage = lazy(() => import('../pages/test/SignalWireDebugPage'))
+  const PurchaseLogsPage = lazy(() => import('../pages/test/PurchaseLogsPage'))
   const TrackingPage = lazy(() => import('../pages/tracking/TrackingPage'))
   const TrackingOverviewPage = lazy(() => import('../pages/tracking/TrackingOverviewPage'))
   const LandingPage = lazy(() => import('../pages/marketing/LandingPage'))
@@ -797,6 +799,22 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <VideoTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/signalwire-debug'
+          element={
+            <SuspensedView>
+              <SignalWireDebugPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/purchase-logs'
+          element={
+            <SuspensedView>
+              <PurchaseLogsPage />
             </SuspensedView>
           }
         />

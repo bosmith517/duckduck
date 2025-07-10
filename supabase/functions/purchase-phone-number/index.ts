@@ -81,7 +81,7 @@ serve(async (req) => {
       'select',
       () => supabaseAdmin
         .from('tenants')
-        .select('id, company_name, is_active')
+        .select('id, company_name, is_active, signalwire_subproject_id, signalwire_subproject_token, signalwire_subproject_space')
         .eq('id', tenantId)
         .eq('is_active', true)
         .single()
@@ -91,10 +91,27 @@ serve(async (req) => {
       throw new Error('Invalid or inactive tenant')
     }
 
-    // Step 5: Get SignalWire credentials
-    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
-    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
-    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+    // Step 5: Get SignalWire credentials - prefer tenant's subproject
+    let signalwireProjectId: string
+    let signalwireApiToken: string
+    let signalwireSpaceUrl: string
+    let usingSubproject = false
+
+    if (tenant.signalwire_subproject_id && tenant.signalwire_subproject_token) {
+      // Use tenant's subproject credentials
+      signalwireProjectId = tenant.signalwire_subproject_id
+      signalwireApiToken = tenant.signalwire_subproject_token
+      signalwireSpaceUrl = tenant.signalwire_subproject_space || Deno.env.get('SIGNALWIRE_SPACE_URL')!
+      usingSubproject = true
+      console.log('Using tenant subproject for purchase:', signalwireProjectId)
+    } else {
+      // Fall back to main project credentials
+      signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
+      signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
+      signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+      usingSubproject = false
+      console.log('Using main project for purchase (no subproject found)')
+    }
 
     console.log('SignalWire credentials check:', {
       hasProjectId: !!signalwireProjectId,
@@ -147,6 +164,7 @@ serve(async (req) => {
       tenant_id: tenantId,
       number: purchasedNumberData.number || phoneNumber,
       signalwire_number_id: purchasedNumberData.id,
+      signalwire_project_id: signalwireProjectId, // Store which project owns this number
       number_type: purchasedNumberData.number_type || 'longcode',
       is_active: true,
       sms_enabled: purchasedNumberData.capabilities?.includes('sms') || false,

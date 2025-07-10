@@ -27,7 +27,7 @@ import './app/tradeworks-branding.css'
 import {AppRoutes} from './app/routing/AppRoutes'
 import {SupabaseAuthProvider} from './app/modules/auth/core/SupabaseAuth'
 import {setupAxios} from './app/modules/auth'
-import {MetronicSplashScreenProvider} from './_metronic/layout/core/MetronicSplashScreen'
+import {SplashScreenWrapper} from './_metronic/layout/core/SplashScreenWrapper'
 /**
  * Creates `axios-mock-adapter` instance for provided `axios` instance, add
  * basic Metronic mocks and returns it.
@@ -51,11 +51,11 @@ if (container) {
   createRoot(container).render(
     <QueryClientProvider client={queryClient}>
       <MetronicI18nProvider>
-        <MetronicSplashScreenProvider>
+        <SplashScreenWrapper>
           <SupabaseAuthProvider>
             <AppRoutes />
           </SupabaseAuthProvider>
-        </MetronicSplashScreenProvider>
+        </SplashScreenWrapper>
       </MetronicI18nProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

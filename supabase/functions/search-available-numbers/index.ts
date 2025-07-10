@@ -56,7 +56,7 @@ serve(async (req) => {
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .select('id, name, is_active')
+      .select('id, name, is_active, signalwire_subproject_id, signalwire_subproject_token, signalwire_subproject_space')
       .eq('id', userProfile.tenant_id)
       .eq('is_active', true)
       .single()
@@ -65,10 +65,24 @@ serve(async (req) => {
       throw new Error('Invalid or inactive tenant')
     }
 
-    // Step 4: Get SignalWire credentials
-    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
-    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
-    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+    // Step 4: Get SignalWire credentials - prefer tenant's subproject
+    let signalwireProjectId: string
+    let signalwireApiToken: string
+    let signalwireSpaceUrl: string
+
+    if (tenant.signalwire_subproject_id && tenant.signalwire_subproject_token) {
+      // Use tenant's subproject credentials
+      signalwireProjectId = tenant.signalwire_subproject_id
+      signalwireApiToken = tenant.signalwire_subproject_token
+      signalwireSpaceUrl = tenant.signalwire_subproject_space || Deno.env.get('SIGNALWIRE_SPACE_URL')!
+      console.log('Searching numbers in tenant subproject:', signalwireProjectId)
+    } else {
+      // Fall back to main project credentials
+      signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
+      signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
+      signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+      console.log('Searching numbers in main project (no subproject found)')
+    }
 
     if (!signalwireProjectId || !signalwireApiToken || !signalwireSpaceUrl) {
       throw new Error('Server configuration error: Missing SignalWire credentials.')

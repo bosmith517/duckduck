@@ -10,7 +10,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 3000,
   },
   server: {
-    host: true,
+    host: 'localhost',
+    port: 5173,
+    strictPort: false,
+    hmr: {
+      overlay: false
+    }
   },
   // This section tells Vite's Sass compiler where to look for imported files.
   css: {
@@ -22,13 +27,15 @@ export default defineConfig({
   },
   // Handle SignalWire package optimization
   optimizeDeps: {
-    include: ['@signalwire/js'],
-    force: true
+    include: ['@signalwire/js', 'react', 'react-dom', 'react/jsx-runtime'],
+    exclude: ['@vite/client', '@vite/env']
   },
   // This section fixes SignalWire WebSocket issues
   resolve: {
     alias: {
-      'ws': 'isomorphic-ws' // Use browser-friendly WebSocket polyfill
+      'ws': 'isomorphic-ws', // Use browser-friendly WebSocket polyfill
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom')
     }
   },
   define: {
