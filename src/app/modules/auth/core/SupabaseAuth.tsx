@@ -254,7 +254,7 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       // User created successfully, setting up profile
       
       // Step 2: Call the Edge Function to create tenant and user profile
-      const { data: setupData, error: setupError } = await supabase.functions.invoke('handle-new-user-signup', {
+      const { data: setupData, error: setupError } = await supabase.functions.invoke('handle-new-user-signup-v2', {
         body: {
           email,
           firstName,
