@@ -5,181 +5,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TradeWorks Pro - Offline</title>
     <style>
-        * {
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background-color: #f5f5f5;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
+            min-height: 100vh;
+        }
+        .offline-container {
             text-align: center;
             padding: 2rem;
-        }
-
-        .offline-container {
             max-width: 400px;
-            width: 100%;
         }
-
         .offline-icon {
-            font-size: 4rem;
-            margin-bottom: 2rem;
-            opacity: 0.8;
-        }
-
-        .offline-title {
-            font-size: 2rem;
-            font-weight: 600;
+            font-size: 5rem;
             margin-bottom: 1rem;
         }
-
-        .offline-message {
-            font-size: 1.125rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-            line-height: 1.6;
+        h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
         }
-
-        .retry-button {
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.3);
+        p {
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 2rem;
+        }
+        .retry-btn {
+            background-color: #3b82f6;
             color: white;
-            padding: 0.875rem 2rem;
-            border-radius: 2rem;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
             font-size: 1rem;
-            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
+            transition: background-color 0.2s;
         }
-
-        .retry-button:hover {
-            background: rgba(255, 255, 255, 0.3);
-            border-color: rgba(255, 255, 255, 0.5);
-            transform: translateY(-2px);
+        .retry-btn:hover {
+            background-color: #2563eb;
         }
-
-        .offline-features {
-            margin-top: 3rem;
-            text-align: left;
-        }
-
-        .offline-features h3 {
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-
-        .feature-list {
-            list-style: none;
-            padding: 0;
-        }
-
-        .feature-list li {
-            padding: 0.5rem 0;
-            opacity: 0.8;
-        }
-
-        .feature-list li::before {
-            content: "✓ ";
-            color: #4ade80;
-            font-weight: bold;
-            margin-right: 0.5rem;
-        }
-
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        @media (max-width: 480px) {
-            .offline-title {
-                font-size: 1.75rem;
-            }
-            
-            .offline-message {
-                font-size: 1rem;
-            }
-            
-            .offline-icon {
-                font-size: 3rem;
-            }
+        .status {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            color: #4b5563;
         }
     </style>
 </head>
 <body>
     <div class="offline-container">
-        <div class="offline-icon pulse">📡</div>
-        
-        <h1 class="offline-title">You're Offline</h1>
-        
-        <p class="offline-message">
-            Don't worry! TradeWorks Pro works offline too. Your data will sync when you're back online.
+        <div class="offline-icon">📵</div>
+        <h1>You're Offline</h1>
+        <p>
+            No internet connection detected. Your work is being saved locally and will sync automatically when you're back online.
         </p>
-        
-        <button class="retry-button" onclick="window.location.reload()">
+        <button class="retry-btn" onclick="location.reload()">
             Try Again
         </button>
-        
-        <div class="offline-features">
-            <h3>Available Offline:</h3>
-            <ul class="feature-list">
-                <li>View cached job details</li>
-                <li>Take and store photos</li>
-                <li>Add job notes</li>
-                <li>Record time entries</li>
-                <li>Access contact information</li>
-            </ul>
+        <div class="status">
+            <strong>Offline Mode Active</strong><br>
+            • View cached jobs<br>
+            • Update job status<br>
+            • Take photos<br>
+            • All changes will sync when online
         </div>
     </div>
-
     <script>
-        // Check for network status changes
-        window.addEventListener('online', function() {
-            // Redirect to main app when back online
-            window.location.href = '/';
-        });
-
-        // Add some interactivity
-        document.addEventListener('DOMContentLoaded', function() {
-            const retryButton = document.querySelector('.retry-button');
-            
-            retryButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                // Show loading state
-                retryButton.textContent = 'Checking Connection...';
-                retryButton.style.opacity = '0.6';
-                
-                // Check if online
-                setTimeout(function() {
-                    if (navigator.onLine) {
-                        window.location.reload();
-                    } else {
-                        retryButton.textContent = 'Still Offline - Try Again';
-                        retryButton.style.opacity = '1';
-                        
-                        // Reset after 2 seconds
-                        setTimeout(function() {
-                            retryButton.textContent = 'Try Again';
-                        }, 2000);
-                    }
-                }, 1000);
-            });
-        });
+        // Check for connection periodically
+        setInterval(() => {
+            if (navigator.onLine) {
+                location.reload();
+            }
+        }, 5000);
     </script>
 </body>
 </html>

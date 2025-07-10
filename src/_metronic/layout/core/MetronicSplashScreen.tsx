@@ -13,7 +13,7 @@ const MetronicSplashScreenContext = createContext<Dispatch<SetStateAction<number
   undefined
 )
 
-const MetronicSplashScreenProvider: FC<WithChildren> = ({children}) => {
+const MetronicSplashScreenProvider: React.FC<WithChildren> = ({children}) => {
   const [count, setCount] = useState(0)
   const visible = count > 0
 
@@ -40,7 +40,7 @@ const MetronicSplashScreenProvider: FC<WithChildren> = ({children}) => {
   )
 }
 
-const LayoutSplashScreen: FC<{visible?: boolean}> = ({visible = true}) => {
+const LayoutSplashScreen: React.FC<{visible?: boolean}> = ({visible = true}) => {
   // Everything are ready - remove splashscreen
   const setCount = useContext(MetronicSplashScreenContext)
 

@@ -83,20 +83,56 @@ class TrackingService {
         throw new Error('Geolocation is not supported by this browser')
       }
 
-      // Get initial position to verify permission
-      const position = await this.getCurrentPosition()
+      // Get initial position with better error handling
+      let position: GeolocationPosition;
+      try {
+        position = await this.getCurrentPosition()
+      } catch (locationError: any) {
+        console.error('Location error:', locationError)
+        
+        // Provide helpful guidance for common scenarios
+        let helpMessage = locationError.message;
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+          helpMessage += '\n\nNote: Location services require HTTPS. Please use HTTPS or test on localhost.';
+        } else if (window.location.hostname === 'localhost') {
+          helpMessage += '\n\nTo enable location on localhost:\n1. Click the info/lock icon in your address bar\n2. Find Location and set to "Allow"\n3. Refresh the page and try again';
+        }
+        
+        throw new Error(helpMessage)
+      }
       
       // Start tracking session with backend (system-managed)
-      const { data, error } = await supabase.functions.invoke('start-technician-tracking', {
-        body: { 
-          job_id: jobId,
-          initial_latitude: position.coords.latitude,
-          initial_longitude: position.coords.longitude
-        }
+      console.log('Calling start-technician-tracking with:', {
+        job_id: jobId,
+        initial_latitude: position.coords.latitude,
+        initial_longitude: position.coords.longitude
       })
+      
+      let data, error;
+      try {
+        const response = await supabase.functions.invoke('start-mobile-tracking', {
+          body: { 
+            job_id: jobId,
+            initial_latitude: position.coords.latitude,
+            initial_longitude: position.coords.longitude
+          }
+        })
+        data = response.data
+        error = response.error
+      } catch (invokeError: any) {
+        console.error('Function invoke error:', invokeError)
+        error = invokeError
+      }
 
       if (error) {
-        console.error('Error starting tracking:', error)
+        console.error('Edge function error:', error)
+        console.error('Error details:', { error, data })
+        
+        // Check if there's an error message in the response data
+        if (data && data.error) {
+          throw new Error(data.error)
+        }
+        
         throw new Error(error.message || 'Failed to start tracking')
       }
 
@@ -131,7 +167,21 @@ class TrackingService {
     return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         resolve,
-        reject,
+        (error) => {
+          let errorMessage = 'Unable to get location';
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Location permission denied. Please enable location services in your browser settings.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information unavailable. Make sure location services are enabled on your device.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out. Please try again.';
+              break;
+          }
+          reject(new Error(errorMessage));
+        },
         {
           enableHighAccuracy: true,
           timeout: 10000,
@@ -178,16 +228,24 @@ class TrackingService {
 
   async getTrackingLocation(trackingToken: string): Promise<TrackingLocation | null> {
     try {
-      const { data, error } = await supabase.functions.invoke('get-technician-location', {
-        body: { tracking_token: trackingToken }
-      })
+      // The edge function expects the token as a URL query parameter
+      const { data, error } = await supabase.functions.invoke(`get-technician-location?token=${encodeURIComponent(trackingToken)}`)
 
       if (error) {
         console.error('Error getting tracking location:', error)
         throw new Error(error.message)
       }
 
-      return data?.location || null
+      // The edge function returns {latitude, longitude} directly, not nested in a location object
+      if (data && data.latitude && data.longitude) {
+        return {
+          latitude: data.latitude,
+          longitude: data.longitude,
+          timestamp: new Date().toISOString()
+        }
+      }
+
+      return null
     } catch (error) {
       console.error('Error in getTrackingLocation:', error)
       throw error

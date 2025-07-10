@@ -1,5 +1,4 @@
 import {FC} from 'react'
-import {useLang} from './Metronici18n'
 import {IntlProvider} from 'react-intl'
 import '@formatjs/intl-relativetimeformat/polyfill'
 import '@formatjs/intl-relativetimeformat/locale-data/en'
@@ -27,7 +26,22 @@ const allMessages = {
 }
 
 const I18nProvider: FC<WithChildren> = ({children}) => {
-  const locale = useLang()
+  // Get the saved language from localStorage directly to avoid context issues
+  const I18N_CONFIG_KEY = import.meta.env.VITE_APP_I18N_CONFIG_KEY || 'i18nConfig'
+  let locale: keyof typeof allMessages = 'en' // default
+  
+  try {
+    const ls = localStorage.getItem(I18N_CONFIG_KEY)
+    if (ls) {
+      const config = JSON.parse(ls)
+      if (config.selectedLang && allMessages[config.selectedLang as keyof typeof allMessages]) {
+        locale = config.selectedLang as keyof typeof allMessages
+      }
+    }
+  } catch (error) {
+    console.error('Error loading language preference:', error)
+  }
+  
   const messages = allMessages[locale]
 
   return (

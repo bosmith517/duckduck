@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { KTIcon } from '../../../_metronic/helpers'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
-import { locationTriggerService } from '../../services/locationTriggerService'
+import { trackingService } from '../../services/trackingService'
 import PhotoCapture from '../shared/PhotoCapture'
 
 interface TodayJob {
@@ -58,27 +58,10 @@ export const MyDayDashboard: React.FC = () => {
           // If permission is already granted, get location
           if (result.state === 'granted') {
             getCurrentLocation()
-          } else if (result.state === 'prompt') {
-            // Show our custom prompt after a short delay for mobile/PWA users
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-            const isPWA = window.matchMedia('(display-mode: standalone)').matches
-            
-            if (isMobile || isPWA) {
-              // Show immediately for mobile users
-              setShowLocationPrompt(true)
-            } else {
-              // Show after delay for desktop users
-              setTimeout(() => setShowLocationPrompt(true), 1000)
-            }
           }
         } catch (error) {
           console.warn('Error checking permissions:', error)
-          // Try to get location anyway
-          setShowLocationPrompt(true)
         }
-      } else {
-        // Browser doesn't support permissions API, show prompt
-        setShowLocationPrompt(true)
       }
     }
     
@@ -420,15 +403,26 @@ export const MyDayDashboard: React.FC = () => {
       if (newStatus === 'on_route') {
         // Start location tracking when technician is en route
         try {
-          locationTriggerService.startLocationTracking(jobId)
-          alert('🚨 Location tracking started! Customer will be notified of your progress.')
+          const trackingResult = await trackingService.startTracking(jobId)
+          if (trackingResult.success) {
+            alert('🚨 Location tracking started! Customer has been notified and can track your arrival.')
+          } else {
+            // Check if it's a location error
+            if (trackingResult.error?.includes('Location')) {
+              alert('🚗 Status updated to "On Route"!\n\n📍 Location tracking unavailable on this device.\n\nOn mobile devices, location tracking will work automatically.')
+            } else {
+              // Show more detailed error for other issues
+              const errorMsg = trackingResult.error || 'Location tracking could not be started.'
+              alert(`Job status updated.\n\nTracking Error: ${errorMsg}`)
+            }
+          }
         } catch (trackingError) {
           console.warn('Location tracking failed:', trackingError)
-          alert('Job status updated, but location tracking could not be started.')
+          alert('🚗 Status updated to "On Route"!\n\n(Location tracking will work on mobile devices)')
         }
       } else if (newStatus === 'completed') {
         // Stop location tracking when job is done
-        locationTriggerService.stopLocationTracking()
+        await trackingService.stopTracking()
         alert('✅ Job completed! Great work!')
       } else if (newStatus === 'in_progress') {
         alert('🔧 Job started! Remember to take photos as you work.')
@@ -507,50 +501,6 @@ export const MyDayDashboard: React.FC = () => {
 
   return (
     <div className="container-fluid p-0" style={{ paddingBottom: '80px' }}>
-      {/* Location Permission Prompt */}
-      {showLocationPrompt && locationPermissionStatus !== 'granted' && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center" style={{ zIndex: 1050 }}>
-          <div className="bg-white rounded-3 p-4 mx-3" style={{ maxWidth: '400px' }}>
-            <div className="text-center mb-4">
-              <i className="bi bi-geo-alt-fill text-primary" style={{ fontSize: '3rem' }}></i>
-            </div>
-            <h5 className="text-center mb-3">Enable Location Services</h5>
-            <p className="text-muted text-center mb-4">
-              TradeWorks Pro needs your location to:
-            </p>
-            <ul className="text-muted mb-4">
-              <li>Provide turn-by-turn navigation to job sites</li>
-              <li>Track your arrival for customer notifications</li>
-              <li>Log job locations for accurate records</li>
-              <li>Calculate travel time between jobs</li>
-            </ul>
-            <div className="d-grid gap-2">
-              <button 
-                className="btn btn-primary"
-                onClick={() => {
-                  setShowLocationPrompt(false)
-                  getCurrentLocation()
-                }}
-              >
-                <i className="bi bi-check-circle me-2"></i>
-                Enable Location
-              </button>
-              <button 
-                className="btn btn-light"
-                onClick={() => setShowLocationPrompt(false)}
-              >
-                Not Now
-              </button>
-            </div>
-            {locationPermissionStatus === 'denied' && (
-              <div className="alert alert-warning mt-3 small">
-                <i className="bi bi-exclamation-triangle me-2"></i>
-                Location is blocked. Go to your browser settings to enable it.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Mobile Header with Menu */}
       <div className="bg-primary text-white p-3 mb-4 position-sticky top-0" style={{ zIndex: 100 }}>
@@ -727,11 +677,7 @@ export const MyDayDashboard: React.FC = () => {
                     <button 
                       className="btn btn-light-primary btn-sm w-100"
                       onClick={() => {
-                        if (locationPermissionStatus === 'granted') {
-                          openDirections(job.customer.address)
-                        } else {
-                          setShowLocationPrompt(true)
-                        }
+                        openDirections(job.customer.address)
                       }}
                       disabled={locationPermissionStatus === 'denied'}
                     >
@@ -770,13 +716,7 @@ export const MyDayDashboard: React.FC = () => {
                   {job.status === 'scheduled' && (
                     <button 
                       className="btn btn-warning btn-sm flex-fill"
-                      onClick={() => {
-                        if (locationPermissionStatus === 'granted') {
-                          updateJobStatus(job.id, 'on_route')
-                        } else {
-                          setShowLocationPrompt(true)
-                        }
-                      }}
+                      onClick={() => updateJobStatus(job.id, 'on_route')}
                     >
                       On My Way
                     </button>
@@ -969,12 +909,8 @@ export const MyDayDashboard: React.FC = () => {
                 href="#"
                 onClick={(e) => {
                   e.preventDefault()
-                  if (locationPermissionStatus !== 'granted') {
-                    setShowLocationPrompt(true)
-                  } else {
-                    getCurrentLocation()
-                    alert('Location updated successfully!')
-                  }
+                  getCurrentLocation()
+                  alert('Location updated successfully!')
                 }}
               >
                 <i className="bi bi-geo-alt-fill me-2"></i>

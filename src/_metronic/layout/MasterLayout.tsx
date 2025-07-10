@@ -25,6 +25,7 @@ import OnboardingModal from '../../app/components/onboarding/OnboardingModal'
 import { useOnboardingModal } from '../../app/hooks/useOnboardingModal'
 import MobileBottomNav from '../../app/components/mobile/MobileBottomNav'
 import { useMobileDetect } from '../../app/hooks/useMobileDetect'
+import LocationPermissionPrompt from '../../app/components/mobile/LocationPermissionPrompt'
 
 const MasterLayout: FC<WithChildren> = ({children}) => {
   const {classes} = useLayout()
@@ -167,6 +168,12 @@ const MasterLayout: FC<WithChildren> = ({children}) => {
       
       {/* Global WebRTC Softphone Dialer */}
       <WebRTCSoftphoneDialer isVisible={isVisible} onClose={hideDialer} />
+      
+      {/* Location Permission Prompt - Shows automatically when needed */}
+      <LocationPermissionPrompt 
+        onPermissionGranted={() => console.log('Location permission granted')}
+        onPermissionDenied={() => console.log('Location permission denied')}
+      />
       
       {/* Mobile Bottom Navigation - Only show on mobile screens */}
       {isMobile && <MobileBottomNav />}

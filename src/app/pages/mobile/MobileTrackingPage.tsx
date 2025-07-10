@@ -4,6 +4,8 @@ import MobileLocationTracker from '../../components/mobile/MobileLocationTracker
 import MobileCameraCapture from '../../components/mobile/MobileCameraCapture';
 import { MobileService, LocationData, PhotoResult } from '../../services/mobileService';
 import { supabase } from '../../../supabaseClient';
+import { trackingService } from '../../services/trackingService';
+import { showToast } from '../../utils/toast';
 
 interface Job {
   id: string;
@@ -36,6 +38,13 @@ export const MobileTrackingPage: React.FC = () => {
         'Location tracking is active',
       );
     }
+    
+    // Cleanup function to stop tracking when component unmounts
+    return () => {
+      if (trackingService.isCurrentlyTracking) {
+        trackingService.stopTracking();
+      }
+    };
   }, []);
 
   const fetchCurrentUser = async () => {
@@ -81,21 +90,25 @@ export const MobileTrackingPage: React.FC = () => {
 
       if (error) throw error;
 
-      // Send notification to customer
-      await MobileService.scheduleLocalNotification(
-        'On My Way Started',
-        `Location tracking started for ${activeJob.title}`,
-      );
-
-      // Share status if supported
-      await MobileService.shareContent(
-        'On My Way',
-        `Your technician is on the way to ${activeJob.address}`,
-        window.location.href
-      );
+      // Start location tracking
+      showToast.loading('Starting location tracking...');
+      const trackingResult = await trackingService.startTracking(activeJob.id);
+      
+      if (trackingResult.success) {
+        showToast.success('Location tracking started! Customer will be notified.');
+        
+        // Send notification to customer
+        await MobileService.scheduleLocalNotification(
+          'On My Way Started',
+          `Location tracking started for ${activeJob.title}`,
+        );
+      } else {
+        throw new Error(trackingResult.error || 'Failed to start tracking');
+      }
 
     } catch (error) {
       console.error('Error starting on my way:', error);
+      showToast.error('Failed to start tracking. Please check location permissions.');
       setIsOnMyWay(false);
     }
   };
@@ -197,6 +210,11 @@ export const MobileTrackingPage: React.FC = () => {
         'Job Completed',
         `${activeJob.title} has been completed`,
       );
+
+      // Stop tracking when job is completed
+      if (trackingService.isCurrentlyTracking) {
+        await trackingService.stopTracking();
+      }
 
       // Reset state
       setActiveJob(null);
