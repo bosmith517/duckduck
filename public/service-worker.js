@@ -57,6 +57,12 @@ self.addEventListener('fetch', (event) => {
   // Skip Chrome extensions
   if (url.protocol === 'chrome-extension:') return;
 
+  // In development, always use network first to avoid stale cache issues
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
   // Handle API requests differently
   if (url.pathname.includes('/api/') || url.hostname.includes('supabase')) {
     event.respondWith(networkFirst(request));
@@ -69,7 +75,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For everything else, cache first
+  // For everything else, cache first (only in production)
   event.respondWith(cacheFirst(request));
 });
 

@@ -102,7 +102,7 @@ class TrackingService {
       }
       
       // Start tracking session with backend (system-managed)
-      console.log('Calling start-technician-tracking with:', {
+      console.log('Calling start-mobile-tracking with:', {
         job_id: jobId,
         initial_latitude: position.coords.latitude,
         initial_longitude: position.coords.longitude
@@ -210,7 +210,7 @@ class TrackingService {
 
   private async updateLocation(jobId: string, latitude: number, longitude: number): Promise<void> {
     try {
-      const { error } = await supabase.functions.invoke('update-technician-location', {
+      const { error } = await supabase.functions.invoke('update-mobile-location', {
         body: {
           job_id: jobId,
           latitude,

@@ -131,6 +131,8 @@ interface PropertyData {
   pricePerSqFt?: number
   comparableSales?: any[]
   priceHistory?: any[]
+  latitude?: number
+  longitude?: number
 }
 
 interface JobData {
@@ -154,6 +156,8 @@ interface TrackingData {
   is_active: boolean
   last_updated: string
   technician_eta?: string
+  eta?: string
+  distance?: string
 }
 
 interface JobHistory {
@@ -167,6 +171,8 @@ interface JobHistory {
 
 const CustomerPortalPage: React.FC = () => {
   const { customerId, trackingToken, token } = useParams<{ customerId?: string; trackingToken?: string; token?: string }>()
+  
+  console.log('🚀 CustomerPortalPage loaded with params:', { customerId, trackingToken, token })
   
   // State management
   const [customer, setCustomer] = useState<CustomerData | null>(null)
@@ -375,6 +381,93 @@ const CustomerPortalPage: React.FC = () => {
           service_type: job.title || 'Service',
           priority: job.priority || 'medium'
         })
+
+        // Check if there's an active tracking session for this job
+        console.log('🔍 Checking for active tracking session for job:', job.id)
+        const { data: trackingSession, error: trackingError } = await supabase
+          .from('job_technician_locations')
+          .select('tracking_token, is_active, expires_at')
+          .eq('job_id', job.id)
+          .eq('is_active', true)
+          .gte('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        console.log('🔍 Tracking query result:', { trackingSession, trackingError })
+        
+        if (trackingSession) {
+          console.log('📍 Active tracking session found:', trackingSession.tracking_token)
+          // Initialize tracking directly with the found token
+          setShowTracking(true)
+          
+          // Fetch initial technician location
+          try {
+            const response = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-technician-location?token=${trackingSession.tracking_token}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                }
+              }
+            )
+
+            if (response.ok) {
+              const locationData = await response.json()
+              
+              // Calculate ETA if we have customer location
+              let etaInfo = null
+              const customerAddress = job.location_address
+              console.log('🗺️ Calculating ETA for address:', customerAddress)
+              
+              if (customerAddress) {
+                // For demo, use the property coordinates if available
+                // In production, you'd geocode the address
+                const destLat = propertyData?.latitude || 41.5541 // Default to Mokena, IL coordinates
+                const destLng = propertyData?.longitude || -87.7406
+                
+                console.log('📍 Technician:', locationData.latitude, locationData.longitude)
+                console.log('🏠 Destination:', destLat, destLng)
+                
+                etaInfo = await calculateETA(
+                  locationData.latitude,
+                  locationData.longitude,
+                  destLat,
+                  destLng
+                )
+                
+                console.log('⏱️ ETA calculated:', etaInfo)
+              } else {
+                console.log('❌ No customer address available for ETA calculation')
+              }
+
+              setTrackingData({
+                tracking_token: trackingSession.tracking_token,
+                latitude: locationData.latitude,
+                longitude: locationData.longitude,
+                is_active: true,
+                last_updated: new Date().toISOString(),
+                eta: etaInfo?.eta,
+                distance: etaInfo?.distance
+              })
+
+              // Initialize map after a short delay
+              setTimeout(() => {
+                if (locationData.latitude && locationData.longitude) {
+                  // Calculate a general area (offset for privacy)
+                  const generalAreaOffset = 0.01
+                  const offsetLat = locationData.latitude + (Math.random() - 0.5) * generalAreaOffset
+                  const offsetLng = locationData.longitude + (Math.random() - 0.5) * generalAreaOffset
+                  
+                  initializeMap(offsetLat, offsetLng, locationData.latitude, locationData.longitude)
+                  setupRealtimeTracking(trackingSession.tracking_token)
+                }
+              }, 500)
+            }
+          } catch (error) {
+            console.error('Error fetching initial tracking location:', error)
+          }
+        }
       }
 
       // Get property data from Attom API
@@ -701,6 +794,47 @@ const CustomerPortalPage: React.FC = () => {
     animateMarkerToActualLocation(initialLng, initialLat, actualLng, actualLat)
   }
 
+  const calculateETA = async (techLat: number, techLng: number, destLat: number, destLng: number) => {
+    try {
+      const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN
+      if (!mapboxToken) return null
+
+      const response = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${techLng},${techLat};${destLng},${destLat}?access_token=${mapboxToken}&geometries=geojson`
+      )
+
+      if (!response.ok) return null
+
+      const data = await response.json()
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0]
+        const durationSeconds = route.duration
+        const distanceMeters = route.distance
+
+        // Convert to minutes and round up
+        const durationMinutes = Math.ceil(durationSeconds / 60)
+        
+        // Format ETA
+        if (durationMinutes < 60) {
+          return {
+            eta: `${durationMinutes} min`,
+            distance: (distanceMeters / 1609.34).toFixed(1) // Convert to miles
+          }
+        } else {
+          const hours = Math.floor(durationMinutes / 60)
+          const minutes = durationMinutes % 60
+          return {
+            eta: `${hours}h ${minutes}m`,
+            distance: (distanceMeters / 1609.34).toFixed(1)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating ETA:', error)
+    }
+    return null
+  }
+
   const animateMarkerToActualLocation = (startLng: number, startLat: number, endLng: number, endLat: number) => {
     if (!markerRef.current) return
 
@@ -727,19 +861,20 @@ const CustomerPortalPage: React.FC = () => {
     animate()
   }
 
-  const setupRealtimeTracking = () => {
-    if (!trackingToken) return
+  const setupRealtimeTracking = (token?: string) => {
+    const activeToken = token || trackingToken
+    if (!activeToken) return
 
     // Subscribe to real-time location updates
     realtimeChannelRef.current = supabase
-      .channel(`tracking-${trackingToken}`)
+      .channel(`tracking-${activeToken}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'job_technician_locations',
-          filter: `tracking_token=eq.${trackingToken}`
+          filter: `tracking_token=eq.${activeToken}`
         },
         (payload) => {
           const newLocation = payload.new
@@ -748,12 +883,38 @@ const CustomerPortalPage: React.FC = () => {
             markerRef.current.setLngLat([newLocation.longitude, newLocation.latitude])
             
             // Update tracking data
-            setTrackingData(prev => prev ? {
-              ...prev,
-              latitude: newLocation.latitude,
-              longitude: newLocation.longitude,
-              last_updated: newLocation.last_updated
-            } : null)
+            // Update tracking data and recalculate ETA
+            setTrackingData(prev => {
+              if (!prev) return null
+              
+              // Calculate new ETA in background
+              if (customer?.address) {
+                const destLat = propertyData?.latitude || 41.5541
+                const destLng = propertyData?.longitude || -87.7406
+                
+                calculateETA(
+                  newLocation.latitude,
+                  newLocation.longitude,
+                  destLat,
+                  destLng
+                ).then(etaInfo => {
+                  if (etaInfo) {
+                    setTrackingData(current => current ? {
+                      ...current,
+                      eta: etaInfo.eta,
+                      distance: etaInfo.distance
+                    } : null)
+                  }
+                })
+              }
+              
+              return {
+                ...prev,
+                latitude: newLocation.latitude,
+                longitude: newLocation.longitude,
+                last_updated: newLocation.last_updated
+              }
+            })
 
             // Center map on new location
             if (mapRef.current) {
@@ -1138,12 +1299,61 @@ const CustomerPortalPage: React.FC = () => {
                         </div>
                         <div className="card-body p-0">
                           {showTracking ? (
-                            /* Tracking Map - Mapbox loads dynamically */
-                            <div 
-                              ref={mapContainerRef}
-                              style={{ height: '500px', width: '100%' }}
-                              className="rounded-bottom"
-                            />
+                            <>
+                              {/* Live Tracking Banner */}
+                              <div className="bg-success text-white p-3 d-flex align-items-center justify-content-between">
+                                <div className="d-flex align-items-center">
+                                  <div className="spinner-grow spinner-grow-sm text-white me-3" role="status">
+                                    <span className="visually-hidden">Loading...</span>
+                                  </div>
+                                  <div>
+                                    <strong>Technician On The Way!</strong>
+                                    <div className="small opacity-75">
+                                      {trackingData?.eta ? (
+                                        <>ETA: {trackingData.eta} • Live tracking active</>
+                                      ) : (
+                                        'Live tracking is active - map updates automatically'
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <i className="ki-duotone ki-geolocation fs-2x">
+                                  <span className="path1"></span>
+                                  <span className="path2"></span>
+                                </i>
+                              </div>
+                              
+                              {/* Tracking Map - Mapbox loads dynamically */}
+                              <div className="position-relative">
+                                <div 
+                                  ref={mapContainerRef}
+                                  style={{ height: '500px', width: '100%' }}
+                                  className="rounded-bottom"
+                                />
+                                
+                                {/* ETA Overlay */}
+                                {trackingData?.eta && (
+                                  <div className="position-absolute top-0 start-0 m-3">
+                                    <div className="card shadow-lg">
+                                      <div className="card-body p-3">
+                                        <div className="d-flex align-items-center">
+                                          <i className="ki-duotone ki-time fs-2x text-primary me-3">
+                                            <span className="path1"></span>
+                                            <span className="path2"></span>
+                                          </i>
+                                          <div>
+                                            <div className="fw-bold fs-4">{trackingData.eta}</div>
+                                            <div className="text-muted small">
+                                              {trackingData.distance && `${trackingData.distance} miles away`}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </>
                           ) : (
                             /* Property Information */
                             <div className="position-relative">

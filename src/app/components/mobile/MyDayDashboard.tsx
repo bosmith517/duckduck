@@ -405,7 +405,21 @@ export const MyDayDashboard: React.FC = () => {
         try {
           const trackingResult = await trackingService.startTracking(jobId)
           if (trackingResult.success) {
-            alert('🚨 Location tracking started! Customer has been notified and can track your arrival.')
+            // Generate the direct tracking URL (works without login)
+            const trackingUrl = `${window.location.origin}/track/${trackingResult.trackingToken}`
+            
+            // Also generate customer portal URL if we have customer info
+            const job = todayJobs.find(j => j.id === jobId)
+            const customerInfo = job ? `\n\nCustomer: ${job.customer.name}` : ''
+            
+            // Copy to clipboard for easy sharing
+            try {
+              await navigator.clipboard.writeText(trackingUrl)
+              alert(`🚨 Location tracking started!${customerInfo}\n\n📋 Tracking link copied to clipboard!\n\nShare with customer:\n${trackingUrl}\n\n🗺️ Customer can track your real-time location!`)
+            } catch (clipboardError) {
+              // Fallback if clipboard fails
+              alert(`🚨 Location tracking started!${customerInfo}\n\nShare this link with customer:\n${trackingUrl}\n\n🗺️ Customer can track your real-time location!`)
+            }
           } else {
             // Check if it's a location error
             if (trackingResult.error?.includes('Location')) {
