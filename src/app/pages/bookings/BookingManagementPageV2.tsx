@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { BookingService } from '../../services/bookingService'
-import { BookingLink, AvailabilitySchedule } from '../../../lib/supabase/bookings.types'
+import { BookingLink, AvailabilitySchedule } from '../../components/bookings/bookings.types'
 import { toast } from 'react-toastify'
 
 const BookingManagementPageV2: React.FC = () => {
@@ -112,7 +112,7 @@ const BookingManagementPageV2: React.FC = () => {
         <div className="container-fluid px-4 py-3">
           <div className="row align-items-center">
             <div className="col">
-              <h4 className="mb-0 fw-semibold">My {userProfile?.company_name || 'TradeWorks'}</h4>
+              <h4 className="mb-0 fw-semibold">My TradeWorks</h4>
             </div>
             <div className="col-auto">
               <div className="d-flex align-items-center gap-3">

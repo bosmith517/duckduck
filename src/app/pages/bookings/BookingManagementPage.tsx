@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { BookingService } from '../../services/bookingService'
-import { BookingLink, AvailabilitySchedule } from '../../../lib/supabase/bookings.types'
+import { BookingLink, AvailabilitySchedule } from '../../components/bookings/bookings.types'
 import { toast } from 'react-toastify'
 
 const BookingManagementPage: React.FC = () => {

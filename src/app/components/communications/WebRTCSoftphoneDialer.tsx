@@ -189,12 +189,13 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           uri,
           displayName: user.email || 'User',
           logBuiltinEnabled: true,
-          logLevel: 'debug',
+          logLevel: 'debug' as any,
           sessionDescriptionHandlerFactoryOptions: {
             constraints: {
               audio: true,
               video: false
             },
+            // @ts-ignore - peerConnectionConfiguration is valid but not in types
             peerConnectionConfiguration: {
               iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -412,14 +413,8 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           constraints: {
             audio: true,
             video: false
-          },
-          peerConnectionConfiguration: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' }
-            ]
           }
-        }
+        } as any
       }
 
       // Make the call

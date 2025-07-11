@@ -8,7 +8,7 @@ import {
   CreateBookingLinkData,
   UpdateAvailabilityData,
   BookingFormData
-} from '../../lib/supabase/bookings.types'
+} from '../components/bookings/bookings.types'
 
 export class BookingService {
   // Booking Links
@@ -104,7 +104,7 @@ export class BookingService {
 
     // Insert new schedules
     if (schedules.length > 0) {
-      const schedulesToInsert = schedules.map(schedule => ({
+      const schedulesToInsert = schedules.map((schedule: any) => ({
         ...schedule,
         booking_link_id: bookingLinkId
       }))

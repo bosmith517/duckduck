@@ -13,7 +13,11 @@ __tests__/
 # Ignore development files
 .env.local
 .env.development
-supabase/
+supabase/functions/
+supabase/migrations/
+supabase/seed.sql
+supabase/config.toml
+supabase/.gitignore
 scripts/
 docs/
 

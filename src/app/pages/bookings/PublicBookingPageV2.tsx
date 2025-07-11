@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { BookingService } from '../../services/bookingService'
-import { BookingLink, TimeSlot, BookingFormData } from '../../../lib/supabase/bookings.types'
+import { BookingLink, TimeSlot, BookingFormData } from '../../components/bookings/bookings.types'
 import { format, addDays, startOfDay, isSameDay, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isToday } from 'date-fns'
 import { toast } from 'react-toastify'
 

@@ -79,8 +79,8 @@ const TestAvailabilityPage: React.FC = () => {
       }
 
       setResults(testResults)
-    } catch (error) {
-      setResults({ error: error.message })
+    } catch (error: any) {
+      setResults({ error: error.message || 'Unknown error' })
     } finally {
       setLoading(false)
     }

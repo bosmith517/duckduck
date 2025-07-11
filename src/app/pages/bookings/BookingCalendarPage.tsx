@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { BookingService } from '../../services/bookingService'
-import { Booking, BookingLink } from '../../../lib/supabase/bookings.types'
+import { Booking, BookingLink } from '../../components/bookings/bookings.types'
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, startOfMonth, endOfMonth, isSameMonth } from 'date-fns'
 import { toast } from 'react-toastify'
 
