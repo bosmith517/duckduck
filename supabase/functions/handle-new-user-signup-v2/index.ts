@@ -68,7 +68,35 @@ serve(async (req) => {
 
     console.log('✅ Profile created for user:', userId)
 
-    // Step 3: Return success with tenant data
+    // Step 3: Create SIP endpoint for the user
+    try {
+      console.log('Creating SIP endpoint for user...')
+      const sipResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/create-user-sip-endpoint`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId,
+          email,
+          tenantId
+        })
+      })
+
+      if (!sipResponse.ok) {
+        console.error('Failed to create SIP endpoint:', await sipResponse.text())
+        // Don't fail the signup, just log the error
+      } else {
+        const sipResult = await sipResponse.json()
+        console.log('✅ SIP endpoint created:', sipResult.sipConfig?.sip_username)
+      }
+    } catch (sipError) {
+      console.error('Error creating SIP endpoint:', sipError)
+      // Don't fail the signup, SIP can be created later
+    }
+
+    // Step 4: Return success with tenant data
     const { data: tenantData } = await supabaseAdmin
       .from('tenants')
       .select('*')

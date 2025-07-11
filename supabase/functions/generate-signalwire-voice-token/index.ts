@@ -92,12 +92,30 @@ serve(async (req) => {
       spaceUrl: spaceUrl || 'not set'
     });
 
+    // First try to get user-specific SIP config
     let { data: sipConfig, error: sipError } = await supabaseAdmin
       .from('sip_configurations')
       .select('*')
-      .eq('tenant_id', userProfile.tenant_id)
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .single();
+      
+    // If no user-specific config, try tenant-level config (legacy)
+    if (sipError || !sipConfig) {
+      console.log('No user-specific SIP config found, checking tenant-level...');
+      const { data: tenantSipConfig, error: tenantSipError } = await supabaseAdmin
+        .from('sip_configurations')
+        .select('*')
+        .eq('tenant_id', userProfile.tenant_id)
+        .eq('is_active', true)
+        .is('user_id', null)
+        .single();
+        
+      if (!tenantSipError && tenantSipConfig) {
+        sipConfig = tenantSipConfig;
+        sipError = null;
+      }
+    }
 
     // If no SIP config exists, create one for the existing SIP endpoint
     if (sipError || !sipConfig) {
@@ -181,10 +199,11 @@ serve(async (req) => {
         console.log('The SIP credentials may need to be manually added to SignalWire');
       }
 
-      // Store the new SIP configuration in database (using existing endpoint)
+      // Store the new SIP configuration in database (user-specific)
       const { data: newSipConfig, error: createError } = await supabaseAdmin
         .from('sip_configurations')
         .insert({
+          user_id: user.id,
           tenant_id: userProfile.tenant_id,
           sip_username: sipUsername,
           sip_password_encrypted: sipPassword,
@@ -193,10 +212,10 @@ serve(async (req) => {
           signalwire_project_id: projectId,
           is_active: true,
           service_plan: 'basic',
-          monthly_rate: 29.99,
-          per_minute_rate: 0.02,
-          included_minutes: 1000,
-          notes: `Auto-provisioned for existing endpoint ${sipDomain}`
+          monthly_rate: 0, // User-level configs don't have individual rates
+          per_minute_rate: 0,
+          included_minutes: 0,
+          notes: `Auto-provisioned user SIP endpoint for ${user.email}`
         })
         .select('*')
         .single();
