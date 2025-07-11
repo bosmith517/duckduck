@@ -131,26 +131,77 @@ ${data.summary.missing_from_database > 0 ?
 
   const fixSIPCredentials = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('fix-sip-credentials')
+      const { data, error } = await supabase.functions.invoke('fix-sip-authentication')
       
       if (error) throw error
       
       console.log('Fix SIP Result:', data)
-      showToast.success('SIP credentials fixed!')
       
-      const message = `
+      if (data.success) {
+        showToast.success('SIP credentials fixed!')
+        const message = `
 SIP Credentials Fixed!
 
 Username: ${data.sip_username}
 Domain: ${data.sip_domain}
-Password: ${data.sip_password || data.new_password}
+Password: ${data.sip_password}
+Endpoint: ${data.endpoint_name}
 
-${data.note}
-      `
-      alert(message)
+${data.message}
+
+Please refresh the page and try making a call.
+        `
+        alert(message)
+        // Reload debug info to show updated credentials
+        loadDebugInfo()
+      } else {
+        showToast.error('Failed to fix SIP credentials')
+        alert(data.message || 'Failed to update credentials')
+      }
     } catch (err: any) {
       console.error('Error fixing credentials:', err)
       showToast.error(`Failed to fix credentials: ${err.message}`)
+    }
+  }
+
+  const recreateSIPEndpoint = async () => {
+    if (!confirm('This will create a new SIP endpoint with email-based username. Continue?')) {
+      return
+    }
+    
+    try {
+      showToast.loading('Creating new SIP endpoint...')
+      
+      const { data, error } = await supabase.functions.invoke('create-sip-endpoint', {
+        body: { forceCreate: true }
+      })
+      
+      if (error) throw error
+      
+      console.log('Create SIP Result:', data)
+      
+      if (data.success) {
+        showToast.success('SIP endpoint created!')
+        const message = `
+SIP Endpoint Created!
+
+Username: ${data.sipConfig.sip_username}
+Domain: ${data.sipConfig.sip_domain}
+Status: ${data.sipConfig.user_created_in_signalwire ? 'Ready to use' : 'Manual setup needed'}
+
+${data.message}
+
+${data.manual_setup_needed ? `\nMANUAL SETUP REQUIRED:\n${data.instructions}` : ''}
+        `
+        alert(message)
+        // Reload debug info
+        loadDebugInfo()
+      } else {
+        showToast.error('Failed to create SIP endpoint')
+      }
+    } catch (err: any) {
+      console.error('Error creating endpoint:', err)
+      showToast.error(`Failed to create endpoint: ${err.message}`)
     }
   }
 
@@ -295,12 +346,17 @@ Check console for full details.
                 >
                   Verify Phone Numbers
                 </button>
-                {/* Removed repair button - no longer needed */}
+                <button 
+                  className="btn btn-success"
+                  onClick={recreateSIPEndpoint}
+                >
+                  Create/Fix SIP Endpoint
+                </button>
                 <button 
                   className="btn btn-danger"
                   onClick={fixSIPCredentials}
                 >
-                  Fix SIP Credentials
+                  Fix SIP Authentication
                 </button>
                 <button 
                   className="btn btn-info"
@@ -327,7 +383,14 @@ Check console for full details.
                   <td><strong>SIP Configuration:</strong></td>
                   <td>
                     {sipConfig ? (
-                      <span className="text-success">✅ Found (Username: {sipConfig.sip_username})</span>
+                      <>
+                        <span className="text-success">✅ Found</span>
+                        <div className="small text-muted">
+                          Username: <code>{sipConfig.sip_username}</code><br/>
+                          Domain: <code>{sipConfig.sip_domain}</code><br/>
+                          Password: <code>{sipConfig.sip_password_encrypted ? '••••••••' : '❌ Missing'}</code>
+                        </div>
+                      </>
                     ) : (
                       <span className="text-danger">❌ Not found</span>
                     )}
