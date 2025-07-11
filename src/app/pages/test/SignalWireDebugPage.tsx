@@ -9,8 +9,10 @@ const SignalWireDebugPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
   const [tenantInfo, setTenantInfo] = useState<any>(null)
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([])
+  const [sipConfig, setSipConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [testNumber, setTestNumber] = useState('+15555551234')
 
   useEffect(() => {
     loadDebugInfo()
@@ -40,6 +42,16 @@ const SignalWireDebugPage: React.FC = () => {
 
       if (numbersError) throw numbersError
       setPhoneNumbers(numbers || [])
+
+      // Get SIP configuration
+      const { data: sip, error: sipError } = await supabase
+        .from('sip_configurations')
+        .select('*')
+        .eq('tenant_id', userProfile.tenant_id)
+        .eq('is_active', true)
+        .single()
+
+      if (!sipError) setSipConfig(sip)
 
     } catch (err: any) {
       setError(err.message)
@@ -204,6 +216,29 @@ Check console for full details.
     }
   }
 
+  const testServerSideCall = async () => {
+    try {
+      showToast.loading('Initiating test call from server...')
+      
+      const { data, error } = await supabase.functions.invoke('start-outbound-call', {
+        body: {
+          to: testNumber,
+          tenantId: userProfile?.tenant_id
+        }
+      })
+      
+      if (error) throw error
+      
+      console.log('Server-side call result:', data)
+      showToast.success('Call initiated from server!')
+      
+      alert(`Server Call Success!\n\nCall SID: ${data.call_sid}\nFrom: ${data.from}\nTo: ${data.to}`)
+    } catch (err: any) {
+      console.error('Server call error:', err)
+      showToast.error(`Server call failed: ${err.message}`)
+    }
+  }
+
   if (loading) {
     return <div>Loading...</div>
   }
@@ -276,6 +311,90 @@ Check console for full details.
               </div>
             </div>
           )}
+        </KTCardBody>
+      </KTCard>
+
+      <KTCard className="mb-6">
+        <div className="card-header">
+          <h3 className="card-title">Mobile Call Testing</h3>
+        </div>
+        <KTCardBody>
+          <div className="mb-4">
+            <h5>Configuration Status</h5>
+            <table className="table table-sm">
+              <tbody>
+                <tr>
+                  <td><strong>SIP Configuration:</strong></td>
+                  <td>
+                    {sipConfig ? (
+                      <span className="text-success">✅ Found (Username: {sipConfig.sip_username})</span>
+                    ) : (
+                      <span className="text-danger">❌ Not found</span>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Phone Numbers:</strong></td>
+                  <td>
+                    {phoneNumbers.length > 0 ? (
+                      <span className="text-success">✅ {phoneNumbers.length} number(s) found</span>
+                    ) : (
+                      <span className="text-danger">❌ No phone numbers</span>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Active Phone:</strong></td>
+                  <td>
+                    {phoneNumbers.find(p => p.is_active) ? (
+                      <span className="text-success">✅ {phoneNumbers.find(p => p.is_active)?.number}</span>
+                    ) : (
+                      <span className="text-danger">❌ No active phone number</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-4">
+            <h5>Test Server-Side Call</h5>
+            <p className="text-muted">Test if SignalWire can make calls from the server (bypasses WebRTC)</p>
+            <div className="d-flex gap-2">
+              <input
+                type="tel"
+                className="form-control"
+                style={{ maxWidth: '250px' }}
+                placeholder="+1234567890"
+                value={testNumber}
+                onChange={(e) => setTestNumber(e.target.value)}
+              />
+              <button 
+                className="btn btn-warning"
+                onClick={testServerSideCall}
+                disabled={!testNumber}
+              >
+                Test Server Call
+              </button>
+            </div>
+          </div>
+
+          <div className="alert alert-info">
+            <h6 className="alert-heading">Mobile Debugging Steps:</h6>
+            <ol className="mb-0">
+              <li>Open browser console on mobile device</li>
+              <li>Look for [Mobile Debug] messages</li>
+              <li>Check these key points:
+                <ul>
+                  <li>Audio permissions granted?</li>
+                  <li>ICE connection state reaches "connected"?</li>
+                  <li>Audio track received?</li>
+                  <li>Any specific error messages?</li>
+                </ul>
+              </li>
+              <li>If server-side call works but WebRTC doesn't, it's likely a network/ICE issue</li>
+            </ol>
+          </div>
         </KTCardBody>
       </KTCard>
 

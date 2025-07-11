@@ -283,9 +283,20 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
         const registerer = new Registerer(userAgent)
         registererRef.current = registerer
 
+        // Add registration state monitoring
+        registerer.stateChange.addListener((state) => {
+          console.log('[Mobile Debug] Registerer state changed:', state)
+        })
+
         console.log('Registering with SIP server...')
-        await registerer.register()
-        console.log('SIP registration successful!')
+        try {
+          await registerer.register()
+          console.log('SIP registration successful!')
+          console.log('[Mobile Debug] Registration state:', registerer.state)
+        } catch (regError) {
+          console.error('[Mobile Debug] Registration failed:', regError)
+          throw new Error('Failed to register with SignalWire SIP server')
+        }
 
         // Set up incoming call handler
         userAgent.delegate = {
@@ -542,32 +553,41 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
 
   // Initiate outbound call
   const initiateCall = async (name: string, phoneNumber: string, contactId?: string) => {
+    console.log('[Mobile Debug] initiateCall started:', { name, phoneNumber, contactId })
+    
     if (!userAgentRef.current || connectionState !== 'connected') {
+      console.error('[Mobile Debug] Not connected to VoIP system:', { userAgent: !!userAgentRef.current, connectionState })
       showToast.error('Not connected to VoIP system')
       return
     }
 
     try {
+      console.log('[Mobile Debug] Setting call state to dialing')
       setCallState('dialing')
       setCallInfo({ name, number: phoneNumber, contactId })
 
       // Create target URI with proper phone number formatting
       const uriString = userAgentRef.current.configuration.uri.toString()
       const domain = uriString.split('@')[1]
+      console.log('[Mobile Debug] SIP domain:', domain)
       
       // Clean and format phone number for SIP
       const cleanNumber = phoneNumber.replace(/[^\d+]/g, '')
       const sipNumber = cleanNumber.startsWith('+') ? cleanNumber.substring(1) : cleanNumber
+      console.log('[Mobile Debug] Formatted number:', { original: phoneNumber, clean: cleanNumber, sip: sipNumber })
       
       const target = new URI('sip', sipNumber, domain)
+      console.log('[Mobile Debug] Target URI:', target.toString())
       
       // Options for the call
       // Check for audio permissions first
+      console.log('[Mobile Debug] Checking audio permissions...')
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        console.log('[Mobile Debug] Audio permissions granted')
         stream.getTracks().forEach(track => track.stop())
       } catch (mediaError) {
-        console.error('Failed to get audio permissions:', mediaError)
+        console.error('[Mobile Debug] Failed to get audio permissions:', mediaError)
         showToast.error('Microphone access is required to make calls. Please grant permissions and try again.')
         throw new Error('Microphone access denied')
       }
@@ -613,16 +633,30 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
       }
 
       // Make the call
+      console.log('[Mobile Debug] Creating inviter...')
       const inviter = new Inviter(userAgentRef.current, target, inviterOptions)
       currentSessionRef.current = inviter
+      console.log('[Mobile Debug] Inviter created:', inviter)
 
-      // Set up session handlers
+      // Set up session handlers BEFORE sending invite
+      console.log('[Mobile Debug] Setting up session handlers...')
       setupSessionHandlers(inviter)
 
-      // Send the invite
-      await inviter.invite()
+      // Add invite error handlers
+      inviter.stateChange.addListener((state) => {
+        console.log('[Mobile Debug] Inviter state changed:', state)
+      })
 
-      showToast.loading(`Calling ${name}...`)
+      // Send the invite
+      console.log('[Mobile Debug] Sending invite...')
+      try {
+        await inviter.invite()
+        console.log('[Mobile Debug] Invite sent successfully')
+        showToast.loading(`Calling ${name}...`)
+      } catch (inviteError) {
+        console.error('[Mobile Debug] Invite failed:', inviteError)
+        throw inviteError
+      }
 
       // Also log the call in database using tenant's configured phone number
       supabase.functions.invoke('start-outbound-call', {
@@ -632,10 +666,18 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           userId: currentUser?.id,
           contactId
         }
-      }).catch(console.error)
+      }).catch(error => {
+        console.error('[Mobile Debug] Failed to log call in database:', error)
+      })
 
     } catch (error) {
-      console.error('Failed to initiate call:', error)
+      console.error('[Mobile Debug] Failed to initiate call:', error)
+      console.error('[Mobile Debug] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        error
+      })
+      
       showToast.error('Failed to initiate call')
       setCallState('idle')
       setCallInfo({ name: '-', number: '-' })
@@ -770,9 +812,17 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
   }, [isVisible, callState, dialedNumber, connectionState])
 
   const handleCall = () => {
+    console.log('[Mobile Debug] handleCall triggered:', { callState, dialedNumber, connectionState })
     if (callState === 'idle' && dialedNumber && connectionState === 'connected') {
       const formattedNumber = formatPhoneNumber(dialedNumber)
+      console.log('[Mobile Debug] Initiating call with formatted number:', formattedNumber)
       initiateCall('Manual Dial', formattedNumber)
+    } else {
+      console.log('[Mobile Debug] Cannot make call:', {
+        isIdle: callState === 'idle',
+        hasNumber: !!dialedNumber,
+        isConnected: connectionState === 'connected'
+      })
     }
   }
 
