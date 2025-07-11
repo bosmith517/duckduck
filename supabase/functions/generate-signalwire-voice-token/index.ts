@@ -69,34 +69,18 @@ serve(async (req) => {
       userProfile.tenant_id = newProfile.tenant_id;
     }
 
-    // Check if tenant has a dedicated subproject
+    // Use service role client for database operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { data: tenant } = await supabaseAdmin
-      .from('tenants')
-      .select('signalwire_subproject_id, signalwire_subproject_token, signalwire_subproject_space, subproject_status')
-      .eq('id', userProfile.tenant_id)
-      .single();
-
-    // Determine which SignalWire credentials to use
-    let projectId, apiToken, spaceUrl;
+    // Always use main SignalWire project credentials
+    const projectId = Deno.env.get('SIGNALWIRE_PROJECT_ID');
+    const apiToken = Deno.env.get('SIGNALWIRE_API_TOKEN');
+    const spaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL');
     
-    if (tenant?.signalwire_subproject_id && tenant?.subproject_status === 'created') {
-      // Use dedicated subproject credentials
-      projectId = tenant.signalwire_subproject_id;
-      apiToken = tenant.signalwire_subproject_token;
-      spaceUrl = tenant.signalwire_subproject_space || Deno.env.get('SIGNALWIRE_SPACE_URL');
-      console.log('Using dedicated subproject for tenant:', userProfile.tenant_id);
-    } else {
-      // Fall back to main project credentials
-      projectId = Deno.env.get('SIGNALWIRE_PROJECT_ID');
-      apiToken = Deno.env.get('SIGNALWIRE_API_TOKEN');
-      spaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL');
-      console.log('Using main project for tenant:', userProfile.tenant_id, 'subproject status:', tenant?.subproject_status || 'none');
-    }
+    console.log('Using main SignalWire project for tenant:', userProfile.tenant_id);
     
     if (!projectId || !apiToken) {
       throw new Error('SignalWire credentials not configured in environment variables');

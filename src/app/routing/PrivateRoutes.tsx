@@ -63,7 +63,7 @@ const PrivateRoutes = () => {
   const TechnicianProfilesPage = lazy(() => import('../pages/settings/TechnicianProfilesPage'))
   const PhoneNumbersPage = lazy(() => import('../pages/settings/PhoneNumbersPage'))
   const PhoneNumbersSettingsPage = lazy(() => import('../pages/settings/PhoneNumbersSettingsPage'))
-  const SubprojectManagementPage = lazy(() => import('../pages/settings/SubprojectManagementPage'))
+  // Removed SubprojectManagementPage - no longer needed
   
   // New Hub Pages
   const BillingDashboardPage = lazy(() => import('../pages/billing/BillingDashboardPage'))
@@ -118,6 +118,10 @@ const PrivateRoutes = () => {
   const MobileMyDayPage = lazy(() => import('../pages/mobile/MobileMyDayPage'))
   const MobileCameraPage = lazy(() => import('../pages/mobile/MobileCameraPage'))
   const MobileLocationPage = lazy(() => import('../pages/mobile/MobileLocationPage'))
+  
+  // Booking Components
+  const BookingManagementPage = lazy(() => import('../pages/bookings/BookingManagementPageV2'))
+  const BookingCalendarPage = lazy(() => import('../pages/bookings/BookingCalendarPage'))
 
   // Note: Onboarding is now handled via modal in MasterLayout
 
@@ -307,6 +311,22 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <SchedulePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='bookings/*'
+          element={
+            <SuspensedView>
+              <BookingManagementPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='bookings/:id'
+          element={
+            <SuspensedView>
+              <BookingCalendarPage />
             </SuspensedView>
           }
         />
@@ -604,14 +624,7 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        <Route
-          path='settings/subprojects'
-          element={
-            <SuspensedView>
-              <SubprojectManagementPage />
-            </SuspensedView>
-          }
-        />
+        {/* Removed subprojects route - no longer needed */}
         <Route
           path='settings/layout'
           element={

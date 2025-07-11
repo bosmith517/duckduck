@@ -1,6 +1,8 @@
 import {Suspense} from 'react'
 import {Outlet} from 'react-router-dom'
 import {Toaster} from 'react-hot-toast'
+import {ToastContainer} from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import {I18nProvider} from '../_metronic/i18n/i18nProvider'
 import {LayoutProvider} from '../_metronic/layout/core'
 import {useSupabaseAuth} from './modules/auth/core/SupabaseAuth'
@@ -27,6 +29,18 @@ const App = () => {
             <SoftphoneProvider>
               <Outlet />
               <Toaster />
+              <ToastContainer
+                position="top-right"
+                autoClose={5000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="light"
+              />
             </SoftphoneProvider>
           </BrandingProvider>
         </ThemeModeProvider>

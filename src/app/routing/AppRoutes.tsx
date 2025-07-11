@@ -20,6 +20,7 @@ import AutomationDemoPage from '../pages/test/AutomationDemoPage'
 import TrackingPage from '../pages/tracking/TrackingPage'
 import CustomerPortalPage from '../pages/customer-portal/CustomerPortalPage'
 import  SignalWireSyncTestPage from '../pages/test/SignalWireSyncTestPage'
+import SignalWireDebugPage from '../pages/test/SignalWireDebugPage'
 import DatabaseTestPage from '../pages/test/DatabaseTestPage'
 import TrackingMigrationPage from '../pages/test/TrackingMigrationPage'
 import SimpleTrackingTest from '../pages/test/SimpleTrackingTest'
@@ -36,6 +37,8 @@ import {SimplePasswordResetTest} from '../pages/test/SimplePasswordResetTest'
 import {SupabaseVerifyProxy} from '../pages/auth/SupabaseVerifyProxy'
 import MobileRedirectTest from '../pages/test/MobileRedirectTest'
 import PwaStartPage from '../pages/PwaStartPage'
+import PublicBookingPage from '../pages/bookings/PublicBookingPageV3'
+import TestAvailabilityPage from '../pages/bookings/TestAvailabilityPage'
 
 
 /**
@@ -108,6 +111,10 @@ const AppRoutes: FC = () => {
         <Route path='customer/:customerId/track/:trackingToken' element={<CustomerPortalPage />} />
         <Route path='portal/:token' element={<CustomerPortalPage />} />
         
+        {/* Public booking routes */}
+        <Route path='book/:slug' element={<PublicBookingPage />} />
+        <Route path='test-availability/:slug' element={<TestAvailabilityPage />} />
+        
         {/* Marketing routes - always accessible */}
         <Route path='/' element={
           new URLSearchParams(window.location.search).get('source') === 'pwa' 
@@ -132,6 +139,7 @@ const AppRoutes: FC = () => {
         <Route path='test-video' element={<VideoTestPage />} />
         <Route path='test-signalwire' element={<SignalWireTestPage />} />
         <Route path='test-signalwire-sync' element={<SignalWireSyncTestPage />} />
+        <Route path='test-signalwire-debug' element={<SignalWireDebugPage />} />
         <Route path='test-database' element={<DatabaseTestPage />} />
         <Route path='test-tracking-migration' element={<TrackingMigrationPage />} />
         <Route path='test-tracking-simple' element={<SimpleTrackingTest />} />

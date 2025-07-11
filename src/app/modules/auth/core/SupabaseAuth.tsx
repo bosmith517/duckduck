@@ -241,8 +241,19 @@ const SupabaseAuthProvider: FC<WithChildren> = ({children}) => {
       })
 
       if (authError) {
-        console.error('Auth signup error')
+        console.error('Auth signup error', authError)
         setAuthLoading(false)
+        
+        // Handle rate limiting specifically
+        if (authError.message?.includes('429') || authError.message?.toLowerCase().includes('rate limit')) {
+          return { 
+            error: { 
+              ...authError, 
+              message: 'Too many signup attempts. Please wait a few minutes and try again.' 
+            } 
+          }
+        }
+        
         return { error: authError }
       }
 

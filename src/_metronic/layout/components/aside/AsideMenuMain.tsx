@@ -79,6 +79,7 @@ export function AsideMenuMain() {
       
       <AsideMenuItemWithSub to='/schedule' title='Scheduling & Dispatch' icon='calendar-8' fontIcon='bi-calendar3'>
         <AsideMenuItem to='/schedule' title='Schedule Overview' hasBullet={true} />
+        <AsideMenuItem to='/bookings' title='Online Booking' hasBullet={true} />
         <AsideMenuItem to='/mobile/tracking' title='Mobile Tracking' hasBullet={true} />
         <AsideMenuItem to='/tracking/overview' title='Fleet Tracking' hasBullet={true} />
         <AsideMenuItem to='/tracking/routes' title='Route Optimization' hasBullet={true} />

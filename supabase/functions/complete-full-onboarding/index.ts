@@ -56,7 +56,7 @@ serve(async (req) => {
 
     console.log('Processing onboarding completion for tenant:', tenantId)
 
-    // Step 1: Complete SignalWire onboarding (subproject, API token, SIP endpoint, phone number)
+    // Step 1: Phone number setup (if requested)
     let signalwireOnboardingSuccess = false
     try {
       console.log('Starting complete SignalWire onboarding...')
@@ -73,13 +73,13 @@ serve(async (req) => {
         throw new Error(signalwireResult.error.message)
       }
 
-      console.log('✅ Complete SignalWire onboarding successful:', signalwireResult.data)
+      console.log('✅ Phone number purchase successful:', signalwireResult.data)
       signalwireOnboardingSuccess = true
       
     } catch (error) {
-      console.error('Complete SignalWire onboarding failed:', error)
-      // Log for admin follow-up but don't block main onboarding
-      await logSubprojectFailure(supabaseAdmin, tenantId, onboardingData.businessName, error.message)
+      console.error('Phone number purchase failed:', error)
+      // Don't block main onboarding for phone number issues
+      console.log('Phone number can be purchased later in Settings')
     }
 
     // Step 2: Update tenant information (subscription/service level info)
@@ -240,7 +240,7 @@ serve(async (req) => {
 
     // Add next steps for incomplete operations
     if (!signalwireOnboardingSuccess) {
-      responseData.next_steps.push('SignalWire onboarding (subproject, SIP endpoint, phone number) needs manual setup')
+      responseData.next_steps.push('Phone number purchase can be completed in Settings')
     }
     if (!phoneProvisioningSuccess && onboardingData.selectedPhoneNumber) {
       responseData.next_steps.push('Phone number provisioning needs retry')
@@ -509,81 +509,4 @@ async function createTeamMembers(supabase: any, tenantId: string, teamMembers: a
   }
 }
 
-// Async function to create subproject without blocking onboarding
-async function createSubprojectAsync(supabase: any, tenantId: string, companyName: string) {
-  try {
-    console.log('Starting background subproject creation for tenant:', tenantId)
-    
-    const subprojectResponse = await supabase.functions.invoke('create-signalwire-subproject', {
-      body: {
-        tenantId,
-        companyName
-      }
-    })
-
-    if (subprojectResponse.error) {
-      throw new Error(subprojectResponse.error.message)
-    }
-    
-    console.log('Background subproject creation completed successfully:', subprojectResponse.data?.subproject?.id)
-    
-    // Mark subproject as successfully created
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-    
-    await supabaseAdmin
-      .from('tenants')
-      .update({ 
-        subproject_status: 'created',
-        subproject_created_at: new Date().toISOString()
-      })
-      .eq('id', tenantId)
-      
-  } catch (error) {
-    console.error('Error in createSubprojectAsync:', error)
-    throw error
-  }
-}
-
-// Function to log subproject creation failures for admin follow-up
-async function logSubprojectFailure(supabase: any, tenantId: string, companyName: string, errorMessage: string) {
-  try {
-    console.log('Logging subproject failure for admin follow-up')
-    
-    // Create admin notification record
-    await supabase
-      .from('admin_notifications')
-      .insert({
-        type: 'subproject_creation_failed',
-        tenant_id: tenantId,
-        title: `SignalWire Subproject Creation Failed - ${companyName}`,
-        message: `Failed to create subproject for tenant ${tenantId} (${companyName}). Error: ${errorMessage}`,
-        priority: 'high',
-        status: 'pending',
-        metadata: {
-          tenant_id: tenantId,
-          company_name: companyName,
-          error_message: errorMessage,
-          created_at: new Date().toISOString()
-        },
-        created_at: new Date().toISOString()
-      })
-    
-    // Update tenant status to indicate subproject needs manual creation
-    await supabase
-      .from('tenants')
-      .update({ 
-        subproject_status: 'failed',
-        subproject_error: errorMessage,
-        subproject_retry_needed: true
-      })
-      .eq('id', tenantId)
-      
-    console.log('Admin notification created for subproject failure')
-  } catch (error) {
-    console.error('Error logging subproject failure:', error)
-    // Even if notification logging fails, we don't want to break anything
-  }
-}
+// Removed subproject functions - no longer needed

@@ -1,5 +1,5 @@
 // supabase/functions/search-available-numbers/index.ts
-// SECURE VERSION: Requires authentication and validates tenant
+// Simplified version - uses only main SignalWire project credentials
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -56,7 +56,7 @@ serve(async (req) => {
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
-      .select('id, name, is_active, signalwire_subproject_id, signalwire_subproject_token, signalwire_subproject_space')
+      .select('id, company_name, is_active')
       .eq('id', userProfile.tenant_id)
       .eq('is_active', true)
       .single()
@@ -65,24 +65,17 @@ serve(async (req) => {
       throw new Error('Invalid or inactive tenant')
     }
 
-    // Step 4: Get SignalWire credentials - prefer tenant's subproject
-    let signalwireProjectId: string
-    let signalwireApiToken: string
-    let signalwireSpaceUrl: string
+    // Step 4: Get main SignalWire credentials from environment
+    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
+    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
+    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
 
-    if (tenant.signalwire_subproject_id && tenant.signalwire_subproject_token) {
-      // Use tenant's subproject credentials
-      signalwireProjectId = tenant.signalwire_subproject_id
-      signalwireApiToken = tenant.signalwire_subproject_token
-      signalwireSpaceUrl = tenant.signalwire_subproject_space || Deno.env.get('SIGNALWIRE_SPACE_URL')!
-      console.log('Searching numbers in tenant subproject:', signalwireProjectId)
-    } else {
-      // Fall back to main project credentials
-      signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
-      signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
-      signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
-      console.log('Searching numbers in main project (no subproject found)')
-    }
+    console.log('Using main SignalWire project for search:', {
+      tenant: tenant.company_name,
+      projectId: signalwireProjectId?.substring(0, 8) + '...',
+      hasToken: !!signalwireApiToken,
+      hasSpaceUrl: !!signalwireSpaceUrl
+    })
 
     if (!signalwireProjectId || !signalwireApiToken || !signalwireSpaceUrl) {
       throw new Error('Server configuration error: Missing SignalWire credentials.')
@@ -104,7 +97,7 @@ serve(async (req) => {
     // Support both areaCode (from frontend) and areacode for backwards compatibility
     const searchAreaCode = areaCode || areacode
 
-    // Step 3: Construct the SignalWire API URL with search parameters
+    // Step 6: Construct the SignalWire API URL with search parameters
     const searchParams = new URLSearchParams()
     if (searchAreaCode) searchParams.append('areacode', searchAreaCode)
     if (starts_with) searchParams.append('starts_with', starts_with)
@@ -115,10 +108,14 @@ serve(async (req) => {
     if (city) searchParams.append('city', city)
     searchParams.append('number_type', number_type)
 
-    // ** UPDATED TO USE NEW RELAY REST API **
     const apiUrl = `https://${signalwireSpaceUrl}/api/relay/rest/phone_numbers/search?${searchParams.toString()}`
+    
+    console.log('SignalWire API Request:', {
+      url: apiUrl,
+      searchParams: Object.fromEntries(searchParams.entries())
+    })
 
-    // Step 6: Make authenticated request to SignalWire
+    // Step 7: Make authenticated request to SignalWire
     const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`);
 
     const signalwireResponse = await fetch(apiUrl, {
@@ -129,21 +126,31 @@ serve(async (req) => {
       }
     })
 
+    console.log('SignalWire API Response:', {
+      status: signalwireResponse.status,
+      statusText: signalwireResponse.statusText
+    })
+
     if (!signalwireResponse.ok) {
       const errorBody = await signalwireResponse.text()
+      console.error('SignalWire API Error Details:', {
+        status: signalwireResponse.status,
+        errorBody: errorBody,
+        apiUrl: apiUrl
+      })
       throw new Error(`SignalWire API error: ${signalwireResponse.status} ${errorBody}`)
     }
     
-    // Step 7: Parse the response and return filtered results
+    // Step 8: Parse the response and return filtered results
     const data = await signalwireResponse.json()
     const availableNumbers = data.available_phone_numbers || data.data || []
 
-    console.log(`Found ${availableNumbers.length} available numbers for tenant ${tenant.name}`)
+    console.log(`Found ${availableNumbers.length} available numbers for tenant ${tenant.company_name}`)
 
     return new Response(JSON.stringify({
       success: true,
       tenant_id: userProfile.tenant_id,
-      tenant_name: tenant.name,
+      tenant_name: tenant.company_name,
       available_numbers: availableNumbers,
       search_criteria: {
         areacode: searchAreaCode,

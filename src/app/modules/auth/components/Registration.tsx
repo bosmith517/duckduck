@@ -52,11 +52,22 @@ const registrationSchema = Yup.object().shape({
 
 export function Registration() {
   const [loading, setLoading] = useState(false)
+  const [lastSubmitTime, setLastSubmitTime] = useState(0)
   const {signUp} = useSupabaseAuth()
   const formik = useFormik({
     initialValues,
     validationSchema: registrationSchema,
     onSubmit: async (values, {setStatus, setSubmitting}) => {
+      // Prevent rapid submissions
+      const now = Date.now()
+      const timeSinceLastSubmit = now - lastSubmitTime
+      if (timeSinceLastSubmit < 3000) { // 3 second cooldown
+        setStatus('Please wait a moment before trying again')
+        setSubmitting(false)
+        return
+      }
+      
+      setLastSubmitTime(now)
       setLoading(true)
       try {
         const {error} = await signUp(values.email, values.password, values.firstname, values.lastname, values.companyName)
@@ -67,7 +78,7 @@ export function Registration() {
         }
         // If successful, the auth state will be updated automatically
       } catch (error) {
-        console.error('Registration error occurred')
+        console.error('Registration error occurred', error)
         setStatus('An unexpected error occurred')
         setSubmitting(false)
         setLoading(false)

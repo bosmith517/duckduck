@@ -3,6 +3,7 @@ import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { showToast } from '../../utils/toast'
 
 const SignalWireDebugPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
@@ -21,10 +22,10 @@ const SignalWireDebugPage: React.FC = () => {
     try {
       setLoading(true)
       
-      // Get tenant SignalWire configuration
+      // Get tenant information
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
-        .select('id, company_name, signalwire_subproject_id, signalwire_subproject_token, signalwire_subproject_space')
+        .select('id, company_name')
         .eq('id', userProfile.tenant_id)
         .single()
 
@@ -116,6 +117,93 @@ ${data.summary.missing_from_database > 0 ?
     }
   }
 
+  const fixSIPCredentials = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('fix-sip-credentials')
+      
+      if (error) throw error
+      
+      console.log('Fix SIP Result:', data)
+      showToast.success('SIP credentials fixed!')
+      
+      const message = `
+SIP Credentials Fixed!
+
+Username: ${data.sip_username}
+Domain: ${data.sip_domain}
+Password: ${data.sip_password || data.new_password}
+
+${data.note}
+      `
+      alert(message)
+    } catch (err: any) {
+      console.error('Error fixing credentials:', err)
+      showToast.error(`Failed to fix credentials: ${err.message}`)
+    }
+  }
+
+  const testWebRTCCredentials = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-signalwire-voice-token')
+      
+      if (error) throw error
+      
+      console.log('WebRTC Credentials:', data)
+      showToast.success('Retrieved WebRTC credentials')
+      
+      const message = `
+WebRTC Credentials Retrieved!
+
+SIP Username: ${data.sip?.username}
+SIP Domain: ${data.sip?.domain}
+WebSocket Server: ${data.websocket?.server}
+Project ID: ${data.project}
+
+Check console for full details.
+      `
+      alert(message)
+    } catch (err: any) {
+      console.error('Error getting credentials:', err)
+      showToast.error(`Failed to get credentials: ${err.message}`)
+    }
+  }
+
+  const checkTenantConfig = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-tenant-signalwire')
+      
+      if (error) throw error
+      
+      console.log('Tenant SignalWire Config:', data)
+      showToast.success('Retrieved tenant configuration')
+      
+      const message = `
+Tenant SignalWire Configuration:
+
+Tenant: ${data.tenant.name}
+Has Subproject ID: ${data.tenant.has_subproject_id ? 'YES' : 'NO'}
+Has Subproject Token: ${data.tenant.has_subproject_token ? 'YES' : 'NO'}
+Subproject Status: ${data.tenant.subproject_status || 'Not set'}
+
+Credentials Used for API Calls: ${data.credentials_decision}
+Reason: ${data.debug_info.reason}
+
+SIP Configurations: ${data.sip_configurations?.length || 0}
+Phone Numbers: ${data.phone_numbers?.length || 0}
+
+Environment Config:
+- Main Project Available: ${data.environment_config.has_main_project_id && data.environment_config.has_main_api_token ? 'YES' : 'NO'}
+- Space URL: ${data.environment_config.space_url || 'NOT SET'}
+
+Check console for full details.
+      `
+      alert(message)
+    } catch (err: any) {
+      console.error('Error checking tenant config:', err)
+      showToast.error(`Failed to check config: ${err.message}`)
+    }
+  }
+
   if (loading) {
     return <div>Loading...</div>
   }
@@ -126,7 +214,7 @@ ${data.summary.missing_from_database > 0 ?
 
       <KTCard className="mb-6">
         <div className="card-header">
-          <h3 className="card-title">Tenant SignalWire Configuration</h3>
+          <h3 className="card-title">Tenant Phone Configuration</h3>
         </div>
         <KTCardBody>
           {error && (
@@ -145,29 +233,21 @@ ${data.summary.missing_from_database > 0 ?
                     <td className="font-monospace">{tenantInfo.id}</td>
                   </tr>
                   <tr>
-                    <td><strong>SignalWire Subproject ID:</strong></td>
-                    <td className="font-monospace">
-                      {tenantInfo.signalwire_subproject_id || <span className="text-danger">NOT SET</span>}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><strong>Has Subproject Token:</strong></td>
+                    <td><strong>Phone System Status:</strong></td>
                     <td>
-                      {tenantInfo.signalwire_subproject_token ? 
-                        <span className="text-success">Yes</span> : 
-                        <span className="text-danger">No</span>}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><strong>SignalWire Space:</strong></td>
-                    <td className="font-monospace">
-                      {tenantInfo.signalwire_subproject_space || <span className="text-muted">Using default</span>}
+                      <span className="text-success">Active (Using Main Project)</span>
                     </td>
                   </tr>
                 </tbody>
               </table>
 
-              <div className="mt-4 d-flex gap-3">
+              <div className="mt-4 d-flex gap-3 flex-wrap">
+                <button 
+                  className="btn btn-primary"
+                  onClick={checkTenantConfig}
+                >
+                  Check Tenant Config
+                </button>
                 <button 
                   className="btn btn-primary"
                   onClick={checkSignalWireProjects}
@@ -180,14 +260,19 @@ ${data.summary.missing_from_database > 0 ?
                 >
                   Verify Phone Numbers
                 </button>
-                {!tenantInfo.signalwire_subproject_id && (
-                  <button 
-                    className="btn btn-success"
-                    onClick={repairSignalWireConfig}
-                  >
-                    Repair SignalWire Config
-                  </button>
-                )}
+                {/* Removed repair button - no longer needed */}
+                <button 
+                  className="btn btn-danger"
+                  onClick={fixSIPCredentials}
+                >
+                  Fix SIP Credentials
+                </button>
+                <button 
+                  className="btn btn-info"
+                  onClick={testWebRTCCredentials}
+                >
+                  Test WebRTC
+                </button>
               </div>
             </div>
           )}

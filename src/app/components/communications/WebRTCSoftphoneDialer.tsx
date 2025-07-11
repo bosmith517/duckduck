@@ -184,9 +184,24 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
         const userAgentOptions = {
           authorizationUsername: sipUsername,
           authorizationPassword: sipPassword,
+          authorizationHa1: '', // Leave empty to use password
           transportOptions,
           uri,
           displayName: user.email || 'User',
+          logBuiltinEnabled: true,
+          logLevel: 'debug',
+          sessionDescriptionHandlerFactoryOptions: {
+            constraints: {
+              audio: true,
+              video: false
+            },
+            peerConnectionConfiguration: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+              ]
+            }
+          },
           delegate: {
             onConnect: () => {
               console.log('WebRTC Connected')
@@ -382,11 +397,27 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
       const target = new URI('sip', sipNumber, domain)
       
       // Options for the call
+      // Check for audio permissions first
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach(track => track.stop())
+      } catch (mediaError) {
+        console.error('Failed to get audio permissions:', mediaError)
+        showToast.error('Microphone access is required to make calls. Please grant permissions and try again.')
+        throw new Error('Microphone access denied')
+      }
+
       const inviterOptions: InviterOptions = {
         sessionDescriptionHandlerOptions: {
           constraints: {
             audio: true,
             video: false
+          },
+          peerConnectionConfiguration: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
           }
         }
       }

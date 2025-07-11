@@ -1,9 +1,8 @@
 // supabase/functions/purchase-phone-number/index.ts
-// CORRECTED VERSION: Uses the correct API Key SID for authentication.
+// Simplified version without logger dependency
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { UniversalLogger, loggedDatabaseOperation, loggedExternalApiCall } from '../_shared/universal-logger.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,8 +13,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
-
-  let logger: UniversalLogger | null = null
 
   try {
     // Step 1: Authenticate the user
@@ -54,14 +51,11 @@ serve(async (req) => {
       throw new Error('Insufficient permissions to purchase phone numbers')
     }
 
-    // Step 3: Initialize logger and validate request
+    // Step 3: Initialize admin client and validate request
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
-
-    logger = new UniversalLogger(supabaseAdmin, 'purchase-phone-number', tenantId, user.id)
-    logger.setRequestData(requestData)
     
     console.log('Purchase request data:', { phoneNumber, tenantId, from_onboarding })
     
@@ -75,43 +69,23 @@ serve(async (req) => {
     }
 
     // Step 4: Validate tenant exists and is active
-    const { data: tenant, error: tenantError } = await loggedDatabaseOperation(
-      logger,
-      'tenants',
-      'select',
-      () => supabaseAdmin
-        .from('tenants')
-        .select('id, company_name, is_active, signalwire_subproject_id, signalwire_subproject_token, signalwire_subproject_space')
-        .eq('id', tenantId)
-        .eq('is_active', true)
-        .single()
-    )
+    const { data: tenant, error: tenantError } = await supabaseAdmin
+      .from('tenants')
+      .select('id, company_name, is_active')
+      .eq('id', tenantId)
+      .eq('is_active', true)
+      .single()
 
     if (tenantError || !tenant) {
       throw new Error('Invalid or inactive tenant')
     }
 
-    // Step 5: Get SignalWire credentials - prefer tenant's subproject
-    let signalwireProjectId: string
-    let signalwireApiToken: string
-    let signalwireSpaceUrl: string
-    let usingSubproject = false
-
-    if (tenant.signalwire_subproject_id && tenant.signalwire_subproject_token) {
-      // Use tenant's subproject credentials
-      signalwireProjectId = tenant.signalwire_subproject_id
-      signalwireApiToken = tenant.signalwire_subproject_token
-      signalwireSpaceUrl = tenant.signalwire_subproject_space || Deno.env.get('SIGNALWIRE_SPACE_URL')!
-      usingSubproject = true
-      console.log('Using tenant subproject for purchase:', signalwireProjectId)
-    } else {
-      // Fall back to main project credentials
-      signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
-      signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
-      signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
-      usingSubproject = false
-      console.log('Using main project for purchase (no subproject found)')
-    }
+    // Step 5: Get SignalWire credentials - always use main project
+    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
+    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
+    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+    
+    console.log('Using main SignalWire project for purchase')
 
     console.log('SignalWire credentials check:', {
       hasProjectId: !!signalwireProjectId,
@@ -129,43 +103,46 @@ serve(async (req) => {
     const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
     const purchaseRequest = { number: phoneNumber }
 
-    const purchasedNumberData = await loggedExternalApiCall(
-      logger,
-      'SignalWire',
-      purchaseUrl,
-      purchaseRequest,
-      async () => {
-        const purchaseResponse = await fetch(purchaseUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(purchaseRequest)
-        })
+    console.log('Making SignalWire purchase request:', {
+      url: purchaseUrl,
+      number: phoneNumber
+    })
 
-        if (!purchaseResponse.ok) {
-          const errorBody = await purchaseResponse.text()
-          console.error(`SignalWire API Error - Status: ${purchaseResponse.status}`)
-          console.error(`SignalWire API Error - URL: ${purchaseUrl}`)
-          console.error(`SignalWire API Error - Body: ${errorBody}`)
-          throw new Error(`SignalWire purchase failed: ${purchaseResponse.status} - ${errorBody}`)
-        }
-        
-        const data = await purchaseResponse.json()
-        console.log('Successfully purchased number from SignalWire:', data)
-        return data
-      }
-    )
+    const purchaseResponse = await fetch(purchaseUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(purchaseRequest)
+    })
+
+    if (!purchaseResponse.ok) {
+      const errorBody = await purchaseResponse.text()
+      console.error(`SignalWire API Error - Status: ${purchaseResponse.status}`)
+      console.error(`SignalWire API Error - URL: ${purchaseUrl}`)
+      console.error(`SignalWire API Error - Body: ${errorBody}`)
+      throw new Error(`SignalWire purchase failed: ${purchaseResponse.status} - ${errorBody}`)
+    }
+    
+    const purchasedNumberData = await purchaseResponse.json()
+    console.log('Successfully purchased number from SignalWire:', purchasedNumberData)
     
     // Step 7: Save the purchased number to the correct database table
+    // Map SignalWire number types to our database constraints
+    let dbNumberType = 'local' // default
+    if (purchasedNumberData.number_type === 'toll-free' || purchasedNumberData.number_type === 'tollfree') {
+      dbNumberType = 'toll-free'
+    } else if (purchasedNumberData.number_type === 'international') {
+      dbNumberType = 'international'
+    }
+    
     const phoneData = {
       tenant_id: tenantId,
       number: purchasedNumberData.number || phoneNumber,
       signalwire_number_id: purchasedNumberData.id,
-      signalwire_project_id: signalwireProjectId, // Store which project owns this number
-      number_type: purchasedNumberData.number_type || 'longcode',
+      number_type: dbNumberType,
       is_active: true,
       sms_enabled: purchasedNumberData.capabilities?.includes('sms') || false,
       voice_enabled: purchasedNumberData.capabilities?.includes('voice') || true,
@@ -174,17 +151,11 @@ serve(async (req) => {
       created_at: new Date().toISOString()
     }
 
-    const { data: newDbRecord, error: dbError } = await loggedDatabaseOperation(
-      logger,
-      'signalwire_phone_numbers',
-      'insert',
-      () => supabaseAdmin
-        .from('signalwire_phone_numbers')
-        .insert(phoneData)
-        .select()
-        .single(),
-      phoneData
-    )
+    const { data: newDbRecord, error: dbError } = await supabaseAdmin
+      .from('signalwire_phone_numbers')
+      .insert(phoneData)
+      .select()
+      .single()
 
     if (dbError) {
       console.error('DB Insert Error after purchase:', dbError)
@@ -197,7 +168,30 @@ serve(async (req) => {
 
     console.log('Successfully saved purchased number to database:', newDbRecord)
 
-    // Step 8: Return success response
+    // Step 8: Log the purchase in function_execution_logs
+    try {
+      await supabaseAdmin
+        .from('function_execution_logs')
+        .insert({
+          function_name: 'purchase-phone-number',
+          tenant_id: tenantId,
+          user_id: user.id,
+          request_data: requestData,
+          response_data: {
+            success: true,
+            phone_number: newDbRecord,
+            signalwire_data: purchasedNumberData
+          },
+          success: true,
+          execution_time: 0, // We're not tracking time in this simplified version
+          created_at: new Date().toISOString()
+        })
+    } catch (logError) {
+      console.error('Failed to log function execution:', logError)
+      // Don't fail the request just because logging failed
+    }
+
+    // Step 9: Return success response
     const responseData = {
       success: true,
       message: `Successfully purchased ${phoneNumber} for ${tenant.company_name}`,
@@ -207,10 +201,6 @@ serve(async (req) => {
       signalwire_data: purchasedNumberData
     }
 
-    logger.setResponseData(responseData)
-    logger.setSuccess(true)
-    await logger.saveLog()
-
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -219,10 +209,23 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in purchase-phone-number function:', error.message)
     
-    if (logger) {
-      logger.setError(error)
-      logger.setSuccess(false)
-      await logger.saveLog()
+    // Try to log the error
+    try {
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      )
+      
+      await supabaseAdmin
+        .from('function_execution_logs')
+        .insert({
+          function_name: 'purchase-phone-number',
+          error_message: error.message,
+          success: false,
+          created_at: new Date().toISOString()
+        })
+    } catch (logError) {
+      console.error('Failed to log error:', logError)
     }
     
     return new Response(JSON.stringify({ 

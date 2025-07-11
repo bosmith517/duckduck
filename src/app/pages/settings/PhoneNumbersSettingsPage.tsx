@@ -78,6 +78,15 @@ const PhoneNumbersSettingsPage: React.FC = () => {
     max_results: 10
   })
 
+  // Debug state
+  useEffect(() => {
+    console.log('PhoneNumbersSettingsPage state:', {
+      showPurchaseModal,
+      selectedNumber,
+      availableNumbers: availableNumbers.length
+    })
+  }, [showPurchaseModal, selectedNumber, availableNumbers])
+
   useEffect(() => {
     loadPhoneNumbers()
     loadTeamMembers()
@@ -270,7 +279,6 @@ const PhoneNumbersSettingsPage: React.FC = () => {
       const { data: result, error } = await supabase.functions.invoke('purchase-phone-number', {
         body: {
           phoneNumber: number.number,
-          friendlyName: number.friendly_name,
           tenantId: userProfile?.tenant_id
         }
       })
@@ -682,9 +690,14 @@ const PhoneNumbersSettingsPage: React.FC = () => {
                         <td>
                           <button
                             className="btn btn-sm btn-primary"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              console.log('Purchase clicked for:', number)
                               setSelectedNumber(number)
-                              setShowPurchaseModal(true)
+                              setTimeout(() => {
+                                setShowPurchaseModal(true)
+                              }, 0)
                             }}
                           >
                             Purchase
@@ -803,9 +816,9 @@ const PhoneNumbersSettingsPage: React.FC = () => {
 
       {/* Purchase Confirmation Modal */}
       {showPurchaseModal && selectedNumber && (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={(e) => e.stopPropagation()}>
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h5 className="modal-title">Purchase Phone Number</h5>
                 <button
