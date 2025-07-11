@@ -154,10 +154,19 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           throw new Error('WebSocket server URL not provided')
         }
 
-        // Create audio element for remote audio
+        // Create audio element for remote audio with mobile support
         if (!audioRef.current) {
           audioRef.current = new Audio()
           audioRef.current.autoplay = true
+          
+          // Mobile-specific attributes
+          if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            console.log('[Mobile Debug] Setting up audio element for mobile')
+            audioRef.current.setAttribute('playsinline', 'true')
+            audioRef.current.setAttribute('webkit-playsinline', 'true')
+            audioRef.current.muted = false // Ensure not muted
+          }
+          
           document.body.appendChild(audioRef.current)
         }
 
@@ -192,15 +201,39 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           logLevel: 'debug' as any,
           sessionDescriptionHandlerFactoryOptions: {
             constraints: {
-              audio: true,
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              },
               video: false
             },
             // @ts-ignore - peerConnectionConfiguration is valid but not in types
             peerConnectionConfiguration: {
               iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
-              ]
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' },
+                // Add SignalWire STUN/TURN servers if available
+                { urls: `stun:${credentials.sip.domain}` },
+                // Public TURN servers as fallback (mobile networks often need TURN)
+                {
+                  urls: 'turn:openrelay.metered.ca:80',
+                  username: 'openrelayproject',
+                  credential: 'openrelayproject'
+                },
+                {
+                  urls: 'turn:openrelay.metered.ca:443',
+                  username: 'openrelayproject',
+                  credential: 'openrelayproject'
+                }
+              ],
+              iceCandidatePoolSize: 10,
+              bundlePolicy: 'max-bundle',
+              rtcpMuxPolicy: 'require',
+              iceTransportPolicy: 'all' // Allow both STUN and TURN
             }
           },
           delegate: {
@@ -346,27 +379,151 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
 
   // Set up session event handlers
   const setupSessionHandlers = (session: Session) => {
+    console.log('[Mobile Debug] Setting up session handlers')
+    
+    // Add error handler
+    session.delegate = {
+      onSessionDescriptionHandler: (sdh: any) => {
+        console.log('[Mobile Debug] Session Description Handler created:', sdh)
+        
+        // Handle session description handler events
+        if (sdh.peerConnection) {
+          // Log initial states
+          console.log('[Mobile Debug] Initial ICE state:', sdh.peerConnection.iceConnectionState)
+          console.log('[Mobile Debug] Initial connection state:', sdh.peerConnection.connectionState)
+          
+          // Monitor ICE gathering
+          sdh.peerConnection.onicegatheringstatechange = () => {
+            console.log('[Mobile Debug] ICE Gathering State:', sdh.peerConnection.iceGatheringState)
+          }
+          
+          // Monitor ICE candidates
+          sdh.peerConnection.onicecandidate = (event: RTCPeerConnectionIceEvent) => {
+            if (event.candidate) {
+              console.log('[Mobile Debug] ICE candidate:', event.candidate.candidate)
+            } else {
+              console.log('[Mobile Debug] ICE candidate gathering complete')
+            }
+          }
+          
+          sdh.peerConnection.oniceconnectionstatechange = () => {
+            const state = sdh.peerConnection.iceConnectionState
+            console.log('[Mobile Debug] ICE Connection State changed to:', state)
+            
+            if (state === 'failed') {
+              console.error('[Mobile Debug] ICE connection failed')
+              showToast.error('Network connection failed. Please check your internet connection.')
+              handleHangup()
+            } else if (state === 'disconnected') {
+              console.warn('[Mobile Debug] ICE connection disconnected, waiting for reconnection...')
+              // Give it some time to reconnect before hanging up
+              setTimeout(() => {
+                if (sdh.peerConnection.iceConnectionState === 'disconnected') {
+                  console.error('[Mobile Debug] ICE connection timeout')
+                  handleHangup()
+                }
+              }, 5000)
+            }
+          }
+          
+          sdh.peerConnection.onconnectionstatechange = () => {
+            console.log('[Mobile Debug] Connection State:', sdh.peerConnection.connectionState)
+          }
+          
+          // Monitor track events
+          sdh.peerConnection.ontrack = (event: RTCTrackEvent) => {
+            console.log('[Mobile Debug] Track received:', event.track.kind)
+            if (event.track.kind === 'audio' && event.streams[0]) {
+              console.log('[Mobile Debug] Audio track received, attaching to audio element')
+              if (audioRef.current) {
+                audioRef.current.srcObject = event.streams[0]
+                // Force play on mobile
+                audioRef.current.play().then(() => {
+                  console.log('[Mobile Debug] Audio playback started successfully')
+                }).catch(e => {
+                  console.error('[Mobile Debug] Failed to play audio:', e)
+                  // Try to play on user interaction
+                  const playAudio = () => {
+                    audioRef.current?.play().then(() => {
+                      console.log('[Mobile Debug] Audio playback started after user interaction')
+                      document.removeEventListener('click', playAudio)
+                    }).catch(err => {
+                      console.error('[Mobile Debug] Still failed to play audio:', err)
+                    })
+                  }
+                  document.addEventListener('click', playAudio)
+                  showToast.info('Tap anywhere to enable audio')
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+    
     session.stateChange.addListener((state: SessionState) => {
-      console.log('Session state changed:', state)
+      console.log('[Mobile Debug] Session state changed to:', state)
       
       switch (state) {
         case SessionState.Establishing:
+          console.log('[Mobile Debug] Call establishing...')
           setCallState('dialing')
           break
         case SessionState.Established:
+          console.log('[Mobile Debug] Call established')
           setCallState('active')
           showToast.success('Call connected!')
           
-          // Handle remote media
+          // Handle remote media with better mobile support
           if (session.sessionDescriptionHandler) {
             const sdh = session.sessionDescriptionHandler as any
-            const remoteStream = sdh.remoteMediaStream
+            console.log('[Mobile Debug] Session description handler:', sdh)
+            
+            // Try multiple ways to get the remote stream
+            const remoteStream = sdh.remoteMediaStream || 
+                                (sdh.peerConnection?.getRemoteStreams && sdh.peerConnection.getRemoteStreams()[0]) ||
+                                null
+                                
+            console.log('[Mobile Debug] Remote stream:', remoteStream)
+            
             if (remoteStream && audioRef.current) {
+              console.log('[Mobile Debug] Setting up audio element with remote stream')
               audioRef.current.srcObject = remoteStream
+              audioRef.current.volume = 1.0
+              
+              // Mobile-specific audio setup
+              if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                console.log('[Mobile Debug] Mobile device detected, applying mobile-specific settings')
+                audioRef.current.setAttribute('playsinline', 'true')
+                audioRef.current.setAttribute('webkit-playsinline', 'true')
+              }
+              
+              audioRef.current.play().then(() => {
+                console.log('[Mobile Debug] Audio playback started')
+              }).catch(e => {
+                console.error('[Mobile Debug] Failed to play audio:', e)
+                // On mobile, we might need user interaction
+                showToast.info('Tap to enable audio')
+                
+                // Try to play on next user interaction
+                const playOnInteraction = () => {
+                  audioRef.current?.play().then(() => {
+                    console.log('[Mobile Debug] Audio started after interaction')
+                    document.removeEventListener('click', playOnInteraction)
+                  })
+                }
+                document.addEventListener('click', playOnInteraction)
+              })
+            } else {
+              console.error('[Mobile Debug] No remote stream available')
             }
           }
           break
+        case SessionState.Terminating:
+          console.log('[Mobile Debug] Call terminating...')
+          break
         case SessionState.Terminated:
+          console.log('[Mobile Debug] Call terminated')
           setCallState('idle')
           setCallInfo({ name: '-', number: '-' })
           currentSessionRef.current = null
@@ -374,6 +531,13 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           break
       }
     })
+    
+    // Add session error handlers
+    if ('sessionDescriptionHandlerException' in session) {
+      (session as any).on('sessionDescriptionHandlerException', (error: any) => {
+        console.error('[Mobile Debug] Session description handler exception:', error)
+      })
+    }
   }
 
   // Initiate outbound call
@@ -411,8 +575,39 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
       const inviterOptions: InviterOptions = {
         sessionDescriptionHandlerOptions: {
           constraints: {
-            audio: true,
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            },
             video: false
+          },
+          // @ts-ignore
+          peerConnectionConfiguration: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' },
+              { urls: 'stun:stun3.l.google.com:19302' },
+              { urls: 'stun:stun4.l.google.com:19302' },
+              // Add SignalWire STUN server
+              { urls: `stun:${userAgentRef.current.configuration.uri.host}` },
+              // Public TURN servers as fallback (mobile networks often need TURN)
+              {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              },
+              {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              }
+            ],
+            iceCandidatePoolSize: 10,
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require',
+            iceTransportPolicy: 'all' // Allow both STUN and TURN
           }
         } as any
       }
