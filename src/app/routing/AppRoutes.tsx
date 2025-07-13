@@ -19,6 +19,9 @@ import SignalWireTestPage from '../pages/test/SignalWireTestPage'
 import AutomationDemoPage from '../pages/test/AutomationDemoPage'
 import TrackingPage from '../pages/tracking/TrackingPage'
 import CustomerPortalPage from '../pages/customer-portal/CustomerPortalPage'
+import VideoEstimatePage from '../pages/customer-portal/VideoEstimatePage'
+import VideoEstimateMockPage from '../pages/customer-portal/VideoEstimateMockPage'
+import VideoEstimateTestPage from '../pages/test/VideoEstimateTestPage'
 import  SignalWireSyncTestPage from '../pages/test/SignalWireSyncTestPage'
 import SignalWireDebugPage from '../pages/test/SignalWireDebugPage'
 import DatabaseTestPage from '../pages/test/DatabaseTestPage'
@@ -110,6 +113,8 @@ const AppRoutes: FC = () => {
         <Route path='customer/:customerId' element={<CustomerPortalPage />} />
         <Route path='customer/:customerId/track/:trackingToken' element={<CustomerPortalPage />} />
         <Route path='portal/:token' element={<CustomerPortalPage />} />
+        <Route path='customer-portal/video-estimate' element={<VideoEstimatePage />} />
+        <Route path='customer-portal/video-estimate-mock' element={<VideoEstimateMockPage />} />
         
         {/* Public booking routes */}
         <Route path='book/:slug' element={<PublicBookingPage />} />
@@ -138,6 +143,7 @@ const AppRoutes: FC = () => {
         <Route path='test-ui' element={<UITestPage />} />
         <Route path='test-video' element={<VideoTestPage />} />
         <Route path='test-signalwire' element={<SignalWireTestPage />} />
+        <Route path='test/video-estimate' element={<VideoEstimateTestPage />} />
         <Route path='test-signalwire-sync' element={<SignalWireSyncTestPage />} />
         <Route path='test-signalwire-debug' element={<SignalWireDebugPage />} />
         <Route path='test-database' element={<DatabaseTestPage />} />

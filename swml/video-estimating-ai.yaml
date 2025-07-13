@@ -1,0 +1,196 @@
+version: "1.0.0"
+sections:
+  main:
+    - ai:
+        prompt:
+          text: |
+            You are a professional trade estimator assistant helping to create accurate estimates through video inspection.
+            
+            Your role is to:
+            1. Guide the customer to show specific areas based on the trade type
+            2. Ask clarifying questions about issues you observe
+            3. Request close-up views when detecting potential problems
+            4. Mention when lighting or camera angle needs adjustment
+            5. Keep track of all detected issues for the estimate
+            
+            Be professional but friendly. Guide the customer step-by-step through the inspection process.
+            Start by greeting them and asking what type of service they need an estimate for.
+        
+        params:
+          temperature: 0.3
+          top_p: 0.7
+          max_tokens: 150
+        
+        languages:
+          - code: en-US
+            name: English
+            voice: rachel
+            speech_model: elevenlabs
+        
+        global_data:
+          session_type: video_estimating
+          platform: tradeworks_pro
+        
+        hints:
+          - word: HVAC
+            pronounce: H-vack
+          - word: PVC
+            pronounce: P-V-C
+          - word: GFCI
+            pronounce: G-F-C-I
+          - word: BTU
+            pronounce: B-T-U
+        
+        post_prompt_url: "%{env.SUPABASE_URL}/functions/v1/handle-ai-conversation"
+        
+        SWAIG:
+          functions:
+            - function: capture_critical_frame
+              purpose: Capture a frame when critical damage or important details are visible
+              argument:
+                type: object
+                properties:
+                  issue_type:
+                    type: string
+                    description: Type of issue detected
+                  severity:
+                    type: string
+                    enum: [minor, moderate, major, critical]
+                    description: Severity level
+                  location:
+                    type: string
+                    description: Location of the issue
+                  notes:
+                    type: string
+                    description: Additional notes
+                required: [issue_type, severity]
+              data_map:
+                expressions:
+                  - string: "%{args.issue_type}"
+                    pattern: "(.+)"
+                    output:
+                      response: "I've captured that %{args.severity} %{args.issue_type}. %{args.notes}"
+                      action:
+                        - SWAIG:
+                            function: webhook
+                            parameters:
+                              url: "%{env.SUPABASE_URL}/functions/v1/capture-critical-frame"
+                              method: POST
+                              headers:
+                                Authorization: "Bearer %{env.SUPABASE_ANON_KEY}"
+                              body:
+                                issue_type: "%{args.issue_type}"
+                                severity: "%{args.severity}"
+                                location: "%{args.location}"
+                                notes: "%{args.notes}"
+            
+            - function: request_closer_look
+              purpose: Ask customer to show a closer view of something
+              argument:
+                type: object
+                properties:
+                  area:
+                    type: string
+                    description: What to show closer
+                  reason:
+                    type: string
+                    description: Why we need a closer look
+                required: [area]
+              data_map:
+                expressions:
+                  - string: "%{args.area}"
+                    pattern: "(.+)"
+                    output:
+                      response: "Could you please show me a closer view of the %{args.area}? %{args.reason}"
+            
+            - function: guide_to_area
+              purpose: Guide customer to show a different area
+              argument:
+                type: object
+                properties:
+                  area:
+                    type: string
+                    description: Where to go next
+                  instructions:
+                    type: string
+                    description: How to get there or what to show
+                required: [area]
+              data_map:
+                expressions:
+                  - string: "%{args.area}"
+                    pattern: "(.+)"
+                    output:
+                      response: "Now let's take a look at the %{args.area}. %{args.instructions}"
+            
+            - function: add_estimate_item
+              purpose: Add a line item to the estimate
+              argument:
+                type: object
+                properties:
+                  description:
+                    type: string
+                    description: Work description
+                  category:
+                    type: string
+                    description: Category of work
+                  priority:
+                    type: string
+                    enum: [low, medium, high, urgent]
+                    description: Priority level
+                required: [description, category]
+              data_map:
+                expressions:
+                  - string: "%{args.description}"
+                    pattern: "(.+)"
+                    output:
+                      response: "I've added '%{args.description}' to your estimate as a %{args.priority} priority item."
+                      action:
+                        - SWAIG:
+                            function: webhook
+                            parameters:
+                              url: "%{env.SUPABASE_URL}/functions/v1/add-estimate-item"
+                              method: POST
+                              headers:
+                                Authorization: "Bearer %{env.SUPABASE_ANON_KEY}"
+                              body:
+                                description: "%{args.description}"
+                                category: "%{args.category}"
+                                priority: "%{args.priority}"
+            
+            - function: complete_inspection
+              purpose: Complete the inspection and generate estimate
+              argument:
+                type: object
+                properties:
+                  summary:
+                    type: string
+                    description: Summary of findings
+                  total_items:
+                    type: number
+                    description: Number of items found
+                required: [summary]
+              data_map:
+                expressions:
+                  - string: "%{args.summary}"
+                    pattern: "(.+)"
+                    output:
+                      response: "I've completed the inspection. %{args.summary}. I'll now generate your detailed estimate."
+                      action:
+                        - SWAIG:
+                            function: webhook
+                            parameters:
+                              url: "%{env.SUPABASE_URL}/functions/v1/finalize-video-estimate"
+                              method: POST
+                              headers:
+                                Authorization: "Bearer %{env.SUPABASE_ANON_KEY}"
+                              body:
+                                summary: "%{args.summary}"
+                                total_items: "%{args.total_items}"
+                        - hangup: {}
+          
+          defaults:
+            webhook:
+              url: "%{env.SUPABASE_URL}/functions/v1/swaig-default-handler"
+              method: POST
+              headers:
+                Authorization: "Bearer %{env.SUPABASE_ANON_KEY}"

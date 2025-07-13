@@ -1,0 +1,177 @@
+All the tools that we just looked at are great for accessing and exploring APIs. However, when it comes time, you're most likely gonna wanna write some code. Now, as we saw in Postman, you can actually generate code. All programming languages have some sort of way of making HTTP requests. And as you know, HTTP requests are all we really need to interact with REST APIs. So writing
+
+that sort of code is totally fine, but you'll find that you'll end up writing a lot of what is known as boilerplate code. By boilerplate, I mean code that is repetitive and almost always the same, just with a few tweaks. Many products and services have created a solution to help you avoid this problem. They're often called helper libraries or SDKs, software development kits. They'll be specific to your programming language. These libraries help make your code more concise and legible. They usually also provide additional documentation for your editor, which I find super handy. Let's go check out
+
+some of these helper libraries. Okay, so let's take a look at 1 of these helper libraries. Let's take a look at the first 1 that's here. So again, I'm in the docs, SMS, create a message resource. I'm here under the curl tab currently. Remember we did this. We went and we saw how to do this. We passed the from, the body, and the to. We passed in these environment variables as this dollar is and this dollar or twilio auth token, they're environment variables and it's also used here in the URL. So we had done that.
+
+We had done that with curl. Now, 1
+
+of the really nice things about these helper libraries is they look very similar, but it's taken away this whole notion. So let's let's go here. I'm going to go to this node.js. Now, quick word of warning. If JavaScript is new to you, there is some stuff here that might be a little confusing and I want this to just kind of kind of wash over you. I want you to more feel what it feels like as I explain it and don't be too concerned with not exactly understanding all of the things that can happen. Especially if you're
+
+1 of the folks who has the hello world requirement. Please don't feel like you need to fully understand all this. I will walk through this code line by line and tell you what it's doing and it will be familiar to what we've been doing just in a programming language that you might not yet be familiar with. So I'll take my time and you take your time. Give yourself some patience. In fact, I'd like to suggest that if you are in the boat where you have not written code like this before, that you watch me first and
+
+then come back and do it later. We're going to take advantage of the fact that we're in a video, right? You can take me right back to right, right here.
+
+It took me back to right here and we can get started. So 1 of the things that
+
+I love about Twilio's documentation is that you can just copy it and it should work. So this is what was happening when we created something here, right? So we created a message. So this is, You get this authenticated client, right? We know what that is. We authenticate with our client, with our account SID and our auth token, like we've been doing. And then we're going to do this messages, a client, so client.messages, there's our rest
+
+client.messages.create, and we're
+
+going to pass in the from the body and the 2, and it's got all the information that we know. And then there's doing some of this JavaScript stuff. So then we're going to get a promise back, and then we're going to get access to the message, and this console log is going to
+
+print out to the screen.
+
+I don't think we should send a message. Why don't we look at the messages that we've done? Let's let's do that. So I'm going to go to that example. So I'm going to choose I don't hear this list all messages. Awesome. So we'll take a look at all of the messages that are in the account. Now what I can do is I can just copy this. So I'm going to copy this, and I'm going to run it on my local machine. Now, I'm just exploring, and this probably happens as you're looking at APIs. So typically, I
+
+have a folder on my computer called Scratch, and if you want to make 1, you do make dir scratch. Just kind of put this wherever you want to and then you get into that directory. If you're doing this in your terminal on Windows there are some instructions in the notes on how to do exactly that. So now I've got this directory named scratch. Now I told you before I was using Visual Studio Code which I hope that you have installed. And so I'm going to do code dot. And if this doesn't work for you, there are
+
+instructions on how to get this installed properly on your machine. What it should do is pop open my Visual Studio code directly
+
+in that directory. So I'm in
+
+this directory here and I'm going to make a new file here. I'm going to call it explore.js because this is typically what I do.
+
+So I'm going to come in here and I am going to paste that code. Awesome.
+
+So now I have this code here and the code is on my local machine, which is awesome. So now I'm going to try to make this code run. Now, 1 thing that I know for sure that I need to do is I need to download the helper library. So if I wanted to go here, I could go to this node install. I happen to know how to do that. So I'm going to go up here under terminal,
+
+and I'm going
+
+to do new terminal. In Visual Studio Code, this is really nice. My terminal can actually run the same terminal that I used to open it is running down here in the bottom. What I'm going to do is I'm going to use a package manager to install the Twilio helper library. I'm going to say npm install Twilio. Npm is node package manager. If you do not have this, if this does not work, check the notes because it means that Node is probably not installed on your computer. If Node is not installed on your computer, there's a great
+
+walkthrough in the notes on how to get Node installed. I now have Twilio helper library installed, which means this require Twilio statement here is requiring that library. Remember in RestFox how there was an environment and we stored the account SID and the auth token, we can do the same thing on our local machine. We can set up a little environment here. And actually, if we go ahead and we click this, Clio secure, there's some great examples in here and how you could do that. So 1 of the things that this is just doing, you can see
+
+it's for Mac and Linux and different different shells have do different things. If you run this in your command line, you can set your environment variables. And then when you run node, it will work. I'm going to do I'm going to do this 1.
+
+So I'm going to copy, copy this here. And
+
+I am going to just paste this will paste this I'll show you show you what it does. So I it's saying we want to export my account, Sid and my auth token, which is we're very familiar with these days. So we're gonna
+
+we're gonna do that. Let's Let's do this real quick. So I'm gonna pop in my account token there.
+
+I'm gonna go back over to my console, scroll down and grab my account here. And then I'm gonna paste that. And I am gonna go and grab my auth token and I am going
+
+to base that so again I got to that oops
+
+accidentally pasted my auth token in the wrong line there.
+
+So I know that it started with a 4, and I'm
+
+going to paste it down here. It says your auth token. So basically what this is doing is this is writing a new file that will have this information. I'll show you that here in a second. So there's my, it's going to write these 2 lines. I'll show you I'll show you what that looks like. So I'm gonna it's gonna create a new file called Twilio m and it's gonna append that that's what this double dash dash Twilio and then I was gonna source that which means put run that environment variable so if all is working well
+
+now if I say echo and I can do Twilio account SID, we can see that I have that available and that created this file here called Twilio-env And you can see there is my account. Sit at my token, which is nice because now this code works. It should be working and using this. And in fact, if all is going right, so I've I've got node installed. I installed the helper library. I put my account said. From the console into this Twilio and then I did this final command here, the source Twilio in which will run that
+
+file and put those variables into my environment variables. And as I showed you that they were working. So let's go ahead and let's do node explorer. So what's going to happen? Let's take a look really quick. I'll show you. Let's see if let's make sure we got it working. Cool. We did. So let's walk the code really quick. So this is pasted straight from those docs. So we're getting a client back from this require Twilio. This is a Twilio library. And when you get the Twilio library, if you pass it in account, said in an auth
+
+token, it'll automatically create a brand new rest client for you. Right? So this is a client that you're able to use to hit the rest API at Twilio. And because it knows who you are, it's able to access stuff on your behalf. So very similar to what we were doing with the curl, but this client, we can use this multiple times. It will always be authenticated. So we're saying of all of the messages, we want to list them. All right, so we want to get a list of all of the messages. Actually not all of them,
+
+only 20 of those. So let's go ahead. I'm going to just we know that we haven't sent 20. I'm going to get rid of this so you can kind of just see this other style here.
+
+So we're going to say of those we're going to do this list and then I'm going to bring this back a little bit here so you can see. Let's change the structure of this a little bit. We'll say client messages, and then
+
+we're going to do a list on those. Now, the way that this works is this is asynchronous. JavaScript is asynchronous, And if JavaScript is new to you, you probably haven't encountered its asynchronous behavior. What we're going to go over here might very well be overwhelming, but it'll make sense someday if you stick with it. I promise. Now I've added notes, but really, please, please, please, please do not let this stress you out. I just want this to go over your mind about what's happening here. And It's important to understand because our client here, these list methods
+
+are asynchronous, which means that it's going to go and run off and do some things, and then it's going to come back. When it comes back, it's going to run this code. So this is how a promise works. So it's going to say then after you go and make that request, then give me the messages. And just so you what's kind of strange about that is if you're probably used to code working like this. So I'm going to write out to the screen. That's this console log. I'm gonna say starting program and we should see that
+
+line print. Now you might think that this is going to print. It's gonna run this and then go, but I'll show you here. If I do this console log and I say, gathering message log, what you'll see is it's going to say this, this line is going to start, but immediately it's going to go to the next line. So let's do that. Let's run that 1 more time. I didn't save it. So of course it won't do anything. So you can see this little dot here in Visual Studio. It didn't save. So I'm going to save
+
+that. Run that 1 more time. Here we go. You'll see right away it's a starting program gathering message log. So It ran this, but then it went down to here. It did not wait because this is asynchronous. What's happening here is asynchronous. What's happening is client message list returns a promise. Now, it's a promise that in
+
+The future there will be a value and that value is messages. And so the way that you write that code is this then waits, it defines a function here and as soon as this is done it will run this function. As soon as they come back it will run the function. So that's what happened right?
+
+So it came, it started, it then ran the function.
+
+And when I say function, you might not have seen this before, but in JavaScript, you can make a function. I'm gonna put parentheses here so it's a little bit more clear. These are the parameters for the function. And this fat arrow is saying this is what happens when the function runs this like little, they call it the fat arrow. It's kind of cute, right? So it's an equal sign and then a greater than it's a, it's called a fat arrow. And that's a way of quickly defining a function. And so you can see here, There's another
+
+1 here that's doing it as well. So it can be a little bit messy as you're looking at it. See all these parens that we're looking at. It's kind of hard to understand and read. If this is your first time looking at that, I totally feel for you. So this messages that comes through here is an array. So what was very nice is it came across this messages list. This is an array. It was a JavaScript array by itself. They have this method called for each on it, and it will let you loop through each of
+
+the values that are in an array. You'll notice that the object that was inside of that array has some properties. So what happened was the client went and made the request, made the HTTP request, it got back that JSON that we saw. Let me just go show you 1 more time. Let's make sure that we're looking at the right thing here. This is the same code that we just saw. This JSON was returned, this JSON is returned, but what the client did for us, was it inflated these into messages. This is a string of things and
+
+it came back JSON, but I'm able to actually work with each of these messages as if they're an object. So let's look at that again. So list returned this object, this array of messages, and each 1 of those in that array, I'm able to use an array method for each. And this message is an actual object that has a property called sid. So again, if that is all new JavaScript terms to you, don't worry too much about it. Basically, we went and got the messages, and we showed the messages that we got. That's what this is
+
+saying. 1 of the things that I want you to be careful of as you're looking at promises, and you might see this sometimes as you work with API's because oftentimes API's that you hit are going to be asynchronous like this. You might see that you need to be able to, you might run into an error and what's going to, what might happen is it might get swallowed. In fact, let me cause 1 to happen. So here it's supposed to say off token. I'm just going to put in, my luggage, the password to my luggage. 123456. So
+
+that is not my account said, that is going in there. So I had the wrong account said, so I'm going to say that, Hey, this is the client. This is what, how I want you to authenticate. And it's going to go to try to make this and it's gonna fail let's see what happens when it fails well I didn't save it so let's save it again boy that's a lesson that I really didn't know. You got to make sure you save your file or the code doesn't run. So let's do
+
+it again. You'll notice that
+
+I didn't get any error at all. That can be confusing. That is something that is very strange because obviously something wrong happened. I didn't get any of the messages back. But it doesn't look like I had any problems. So what's happening, because this is running asynchronously, this then never runs, right? We never get a chance to run this because this list method didn't actually finish working. So 1 of the things you always want to make sure that you do is to every promise you can catch and you can catch an error. And I'm going to make
+
+a fat arrow because I'm going to have a function happen here that says console dot error ERR. Okay. So now I'm going to print that out. I'm going to print out the error. Let's run that again. Let's see what happens. Ah, now we see the error. And you'll see that sometimes this is what comes back as there was an authentication error, right? And we got a very specific error on this 2003 and it
+
+will help us kind of look at what's happening.
+
+Oh, here, great, this is right. My auth token is wrong. The wrong combination of accounts that an off token. Exactly. That is what has happened. So cool use of things there. I'm going to put this back so that we have things working. So this was off the token. I can still leave my error in there. I'm not going to hit an error, so it's not going to happen. So a promise has a then and also has a catch, right? So let's do that. So I'm going to run that 1 more time and save it. Wow. Y'all,
+
+I got to get better at saving. Here we go. So now we're back to
+
+working again. Awesome. All right, I'm gonna show
+
+you a little bit of a different way that JavaScript can work asynchronously that you might also see. And this is really syntactical sugar. It's called async await. And if you just wait a bit, it will all sink in. I promise that's a there's 3 jokes in that 1. I was a that was a hat trick of a joke. All right, so here we go. So the way that it works, the way that this works is you can say that if a function is going to be asynchronous, and we want this to run asynchronously. I was thinking,
+
+we're getting ready to start using our number in an application and to get there we need to clean it up. We have a bunch of weird messages in there that aren't going to be relevant to the messages that we have So I'm going to make a a new function and I'm going to call it delete all messages Okay, when you define a function you can kind of put the this is the parameters that it takes We're going to say that there are no parameters and then I'm going to run this function. So while this is an
+
+asynchronous function, I can actually make it look more like it is inline. So it can run the way that we want it to.
+
+So I'm going to say const messages equals
+
+await. Now I have, because the function itself is asynchronous, because I've used this here, I can use this keyword, await, and I'm
+
+going to say client.messages.list. Now, I think this is a little bit more clear. So
+
+this is basically doing the same thing. These messages are the same
+
+messages that were coming into this function, but now it's out on
+
+this side. So I have this variable that's called messages. So, and that's an array, right? And I could do this exact same thing here and I could list that the same way. But let's go a little bit farther. So I'm going to say for each of the messages, for each message that is of the messages array. So these are those inflated messages that we saw. 1 of the cool things that you're able to do with the client is that the object that's returned back has actually has some properties on them. And 1 of those properties that
+
+it has is called delete. Before we do that, I'm gonna make sure that let's do a warning here real quick.
+
+So I'm gonna say console.warn.
+
+We're gonna say would have deleted. I'm actually gonna use, if you use these back ticks, this is kind of a neat trick. You can use this backtick to do string interpolation. So we'll say would have deleted message.sid. So again, that's the string identifier of that. So would have deleted a message.sid. So and we will close that function out. All right. And now I'm going to call that function. And of course, that's how we call it. And this is would actually be a promise. This would be a very similar. So we could do this. We could do
+
+a then. Well, in fact, let's do it. We'll say then. And if you wanted to call, make a function that has no parameters, because I'm not returning anything, right? I'm not returning anything from that function I'm just gonna say console.log and I'm gonna write done and I will put all of these this code into the note so you can also copy and paste it if you want to and I'm gonna do the same thing that I did before catch the error and I'll do will do console error And now if you do the console is, you
+
+know, of course what's running when the program runs is running out to the screen and there's different levels that you can do and error is 1 of those. And if I just pass the error that happened
+
+there, so, I'm going to warn that we're going
+
+to, would have deleted the message, but let's take a look at what happens. I'm going to keep the starting program here. We can do starting program, and then it's going to do delete all messages. It's going to call that, and then when it's all done, it will say done. I'm going to get rid of what
+
+we had here. We have delete all messages. It's going
+
+to go and it's going to get a list of all the messages. It's going to loop through each 1 of those messages, and when it is done, right now we're going to warn that it's a would have deleted it. And this is what we're eventually going to do because there's a function that's available to it.
+
+All right. So I'm going to save that. I'm going to run it. Let's see what happens. Okay.
+
+So it would have deleted some of our SIDS. Again, this is the This is the means that it was the MMS, which is the 1 with the picture and the rest of the SMS that we have. I think I am ready to do this. I hope that you are ready to do this as well. Again, this code, should you want it, is available in the repo because you want to run this because you want to delete these messages. I'm going to say Instead of would have deleted, I'm going to say deleting. Then here we go. I'm
+
+going to save that. I'm going to run it. The message object that's coming back from this client has enough information to make another API call to delete itself. Because the object itself knows how to do that, the library has made an object that is smart enough to be able to call delete on it, and it feels like It's just working that way, but it's really making a REST API called a make a delete request.
+
+It's pretty cool, right? Here we go.
+
+Message.delete is not a function. What I meant was actually remove. The function name is remove on the message. So here we go. So and you saw that there was an error, right? That was the error that just happened. The good thing I put that catch in there, otherwise we would have thought it worked. So here we go. So in node explorer, remove and said deleting, deleting, deleting. We deleted all of those. So remove is the name of the function that's there, but it is doing a delete, making a delete call. Cool. So we have now cleaned
+
+out. If we try to run it again, you'll see that there's no messages left for it to delete. Awesome. Now, if you have just watched that, and we're very confused, let's watch this last bit, and then I want you to rewind it 1 more time. So I've made a function that is asynchronous, and that function is called delete all messages. And because it's asynchronous, I'm able to use this await, which will return this this client dot messages that list returns a promise. Okay, but a promise of the future, but because it's being awaited, it's going to
+
+return it right here in line. Then I'm going to loop through each of those messages. And because that message came back from the API and an object was created thanks to our helper library here, I have a method on that message called remove and it will actually go and do that next level, the next level of delete there for me. So it's really nice. This object feels like it would feel like if you were writing JavaScript code, it would feel this way. But behind the scenes, we know that it's doing this API calls, and the client
+
+library has abstracted all of that away from us. And now if you go and you take a look, let's go back really quick. Let's take a look. There's other helper libraries. So if Python happens to be your language, there's how you do it. So it's client.messages.list and for record and messages, and you print the record set, And you can see that the code looks a little bit different in all of the languages that you go through, but it's also kind of similar. And so that's really nice about the standardness of
+
+a REST API is that the
+
+helper library is producing code that feels the same in each way because the library is kind of the same. And you'll find that as you use other APIs, and they have helper libraries, they will mimic the way that the rest API looks. So I realized that was a lot. I don't want you to get hung up if you feel like you can't completely understand what that is. In the next unit what we're gonna do is we're gonna go into more deep things and I know you can do this. So there this code is there And also
+
+if you feel like you want me to go back and explain that again, please, please, please, please pause me, slow me down. Let me walk through those different things, but don't feel like you need to be able to read this. I want you to just conceptually understand that you're using a helper library that's abstracting away all of the HTTP API things that we were doing with curl and we were doing with rest box. This is just doing it in code and it's doing it for you. A lot of the magic is gone and hidden and tucked
+
+away And it just feels like you're actually working with these objects. That's the power of this abstraction. Awesome. Did you see how the helper libraries are all similar, yet match the development workflow and style of each language? This is 1 of the benefits of helper libraries in general. They abstract away the HTTP client connection and the boilerplate necessary to make REST API calls. They also behave as you expect them to behave. It feels natural. The way that we were able to delete from the resource itself helps to unlock another REST API constraint scavenger hunt item. And
+
+that 1 is uniform design. Now this constraint has 4 subsections. 1 of which we just discussed. Resource manipulation through representations. Because enough information was included in the response, it was clear for us how we could modify and delete the resource. Another subsection in here is resource identification and requests. That's the URIs that are included. And we've seen that. But because the URIs are included, we know how to get and manipulate specific resources. Uniform use of the HTTP verbs is pretty powerful. We just wrote some scripts that make use of helper libraries. These libraries are super handy
+
+for automation-based tasks or batch scripting, which is like making a whole bunch of calls at once. Now, while we're talking about this, we should cover another common tool for talking to external APIs and that 1 is CLI, command line interface. There it is again. Command line interfaces can be used to make API calls from an executable on your machine.
+
+More and more, these
+
+are showing up for tools that require authentication and do a bunch of different services. This concept is popular amongst cloud providers where setting something up needs to be done quickly from the command line. Check the notes for more. Another common place where you'll use helper libraries is from within applications that you're building. Let's get to the final unit of this course and implement an external API into an existing web application.

@@ -116,6 +116,10 @@ const PrivateRoutes = () => {
   const EmailPage = lazy(() => import('../pages/email/EmailPage'))
   const PasswordResetLogsPage = lazy(() => import('../pages/admin/PasswordResetLogsPage'))
 
+  // Video Estimating - AI-Powered
+  const VideoEstimatingHub = lazy(() => import('../pages/video-estimating/VideoEstimatingHub'))
+  const CustomerVideoPortal = lazy(() => import('../pages/video-estimating/CustomerVideoPortal'))
+
   // Mobile Components
   const MobileMyDayPage = lazy(() => import('../pages/mobile/MobileMyDayPage'))
   const MobileCameraPage = lazy(() => import('../pages/mobile/MobileCameraPage'))
@@ -389,6 +393,24 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        {/* AI-Powered Video Estimating - Primary Feature */}
+        <Route
+          path='video-estimating'
+          element={
+            <SuspensedView>
+              <VideoEstimatingHub />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='video-estimate/:sessionId'
+          element={
+            <SuspensedView>
+              <CustomerVideoPortal />
+            </SuspensedView>
+          }
+        />
+        {/* Legacy Video Meetings - Moved to overflow menu */}
         <Route
           path='communications/video/*'
           element={

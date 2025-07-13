@@ -1,0 +1,428 @@
+Project Requirements & Proposal (PRP)
+AI-Powered Video Estimating Module — Multi-Trade Edition
+
+Prepared for Bo Smith • July 13 2025
+
+1 Executive Overview
+TradeWorks Pro will replace ad-hoc video meetings with a guided Video Estimating workflow. This module lets any service contractor—roofers, plumbers, HVAC techs, and electricians—diagnose jobs remotely, capture visual evidence, and auto-draft estimates.
+
+The solution is built on three key pillars:
+
+SignalWire Video + Vision: At the core of the system, SignalWire provides the real-time video backbone. By enabling its vision capabilities directly within the video stream, we can pipe camera frames to our AI for real-time analysis without a separate upload process. Participants join via a one-tap magic link with no app installation required.
+
+Supabase: This will serve as the data backend, storing session data, captured frames, and estimate records. Supabase Edge Functions will run pricing logic close to the user for improved performance.
+
+Claude Code MCP: This orchestrates the infrastructure, managing deployment pipelines and bundling trade-specific toolkits (computer vision models and pricing JSON) during deployment.
+
+The expected outcome is fewer truck rolls, draft estimates generated in under 15 minutes, and higher close rates across all trades.
+
+2 Goals & Success Metrics
+Goal
+
+KPI
+
+Target
+
+Source
+
+Reduce on-site visits
+
+Jobs estimated remotely
+
+≥ 40 % after 90 days
+
+CRM records
+
+Faster estimate prep
+
+Avg. mins (call → draft)
+
+< 15 min
+
+Supabase logs
+
+Improve close rate
+
+Accepted / Sent
+
++15 pp vs baseline
+
+Proposal system
+
+Customer CSAT
+
+Post-estimate rating
+
+4.5 / 5
+
+In-app survey
+
+
+Export to Sheets
+3 Scope
+In-Scope (Phase-1)
+
+Web-embedded video room & guided prompts.
+
+Real-time frame capture via SignalWire and vision inference.
+
+Trade-specific toolkits (Roof, HVAC, Plumbing, Electrical).
+
+Auto-drafted estimates and annotated snapshots.
+
+Estimator review UI built with Metronic8 React.
+
+Claude Code MCP pipelines for blue-green deployments, roll-backs, and testing.
+
+Out-of-Scope (Phase-1)
+
+LiDAR / ARKit 3-D reconstruction.
+
+Automated permit-code lookup.
+
+Advanced BOM integrations with ERP systems.
+
+4 Stakeholders & Roles
+Role
+
+Owner
+
+Responsibilities
+
+Product Owner
+
+Bo Smith
+
+Vision, priority, acceptance
+
+Tech Lead
+
+TBD
+
+Architecture, reviews
+
+AI/ML Eng
+
+TBD
+
+Model tuning, toolkits
+
+Front-End Dev
+
+TBD
+
+UI in Metronic
+
+Claude Code Agents
+
+infra-builder.bot, code-review.bot
+
+IaC, CI/CD
+
+QA
+
+TBD
+
+Regression, load tests
+
+
+Export to Sheets
+5 Functional Requirements
+5.1 Session Creation
+A POST request to the SignalWire API creates a video room.
+
+The 
+
+trade_type (e.g., HVAC, PLUMBING) is passed in a JWT to inform the system which toolkit to load.
+
+Moderator and guest tokens are generated, and a magic link is sent to the customer via SMS/email.
+
+5.2 Guided Capture
+A trade-aware bot provides dynamic prompts to the homeowner (e.g., “Show me the breaker panel…”) based on scripts from the loaded Toolkit YAML.
+
+SignalWire's vision feature is enabled in SWML, allowing for real-time camera frames to be piped to the AI backend.
+
+5.3 AI Vision Pipeline
+The browser SDK fires 
+
+visual_input events, which are published by a vision-ingest service to a NATS message queue.
+
+A GPU worker pod (running YOLO v8) consumes these frames from the queue for inference.
+
+Plug-in toolkits are used per trade_type:
+
+Roofing: Detects shingle type, vents, and estimates square footage.
+
+Plumbing: Identifies pipe material and flags potential leak sources.
+
+HVAC: Reads filter sizes and condenser model numbers.
+
+Electrical: Determines panel amperage and available breaker slots.
+
+5.4 Estimate Drafting
+A Supabase Edge Function (draft_estimate()) is invoked, receiving the JSON output from the vision model. This function maps detected objects to the contractor's price book.
+
+5.5 Review & Send
+The estimator reviews and adjusts the auto-drafted line items in the Metronic UI.
+
+Upon clicking "Send," a PDF is rendered and made available to the customer in their portal.
+
+6 API Infrastructure & Integrations
+6.1 SignalWire Video + Vision
+Purpose
+
+Endpoint / Config
+
+Notes
+
+Create Room
+
+POST https://<SPACE>.signalwire.com/api/video/rooms
+
+Uses Basic Auth; returns room ID and metadata.
+
+Mint Room Token
+
+POST https://<SPACE>.signalwire.com/api/video/room_tokens
+
+Token is embedded in the magic link for the customer.
+
+Enable Vision
+
+yaml - ai: params: enable_vision: true
+
+This SWML command enables the real-time piping of camera frames to the AI backend.
+
+Get Visual Input
+
+get_visual_input()
+
+Method used within SWML to retrieve the base64 frame blob for analysis.
+
+
+Export to Sheets
+
+Browser Join Flow Example: 
+
+TypeScript
+
+import { RoomSession } from '@signalwire/js';
+const room = new RoomSession({ token, rootElement: '#video' });
+await room.join();
+room.on('room.started', () => room.getVisualInput()); // Triggers vision
+6.2 Supabase
+Purpose
+
+Endpoint / SDK
+
+Notes
+
+Edge Function
+
+https://<project_id>.functions.supabase.co/{fn}
+
+Invoked with a Clerk JWT in the Authorization header.
+
+Storage Upload
+
+POST /storage/v1/object/{bucket}/{path}
+
+Used by the backend to save annotated frames. The bucket will have a 24-hour lifecycle rule.
+
+Public URL
+
+GET /storage/v1/object/public/{bucket}/{file}
+
+Used to embed images inside the final proposals.
+
+RPC (pricing)
+
+POST /rest/v1/rpc/draft_estimate
+
+Maps vision JSON to SKUs via a Postgres function.
+
+
+Export to Sheets
+7 System Architecture
+Code snippet
+
+graph LR
+    A[Customer Browser] -- WebRTC --> B[SignalWire Room]
+    B -- SWML enable_vision --> C{NATS Message Queue}
+    C -- 1 fps Frames --> D[GPU Worker Pod]
+    D -- Vision JSON --> E[Supabase Edge Fn]
+    E --> F[Postgres & Storage]
+    F --> G[Metronic UI]
+
+Diagram adapted from source.
+
+8 Data Model
+Table
+
+Fields
+
+Notes
+
+video_sessions
+
+id, lead_id, trade_type, room_id, ended_at
+
+trade_type is an ENUM (HVAC, PLUMBING, etc.).
+
+vision_results
+
+object_id, confidence, bbox, session_id
+
+Stores results from the inference model.
+
+estimate_items
+
+id, estimate_id, sku, qty, unit_price, total
+
+Line items for the final estimate.
+
+trade_toolkits
+
+trade_type, yaml_config
+
+Defines prompts and models for each trade.
+
+
+Export to Sheets
+9 Non-Functional Requirements
+Category
+
+Requirement
+
+Latency
+
+End-to-end prompt → AI result < 1.2 s @ 95th percentile.
+
+Privacy
+
+Raw video auto-purged ≤ 24 h; frames stored in private bucket. BAA with SignalWire.
+
+Availability
+
+99.5% for video API; 99.9% for Supabase.
+
+Scalability
+
+200 concurrent sessions; GPU worker auto-scales via MCP.
+
+Auditing
+
+Every API call will be tracked via OpenTelemetry traces.
+
+
+Export to Sheets
+10 Project Plan & Milestones
+Sprint
+
+Length
+
+Key Deliverables
+
+0 – Setup
+
+1 wk
+
+MCP environments (dev/stage/prod), repo scaffold.
+
+1 – MVP Capture
+
+2 wks
+
+Video embed with browser join working; frame save to storage.
+
+2 – Toolkit Loader
+
+3 wks
+
+Plug-in framework for YAML toolkits; Roofing toolkit implemented.
+
+3 – Core Trades
+
+2 wks
+
+Plumbing, HVAC, and Electrical toolkits.
+
+4 – Estimator UI
+
+2 wks
+
+Review screen, PDF export, and portal integration.
+
+5 – Beta
+
+2 wks
+
+Pilot with 5 contractors; feedback loop established.
+
+6 – GA Hardening
+
+2 wks
+
+Load testing and penetration testing.
+
+Total: 14 weeks + 1 wk contingency
+
+
+Export to Sheets
+11 Acceptance Criteria (Sample)
+
+AC-01: Creating a session issues /rooms and /room_tokens calls, completing in under 2 seconds.
+
+
+AC-02: Images from enable_vision are processed by the AI pipeline within 500 ms per frame.
+
+AC-03: A loaded Toolkit YAML correctly maps detected objects to at least three price codes with >90% accuracy.
+
+
+AC-04: The final estimate PDF is available in the customer portal within 60 seconds of the "Send" click.
+
+AC-05: An MCP deployment can be rolled back in ≤ 1 minute.
+
+12 Risks & Mitigations
+Risk
+
+Likelihood
+
+Impact
+
+Mitigation
+
+Poor Camera/Lighting Quality
+
+Med
+
+High
+
+Real-time blur check and quality prompts; fallback to photo upload.
+
+AI Mis-classification
+
+Med
+
+High
+
+Implement a confidence threshold for all tags and mandate human review for flagged items.
+
+SignalWire Cost Spike
+
+Low
+
+Med
+
+Keep default frame rate at 1 fps; consider a modular adapter that allows for a Twilio fallback.
+
+Claude Code MCP Outage
+
+Low
+
+Med
+
+Maintain a local Docker Compose fallback configuration for critical services; ensure nightly backups.
+
+
+Export to Sheets

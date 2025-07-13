@@ -22,7 +22,7 @@ export const clientService = {
       // Fetch business accounts
       const { data: accounts, error: accountsError } = await supabase
         .from('accounts')
-        .select('id, name, email, phone, address_line1, city, state, zip_code')
+        .select('id, name, email, phone')
         .eq('tenant_id', tenantId)
         .order('name')
 
@@ -31,7 +31,7 @@ export const clientService = {
       // Fetch individual contacts (those not associated with a business account)
       const { data: contacts, error: contactsError } = await supabase
         .from('contacts')
-        .select('id, name, first_name, last_name, email, phone, address_line1, city, state, zip_code, account_id')
+        .select('id, name, first_name, last_name, email, phone, account_id')
         .eq('tenant_id', tenantId)
         .is('account_id', null) // Only get standalone contacts, not business contacts
         .order('name')
@@ -50,12 +50,6 @@ export const clientService = {
             type: 'business',
             email: account.email || undefined,
             phone: account.phone || undefined,
-            address: [
-              account.address_line1,
-              account.city,
-              account.state,
-              account.zip_code
-            ].filter(Boolean).join(', ') || undefined,
             accountId: account.id
           })
         })
@@ -75,12 +69,6 @@ export const clientService = {
             type: 'individual',
             email: contact.email || undefined,
             phone: contact.phone || undefined,
-            address: [
-              contact.address_line1,
-              contact.city,
-              contact.state,
-              contact.zip_code
-            ].filter(Boolean).join(', ') || undefined,
             contactId: contact.id
           })
         })
@@ -116,7 +104,7 @@ export const clientService = {
       if (accountId) {
         const { data, error } = await supabase
           .from('accounts')
-          .select('id, name, email, phone, address_line1, city, state, zip_code')
+          .select('id, name, email, phone')
           .eq('id', accountId)
           .eq('tenant_id', tenantId)
           .single()
@@ -129,18 +117,12 @@ export const clientService = {
           type: 'business',
           email: data.email || undefined,
           phone: data.phone || undefined,
-          address: [
-            data.address_line1,
-            data.city,
-            data.state,
-            data.zip_code
-          ].filter(Boolean).join(', ') || undefined,
           accountId: data.id
         }
       } else if (contactId) {
         const { data, error } = await supabase
           .from('contacts')
-          .select('id, name, first_name, last_name, email, phone, address_line1, city, state, zip_code')
+          .select('id, name, first_name, last_name, email, phone')
           .eq('id', contactId)
           .eq('tenant_id', tenantId)
           .single()
@@ -158,12 +140,6 @@ export const clientService = {
           type: 'individual',
           email: data.email || undefined,
           phone: data.phone || undefined,
-          address: [
-            data.address_line1,
-            data.city,
-            data.state,
-            data.zip_code
-          ].filter(Boolean).join(', ') || undefined,
           contactId: data.id
         }
       }

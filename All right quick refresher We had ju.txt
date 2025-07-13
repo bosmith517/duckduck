@@ -1,0 +1,91 @@
+All right quick refresher We had just sent a message from RestFox, a Rest API client. Here's the body of the message we did sent from RestFox and we actually sent across some media with it. You can see here it has this NumMedia1, because each
+
+text message can have multiple medias attached. And if you scroll down here, you'll can see that there is this key of sub resource URIs, and it has a list of an object here in 1 of the objects is for media and what this will do is this will allow whatever is at this URL will give us the accounts for this account for this message specifically it'll give us all of the media that is listed. Now, typically when I have something that's this far out, we could actually add another 1 here, but I thought I'd show you
+
+a little bit of how my process normally works, in case you wanted to see what that felt like. So I use an editor called Visual Studio Code. It's free, it's available, and this is where I do my coding from. So I start here, I start working on my coding. I would love for you to go ahead and download this because I want to show you a tool that's inside of here that will allow us to do a rest client as well. So go ahead and pause me, get Visual Studio Code installed, and when you do, come
+
+back and I'll show you something.
+
+Okay, so once you get
+
+visual studio code up and running, if you press Command-Shift-P, there is a thing called extensions. This will do a little, if you type in install extensions, you can come here and you can see different things that are available. What I want you to install is a thing called thunder. We're going to install a thing called thunder client and it's this 1 here. It's a lightweight rest API client for VS code. It's really powerful and the good news is, is it is postman ask. You are going to feel very familiar when you take a
+
+look at this. So if you do it, you
+
+can go ahead and click install. What will happen is there'll be a little Thunder client that will install over here like so. Just like you've seen before, there are this concept of collections and we can make a new 1. So I'll make a new collection for Twilio. And typically what I'm doing is I'm coding and I run into this API and I'm like, oh, I wonder what this is. I'm gonna go explore it a little bit. I'll explore it right from my editor, right? So I'm writing my code here And then I can come over here
+
+and just take a look at what was there. And so let's go back to RESTFox and I'm gonna grab that RESTFox that we had here, right?
+
+So we're gonna do that. And then grab that.
+
+And I'm gonna come back over here to Twilio. I'm gonna make a new request. I get to name it. And this was the media check. Let's know we're gonna do all media, all media for a specific message. Right. So here we go. I'm going to paste that URL in here. And of course it's missing that first part, which was, API dot Twilio.com. So again, this is the going for that account to those messages. I'm going to look here at where it says off. So it says, inherit authentication values from parent. This is a very nice thing.
+
+This is something that Postman has too, that RESTvox doesn't necessarily have. We put this in our own environment. It's kind of similar, but you can make for this collection that we built, we can actually do the settings for the collection.
+
+And if I come in here,
+
+I can set the auth up here. So I could do this basic auth here and go grab my stuff. And so just a reminder in rest Fox, when we did that before we were in the environment of Twilio and I was able to grab the Twilio account, Sid, right? So let's go back to our code here. And the Twilio account Sid is the username and the password. Let's go back to that environment and rest box the password is that auth. There we go We'll paste that there. Perfect.
+
+So I'm going to click
+
+save on this. And so now this all media should work. So I'm going to go ahead. I'm going to do a send to this. And there we go.
+
+We got it back and we
+
+can see there's a media list is the key here. And again, it's an array of those. And this is the list of all of the media that's available. So now, look at this collection. So we have a collection of accounts, and here's a specific account. We have a collection, that account has messages, that message has media, and that media has an entry, a media entry, and that's it. This is
+
+what we're looking at right here. So something that's pretty cool.
+
+The way that this works is if I get this, I can get some metadata information about it. But if I get just a little bit of it, if I just go ahead and take this the way that the way that Twilio works and not, not all API APIs do this, but if I do this without the extension here, I'll actually get back the picture that I sent.
+
+So I'm gonna do that. I'm gonna make
+
+a new a new little request here. So a new request and we're gonna call this get the pick, right? We're gonna get that pick that I sent because we don't still don't know
+
+what that pic was. What was it? Let's go take a look.
+
+Again, at the end of this, oops, sorry, at the end of this, there is no extension, right? So I got rid of the dot JSON extension. I'm going to put at the front here, hpsapi.twilio.com. And the interesting thing about this is this pick is not authenticated. If you do authenticate, you end up actually having some problems. So I'm going to tell this request specifically to not inherit value. So I'm going to disable this so that it's not authenticated. So when I click this, if all goes well, we should see the pick that I submitted. Awesome! And
+
+we do. Cool. So it's a little big. It's a little big of a pick that was sent here. We can take a look at some stuff here.
+
+We could look at the headers that were sent. We can see a couple of things.
+
+1 of the things that I think is really interesting is when it says last modified. The last modified date, if you have a request that has this on it, it means that you can use caching. So when you make the request, you can actually say if it's been modified since this time, do it. So I'm going to do that. I'm going to grab this. Let's just take a look and see what that does.
+
+So I'm going to go to headers here and I'm going to put a new header in here of if, and you
+
+can see that there's autocomplete. So it's if modified since. So again, this is the request that I am making.
+
+I'm making this request and I'm
+
+going to say if it's been modified since then, give me it. Otherwise, let me know. The way that it lets you know is 304 not modified. That's the status and you'll see that I got 0 bytes back. So that is how caching works and what you can do to send this across. So this is really powerful, right? I didn't need to set up all the other things and it's kind of really a quick little look at this. I don't actually need to do a collection. I can just do a new request outside of it and I
+
+kind of explore through and see how these things are working. Which ding, ding, ding, means we covered another part of a restful API constraint scavenger hunt using standard HTTP caching mechanisms like last modified and e tags, a restful API should support caching. It's up to you to maintain the cash on your client and decorate your requests. But this can come in really handy to avoid making unneeded requests. And those are the, the postman ask things I wanted you to see. They wanted you to be able to do that without diving in necessarily to do all of
+
+the Postman Enterprise things that
+
+you want to do.
+
+But I think it's time, I think you should feel comfortable enough that we can now look at Postman and see what we've already learned there. So I'm going to go here and I'm going to just do a quick little Google search for Postman. This is really nice. You can do this for whatever API you're working it with. And since we're working with Twilio, I'm gonna search for the Postman Twilio collection. So there's some docs on Twilio about it, but if you look here, there's this Twilio Postman on the API network. So this is important to know.
+
+There's a lot of things on this API network where they've built APIs for you to go and share. So I'm going to click this and now note I'm inside of a web browser. Postman's done a really gorgeous job of letting you run inside of your browser. You also can run it locally like we did with RESTFox. But I'm gonna run this from my browser. So I'm gonna go into this messaging SMS. And you can see there's all sorts of different things in here. It's a little bit hard to get to here, but you can change things,
+
+put in your account, sit and all sorts of things like we saw. Look, here's the double mustaches, right? And here's a thing to send an
+
+SMS. And it's super cool. It's neat, right?
+
+And so you've seen this, here's your authorization, the headers, the body, there's collections. And what's cool is somebody's already built these collections for you and they're sharing your stuff this way, right? So that's kind of nice. So again, there's path variables, right? And the path variables coming up here, there's the colon account SID that you saw from before. Here somebody's using this as the start the HTTPS API twillie.com and it's doing a post right so it feels very similar So you're familiar with this There's also a bunch of other things over here that it can do
+
+that could get a little bit distracting And that's what I was trying to kind of avoid because I wanted you to get familiar with it but know that this exists. 1 of the really cool things that Postman does is if you click over here on this far right over here there's this little code it's like open and close tag. This is really neat. So we have curl right so we could see this is how I would go ahead and do this. This feels familiar, this is what we actually did. We did this curl statement. But check
+
+this out, you can do this in any programming language. The trick here, the trick to remember is that any programming language that can make an HTTP request, like it has a client built into it because these are all standard the rest API right we're following these constraints that have been defined it can generate code for you so here's node.js using a package called axios So Axios allows you to fetch things. So this is what it would look like if you tried to write that using Axios. And if you look in here, you come down here, here
+
+it is in PHP with with Guzzle. I don't know what Guzzle is. I like that though. That's why I chose it. So you can see that it's generating this code for you. And if I copy this and pasted it into my PHP code or my Python code or my Java code, it would just work. And that's really handy. That is if the company that's providing the API doesn't have a helper library or an SDK, a software development kit, which we haven't looked at yet, but we're about ready to. Atulio does have 1 of those, but if
+
+you were looking at 1 of these that didn't, this is a great way to get that code. So again, check out the API network, this Postman API network, it's cool. I think you're ready now to use this if you want to, but also feel free to use the other tools. Explore the APIs in a comfortable way, wherever you might be most comfortable with, because there's all sorts of really fancy tools here on Postman, and like I said, there are courses on how to take full use of all of the things that are available. Awesome job diving
+
+into all those tools. Postman is a super powerful tool and it keeps getting better every day. There are so many features that we didn't cover, we barely even scratched the surface. There's an entire course out there on it. Check the notes for where to see that. We saw how to organize our requests together into collections as well as share common and secure values by using variables. We learned how to add different values to requests, both in form values, query strings, and headers. And we also saw how to navigate through various sub-resources via clicking URLs. We even
+
+saw how to create actual runnable code from your request. While we were in the Twilio documentation, you might have noticed the code examples on the screen. On that page, it's possible to tab between various language implementations and solutions. Many products offer what is known as an SDK or Software Development Kit, or Helper Library that allows you to interact with their product in your native language. As you can see, it abstracts away the REST API completely. Let's take a look at the Twilio helper library next. Before that though, just a quick reminder to make sure that you
+
+check the notes on this video. There's a link to a repository of built out collections that are ready for you to use. There are lots of great APIs to practice with. 

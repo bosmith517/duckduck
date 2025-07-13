@@ -1,0 +1,40 @@
+{
+  "version": "1.0.0",
+  "sections": {
+    "main": [
+      {
+        "ai": {
+          "prompt": {
+            "text": "You are a professional estimator assistant. Help the customer get an accurate estimate by guiding them to show relevant areas via video. Be friendly and thorough."
+          },
+          "params": {
+            "temperature": 0.3,
+            "top_p": 0.7
+          },
+          "post_prompt_url": "%{env.WEBHOOK_URL}",
+          "SWAIG": {
+            "functions": [
+              {
+                "function": "capture_issue",
+                "purpose": "capture important issues during inspection",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "issue": {
+                      "type": "string",
+                      "description": "what was found"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "description": "how serious"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,303 @@
+{
+  "version": "1.0.0",
+  "description": "AI-powered video estimating digital employee for trade services",
+  "sections": {
+    "main": [
+      {
+        "ai": {
+          "engine": "openai",
+          "params": {
+            "temperature": "0.3",
+            "top_p": "0.7"
+          },
+          "enable_vision": "true",
+          "vision_config": {
+            "fps": 1,
+            "quality": "high",
+            "enable_object_detection": true,
+            "enable_text_recognition": true
+          },
+          "voice": "en-US-Standard-C",
+          "personality": "helpful, professional, thorough",
+          "prompt": {
+            "temperature": "0.3",
+            "top_p": "0.7",
+            "text": "You are a professional trade estimator assistant helping to create accurate estimates through video inspection. Your role is to:\n\n1. Guide the customer to show specific areas based on the trade type (${args.trade_type})\n2. Ask clarifying questions about issues you observe\n3. Request close-up views when detecting potential problems\n4. Mention when lighting or camera angle needs adjustment\n5. Keep track of all detected issues for the estimate\n\nFor ${args.trade_type} inspections, focus on:\n${args.focus_areas}\n\nLook for these specific issues:\n${args.detection_types}\n\nBe professional but friendly. Guide the customer step-by-step through the inspection process."
+          },
+          "post_prompt_url": "${env.SUPABASE_URL}/functions/v1/handle-ai-conversation",
+          "post_prompt_auth_user": "${env.SUPABASE_ANON_KEY}",
+          "post_prompt_auth_password": "",
+          "SWAIG": {
+            "functions": [
+              {
+                "function": "capture_critical_frame",
+                "purpose": "Capture a frame when critical damage or important details are visible",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "issue_type": {
+                      "type": "string",
+                      "description": "Type of issue detected (e.g., 'water_damage', 'missing_shingles', 'corrosion')"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": ["minor", "moderate", "major", "critical"],
+                      "description": "Severity level of the detected issue"
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "Location of the issue in the frame"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Additional notes about the issue"
+                    }
+                  },
+                  "required": ["issue_type", "severity"]
+                },
+                "data_map": {
+                  "expressions": [
+                    {
+                      "string": "${args.issue_type}",
+                      "pattern": "(.+)",
+                      "output": {
+                        "response": "I've captured that ${args.severity} ${args.issue_type}. ${args.notes}",
+                        "action": [
+                          {
+                            "capture_frame": {
+                              "metadata": {
+                                "issue_type": "${args.issue_type}",
+                                "severity": "${args.severity}",
+                                "location": "${args.location}",
+                                "notes": "${args.notes}",
+                                "timestamp": "${system.timestamp}"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "webhook": {
+                  "url": "${env.SUPABASE_URL}/functions/v1/capture-critical-frame",
+                  "method": "POST",
+                  "headers": {
+                    "Authorization": "Bearer ${env.SUPABASE_ANON_KEY}"
+                  },
+                  "params": {
+                    "session_id": "${session.id}",
+                    "issue_type": "${args.issue_type}",
+                    "severity": "${args.severity}",
+                    "location": "${args.location}",
+                    "notes": "${args.notes}"
+                  }
+                }
+              },
+              {
+                "function": "update_inspection_area",
+                "purpose": "Move to a different area of inspection",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "area": {
+                      "type": "string",
+                      "description": "The area to inspect next"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "Why this area needs inspection"
+                    }
+                  },
+                  "required": ["area"]
+                },
+                "data_map": {
+                  "expressions": [
+                    {
+                      "string": "${args.area}",
+                      "pattern": "(.+)",
+                      "output": {
+                        "response": "Now let's take a look at the ${args.area}. ${args.reason}",
+                        "action": [
+                          {
+                            "update_context": {
+                              "current_area": "${args.area}",
+                              "inspection_reason": "${args.reason}"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "function": "request_measurement",
+                "purpose": "Ask customer to provide or show measurements",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "measurement_type": {
+                      "type": "string",
+                      "description": "What needs to be measured"
+                    },
+                    "method": {
+                      "type": "string",
+                      "description": "How to take the measurement"
+                    }
+                  },
+                  "required": ["measurement_type"]
+                },
+                "data_map": {
+                  "expressions": [
+                    {
+                      "string": "${args.measurement_type}",
+                      "pattern": "(.+)",
+                      "output": {
+                        "response": "I need to get the ${args.measurement_type}. ${args.method}",
+                        "action": [
+                          {
+                            "request_info": {
+                              "type": "measurement",
+                              "measurement_type": "${args.measurement_type}",
+                              "method": "${args.method}"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "function": "generate_estimate_item",
+                "purpose": "Add a line item to the estimate based on detected issues",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "description": {
+                      "type": "string",
+                      "description": "Description of the work needed"
+                    },
+                    "category": {
+                      "type": "string",
+                      "description": "Category of work (e.g., 'repair', 'replacement', 'maintenance')"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": ["urgent", "high", "medium", "low"],
+                      "description": "Priority level of the work"
+                    },
+                    "estimated_hours": {
+                      "type": "number",
+                      "description": "Estimated hours for the work"
+                    }
+                  },
+                  "required": ["description", "category", "priority"]
+                },
+                "webhook": {
+                  "url": "${env.SUPABASE_URL}/functions/v1/add-estimate-item",
+                  "method": "POST",
+                  "headers": {
+                    "Authorization": "Bearer ${env.SUPABASE_ANON_KEY}"
+                  },
+                  "params": {
+                    "session_id": "${session.id}",
+                    "description": "${args.description}",
+                    "category": "${args.category}",
+                    "priority": "${args.priority}",
+                    "estimated_hours": "${args.estimated_hours}"
+                  }
+                }
+              },
+              {
+                "function": "complete_inspection",
+                "purpose": "Complete the inspection and generate the final estimate",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string",
+                      "description": "Summary of the inspection findings"
+                    },
+                    "followup_needed": {
+                      "type": "boolean",
+                      "description": "Whether an in-person follow-up is recommended"
+                    }
+                  },
+                  "required": ["summary"]
+                },
+                "data_map": {
+                  "expressions": [
+                    {
+                      "string": "${args.summary}",
+                      "pattern": "(.+)",
+                      "output": {
+                        "response": "I've completed the inspection. ${args.summary} I'll now generate your detailed estimate.",
+                        "action": [
+                          {
+                            "webhook": {
+                              "url": "${env.SUPABASE_URL}/functions/v1/finalize-video-estimate",
+                              "method": "POST",
+                              "params": {
+                                "session_id": "${session.id}",
+                                "summary": "${args.summary}",
+                                "followup_needed": "${args.followup_needed}"
+                              }
+                            }
+                          },
+                          {
+                            "end_session": true
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "defaults": {
+              "webhook": {
+                "url": "${env.SUPABASE_URL}/functions/v1/swaig-default-handler",
+                "method": "POST",
+                "headers": {
+                  "Authorization": "Bearer ${env.SUPABASE_ANON_KEY}"
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "config": {
+    "video_params": {
+      "enable_recording": true,
+      "layout": "grid-responsive",
+      "quality": "high"
+    },
+    "session_params": {
+      "max_duration": 1800,
+      "idle_timeout": 300,
+      "attention_timeout": 10
+    },
+    "trade_configs": {
+      "ROOFING": {
+        "focus_areas": "roof slopes, shingles, flashing, gutters, vents, chimney, valleys, ridge",
+        "detection_types": "missing shingles, damaged shingles, water stains, moss growth, debris accumulation, flashing issues, gutter damage"
+      },
+      "PLUMBING": {
+        "focus_areas": "pipes, fixtures, water heater, shut-off valves, drainage, water meter, supply lines",
+        "detection_types": "leaks, corrosion, water damage, outdated fixtures, poor water pressure, drainage issues"
+      },
+      "HVAC": {
+        "focus_areas": "outdoor unit, indoor unit, thermostat, vents, filters, ductwork, electrical disconnect",
+        "detection_types": "rust, physical damage, dirty filters, blocked vents, refrigerant leaks, electrical issues"
+      },
+      "ELECTRICAL": {
+        "focus_areas": "main panel, subpanels, outlets, switches, visible wiring, grounding, meter",
+        "detection_types": "outdated components, code violations, burn marks, exposed wiring, improper grounding, overloaded circuits"
+      }
+    }
+  }
+}

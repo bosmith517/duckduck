@@ -1,0 +1,188 @@
+Important To Dos for TradeWork Pros
+
+
+
+  🎯 The Missing 5% for 100% Professional Experience:
+
+  1. Branded Client Portal Tokens (The Vision Gap)
+
+  Current State: We have a great customer portal, but it's not automatically integrated with the
+  communication system.
+
+  The Vision: "When a new job is created, automatically generate a secure portal token. Send an SMS to       
+  the client: 'Hi, [Client Name]! Here is your private portal for your job with [Contractor Name]: 
+  [unique_link]'"
+
+  What's Missing:
+  - ✅ Portal exists ✅
+  - ❌ Automatic secure token generation per job
+  - ❌ Auto-SMS with portal link on job creation
+  - ❌ Branded portal URLs (contractor-specific subdomains)
+
+  2. Portal Activity Tracking (Professional Analytics)
+
+  The Vision: "All activity is logged in portal_activity_log"
+
+  What's Missing:
+  - ❌ Track every customer portal interaction
+  - ❌ "Last viewed: 2 hours ago" for contractors
+  - ❌ Customer engagement analytics
+  - ❌ Portal usage insights for follow-ups
+
+  3. White-Label Branding (Enterprise Feel)
+
+  Current: Generic TradeWorks Pro branding
+  100% Vision: Each contractor's customers see THEIR company branding:
+  - ❌ Contractor logo in all communications
+  - ❌ Custom email "From" addresses (mailto:mike@mikesplumbing.com)
+  - ❌ Branded portal subdomain (portal.mikesplumbing.com)
+  - ❌ Company-specific color schemes
+
+  4. Smart Communication Scheduling (Ultra Professional)
+
+  Current: Messages send immediately
+  100% Vision:
+  - ❌ Respect business hours (don't SMS at 11 PM)
+  - ❌ Customer communication preferences (SMS vs Email)
+  - ❌ Follow-up scheduling ("If no response in 24 hours, send reminder")
+  - ❌ Escalation chains for missed appointments
+
+  🚀 Which of these would you like to tackle for 100%?
+
+  Option A: Branded Portal Integration ⭐ (Highest Impact)
+  - Auto-generate secure portal links for each job
+  - Send branded portal SMS on job creation
+  - Track all customer portal activity
+  - "Professional portal experience that rivals enterprise companies"
+
+  Option B: White-Label Branding System 🎨
+  - Contractor-specific email addresses
+  - Custom logos in all communications
+  - Branded portal subdomains
+  - "Every customer thinks they're dealing with a big company"
+
+  Option C: Smart Communication Intelligence 🧠
+  - Respect business hours and preferences
+  - Auto-follow-ups and escalations
+  - Customer response tracking
+  - "Communication that adapts to customer behavior"
+
+  Option D: All of the above 💪
+  - Go for the full 100% experience
+  - Complete enterprise-level professionalism
+  - Every feature from the original vision
+
+  What feels like the most important gap to close for that final 5%?--------------------------
+
+_______________________________________________________________________________________________________________
+  Option A: Template-Driven Estimates ⚡
+  - Quick win, immediate productivity boost
+  - Reduces estimate creation time by 80%
+  - Builds on existing tiered estimate system
+
+
+ Option C: Real-Time Job Costing 💰
+  - Direct profit impact for contractors
+  - Mobile receipt scanning is a unique differentiator
+  - Helps identify profitable vs losing jobs
+
+
+
+
+ 🚨 CRITICAL FINDING: Major Features Are Hidden!
+
+  You're absolutely right - many of our flagship features are built but not accessible through
+  navigation! This is a major issue for production launch.
+
+  Missing Routes - Critical Business Impact:
+
+-          <AsideMenuItem to='/jobs/costing' title='Job Costing' hasBullet={true} />
+       58 -          <AsideMenuItem to='/jobs/analytics' title='Project Analytics' hasBullet={true} />       
+       59 -          <AsideMenuItem to='/jobs/templates' title='Job Templates' hasBullet={true} />
+       60 -          <AsideMenuItem to='/jobs/planning' title='Resource Planning' hasBullet={true} />        
+       57 +          <AsideMenuItem to='/jobs/costing' title='Real-Time Job Costing' hasBullet={true} />     
+       58          </AsideMenuItemWithSub>
+       59
+       60          <AsideMenuItemWithSub to='/customers' title='Customers' icon='profile-circle'
+     fontIcon
+            ='bi-people'>
+
+● Update(src/_metronic/layout/components/aside/AsideMenuMain.tsx)
+  ⎿  Updated src/_metronic/layout/components/aside/AsideMenuMain.tsx with 1 addition and 3 removals
+       60          <AsideMenuItemWithSub to='/customers' title='Customers' icon='profile-circle'
+     fontIcon
+            ='bi-people'>
+       61            <AsideMenuItem to='/customers/accounts' title='Accounts' hasBullet={true} />
+       62            <AsideMenuItem to='/customers/contacts' title='Contacts' hasBullet={true} />
+       63 -          <AsideMenuItem to='/customers/analytics' title='Customer Analytics' 
+     hasBullet={true} />
+          -  />
+       63 +          <AsideMenuItem to='/homeowner-portal' title='Homeowner Portal' hasBullet={true} />      
+       64            <AsideMenuItem to='/customers/portal-preview' title='Portal Preview'
+     hasBullet={true
+            } />
+       65 -          <AsideMenuItem to='/customers/communications' title='Communications' 
+     hasBullet={true
+          - } />
+       66 -          <AsideMenuItem to='/customers/feedback' title='Feedback' hasBullet={true} />
+       65          </AsideMenuItemWithSub>
+       66
+       67          <AsideMenuItemWithSub to='/schedule' title='Scheduling & Dispatch' icon='calendar-8'      
+     f
+            ontIcon='bi-calendar3'>
+
+● Update(src/_metronic/layout/components/aside/AsideMenuMain.tsx)
+  ⎿  Updated src/_metronic/layout/components/aside/AsideMenuMain.tsx with 1 addition and 4 removals
+       66
+       67          <AsideMenuItemWithSub to='/schedule' title='Scheduling & Dispatch' icon='calendar-8'      
+     f
+            ontIcon='bi-calendar3'>
+       68            <AsideMenuItem to='/schedule' title='Schedule Overview' hasBullet={true} />
+       69 -          <AsideMenuItem to='/schedule/tracking' title='Technician Tracking' hasBullet={true}     
+     />
+          - />
+       70 -          <AsideMenuItem to='/schedule/routes' title='Route Optimization' hasBullet={true} />     
+       71 -          <AsideMenuItem to='/schedule/mobile' title='Mobile Dispatch' hasBullet={true} />        
+       72 -          <AsideMenuItem to='/schedule/automation' title='Automation' hasBullet={true} />
+       69 +          <AsideMenuItem to='/mobile/tracking' title='Mobile Tracking' hasBullet={true} />        
+       70          </AsideMenuItemWithSub>
+       71
+       72          <AsideMenuItemWithSub to='/services' title='Services & Inventory' icon='package'
+     fontI
+            con='bi-box'>
+
+● Update(src/_metronic/layout/components/aside/AsideMenuMain.tsx)
+  ⎿  Updated src/_metronic/layout/components/aside/AsideMenuMain.tsx with 3 removals
+       72          <AsideMenuItemWithSub to='/services' title='Services & Inventory' icon='package'
+     fontI
+            con='bi-box'>
+       73            <AsideMenuItem to='/services/inventory' title='Inventory' hasBullet={true} />
+       74            <AsideMenuItem to='/services/catalog' title='Service Catalog' hasBullet={true} />       
+       75 -          <AsideMenuItem to='/services/equipment' title='Equipment Tracking' hasBullet={true}     
+          - />
+       76 -          <AsideMenuItem to='/services/smart-devices' title='Smart Devices' hasBullet={true}      
+     /
+          - >
+       77 -          <AsideMenuItem to='/services/analytics' title='Service Analytics' hasBullet={true}      
+     /
+          - >
+       75          </AsideMenuItemWithSub>
+       76
+       77          {/* REVENUE ENGINE */}
+
+● Update(src/_metronic/layout/components/aside/AsideMenuMain.tsx)
+  ⎿  Updated src/_metronic/layout/components/aside/AsideMenuMain.tsx with 1 addition and 4 removals
+       84          <AsideMenuItemWithSub to='/billing' title='Billing & Payments' icon='bill'
+     fontIcon='b
+            i-credit-card'>
+       85            <AsideMenuItem to='/billing/invoices' title='Invoices' hasBullet={true} />
+       86            <AsideMenuItem to='/billing/estimates' title='Estimates & Quotes' hasBullet={true}      
+     /
+            >
+       87 -          <AsideMenuItem to='/billing/payments' title='Payment Processing' hasBullet={true}       
+     />
+       88 -          <AsideMenuItem to='/billing/reports' title='Financial Reports' hasBullet={true} />      
+       89 -          <AsideMenuItem to='/billing/automation' title='Automated Billing' hasBullet={true}      
+     /
+          - >
+       90 -          <AsideMenuItem to='/billing/signatures' title='Digital Signatures' hasBullet={true}    

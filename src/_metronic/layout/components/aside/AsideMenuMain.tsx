@@ -17,17 +17,17 @@ export function AsideMenuMain() {
         fontIcon='bi-speedometer2'
       />
       
-      {/* NEW FEATURES SHOWCASE */}
+      {/* AI-POWERED FEATURES */}
       <div className='menu-item'>
         <div className='menu-content pt-4 pb-2'>
-          <span className='menu-section text-primary text-uppercase fs-8 ls-1 fw-bold'>✨ New Features</span>
+          <span className='menu-section text-primary text-uppercase fs-8 ls-1 fw-bold'>🤖 AI-Powered Features</span>
         </div>
       </div>
       
       <AsideMenuItem
-        to='/communications/video'
-        icon='video'
-        title='Modern Video Meetings'
+        to='/video-estimating'
+        icon='scan-barcode'
+        title='AI Video Estimating'
         fontIcon='bi-camera-video'
       />
       
@@ -131,7 +131,10 @@ export function AsideMenuMain() {
         <AsideMenuItem to='/communications/sms' title='SMS Messages' hasBullet={true} />
         <AsideMenuItem to='/communications/email' title='Email System' hasBullet={true} />
         <AsideMenuItem to='/communications/team-chat' title='Team Chat' hasBullet={true} />
-        <AsideMenuItem to='/communications/video' title='Video Meetings' hasBullet={true} />
+        <AsideMenuItemWithSub to='/communications/video' title='Video Tools' hasBullet={true}>
+          <AsideMenuItem to='/video-estimating' title='AI Video Estimating' hasBullet={true} />
+          <AsideMenuItem to='/communications/video' title='Simple Video Meetings' hasBullet={true} />
+        </AsideMenuItemWithSub>
         <AsideMenuItem to='/communications/numbers' title='Phone Numbers' hasBullet={true} />
         <AsideMenuItem to='/communications/users' title='User Provisioning' hasBullet={true} />
         <AsideMenuItem to='/communications/analytics' title='Analytics' hasBullet={true} />

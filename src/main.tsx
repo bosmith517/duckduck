@@ -108,8 +108,8 @@ if (container) {
     document.addEventListener('DOMContentLoaded', removeSplashScreen)
   }
   
-  // Register Service Worker for PWA functionality
-  if ('serviceWorker' in navigator) {
+  // Register Service Worker for PWA functionality (production only)
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {

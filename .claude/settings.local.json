@@ -13,8 +13,11 @@
       "Bash(sed:*)",
       "Bash(npm run build:*)",
       "Bash(cd:*)",
-      "Bash(cd:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:developer.signalwire.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:docs.signalwire.com)"
     ],
     "deny": []
   }
