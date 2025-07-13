@@ -86,13 +86,20 @@ serve(async (req) => {
     }
 
     // SignalWire credentials
-    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')!
-    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')!
-    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')!
+    const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')
+    const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')
+    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL') || 'taurustech.signalwire.com'
+    
+    if (!signalwireProjectId || !signalwireApiToken) {
+      throw new Error('SignalWire credentials not configured. Please set SIGNALWIRE_PROJECT_ID and SIGNALWIRE_API_TOKEN in Supabase Edge Function secrets.')
+    }
 
     // Create room with AI vision configuration
-    const roomName = `AI-Estimate-${trade_type}-${Date.now()}`
+    const roomName = `tw-estimate-${trade_type.toLowerCase()}-${Date.now()}`
     const signalwireApiUrl = `https://${signalwireSpaceUrl}/api/video/rooms`
+    
+    // Get the AI script ID from environment
+    const aiScriptId = Deno.env.get('SIGNALWIRE_AI_ESTIMATOR_ID') || 'YOUR_AI_SCRIPT_ID'
     
     const roomConfig = {
       name: roomName,
@@ -180,6 +187,47 @@ serve(async (req) => {
     const roomData = await roomResponse.json()
     console.log('SignalWire room created:', roomData.id)
 
+    // Step 2: Execute the AI script to join the room (if configured)
+    if (aiScriptId && aiScriptId !== 'YOUR_AI_SCRIPT_ID') {
+      try {
+        const scriptExecuteUrl = `https://${signalwireSpaceUrl}/api/video/scripts/${aiScriptId}/execute`
+        console.log('Executing AI script:', aiScriptId)
+        
+        const executeResponse = await fetch(scriptExecuteUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            room_name: roomName,
+            metadata: {
+              tenant_id: userProfile.tenant_id,
+              trade_type,
+              lead_id,
+              contact_id,
+              account_id
+            }
+          })
+        })
+
+        if (!executeResponse.ok) {
+          const errorBody = await executeResponse.text()
+          console.error('AI script execution failed:', errorBody)
+          // Don't fail the whole request if AI fails to join
+          console.log('Continuing without AI assistant')
+        } else {
+          const executeData = await executeResponse.json()
+          console.log('AI script executed successfully:', executeData)
+        }
+      } catch (scriptError) {
+        console.error('Error executing AI script:', scriptError)
+        // Continue without AI
+      }
+    } else {
+      console.log('No AI script ID configured, skipping AI assistant')
+    }
+
     // Create video session record
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -258,13 +306,29 @@ serve(async (req) => {
       status: 200,
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in create-video-estimating-session:', error)
+    console.error('Stack trace:', error.stack)
+    
+    // Check for specific error types
+    let statusCode = 500
+    let errorMessage = error.message || 'Failed to create video estimating session'
+    
+    if (error.message?.includes('SignalWire credentials not configured')) {
+      statusCode = 503
+      errorMessage = 'Service not configured. Please contact support.'
+    } else if (error.message?.includes('authentication')) {
+      statusCode = 401
+    } else if (error.message?.includes('not found')) {
+      statusCode = 404
+    }
+    
     return new Response(JSON.stringify({ 
-      error: error.message || 'Failed to create video estimating session' 
+      error: errorMessage,
+      details: error.toString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: statusCode,
     })
   }
 })

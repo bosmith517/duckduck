@@ -39,6 +39,10 @@ serve(async (req) => {
     if (!session_id || !room_id) {
       throw new Error('session_id and room_id are required')
     }
+    
+    // For SignalWire, we need to use the room_id which is the actual SignalWire room ID
+    // The metadata.room_name is just a display name
+    const roomName = room_id
 
     // For customer portal access, we'll use a simple encrypted token approach
     // This avoids needing the JWT secret in Edge Functions
@@ -55,16 +59,43 @@ serve(async (req) => {
     // Also generate the SignalWire token for video
     const signalwireProjectId = Deno.env.get('SIGNALWIRE_PROJECT_ID')
     const signalwireApiToken = Deno.env.get('SIGNALWIRE_API_TOKEN')
-    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL')
+    const signalwireSpaceUrl = Deno.env.get('SIGNALWIRE_SPACE_URL') || 'taurustech.signalwire.com'
 
-    const signalwireResponse = await fetch(`https://${signalwireSpaceUrl}/api/video/room_tokens`, {
+    console.log('Generating SignalWire token for room:', roomName)
+    
+    if (!signalwireProjectId || !signalwireApiToken) {
+      console.error('SignalWire credentials missing:', {
+        hasProjectId: !!signalwireProjectId,
+        hasApiToken: !!signalwireApiToken,
+        spaceUrl: signalwireSpaceUrl
+      })
+      // Return without SignalWire token rather than failing entirely
+      return new Response(
+        JSON.stringify({
+          portal_token: token,
+          signalwire_token: null,
+          session_id,
+          room_id,
+          error: 'SignalWire not configured - video will not be available'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+    
+    const signalwireUrl = `https://${signalwireSpaceUrl}/api/video/room_tokens`
+    console.log('SignalWire token URL:', signalwireUrl)
+    
+    const signalwireResponse = await fetch(signalwireUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${btoa(`${signalwireProjectId}:${signalwireApiToken}`)}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        room_name: room_id,
+        room_name: roomName,
         user_name: 'Customer',
         permissions: ['room.self.audio_mute', 'room.self.audio_unmute', 'room.self.video_mute', 'room.self.video_unmute'],
         auto_join: true,
@@ -76,6 +107,11 @@ serve(async (req) => {
     if (signalwireResponse.ok) {
       const signalwireData = await signalwireResponse.json()
       signalwireToken = signalwireData.token
+      console.log('SignalWire token generated successfully')
+    } else {
+      const errorText = await signalwireResponse.text()
+      console.error('Failed to generate SignalWire token:', signalwireResponse.status, errorText)
+      throw new Error(`Failed to generate video token: ${errorText}`)
     }
 
     return new Response(

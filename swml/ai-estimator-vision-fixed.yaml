@@ -1,0 +1,141 @@
+version: "1.0.0"
+sections:
+  main:
+    # First, join the video room
+    - video:
+        join_room: "{{context.room_id}}"
+    
+    # Then start the AI with vision
+    - ai:
+        voice: "rachel"
+        engine: "elevenlabs"
+        
+        params:
+          enable_vision: true
+          vision_model: "gpt-4o-mini"
+          language: "en-US"
+          temperature: 0.4
+          top_p: 0.9
+          
+        prompt:
+          role: "system"
+          text: |
+            You are Alex, a professional trade estimator for TradeWorks Pro conducting a video estimate inspection.
+            
+            You can SEE what the customer is showing you through their camera. Use the get_visual_input() function to analyze what you're seeing.
+            
+            Your personality:
+            - Friendly and professional
+            - Expert in roofing, plumbing, HVAC, and electrical work
+            - Observant and detail-oriented
+            - Patient with clear instructions
+            
+            Your inspection process:
+            1. Greet the customer and ask what type of service they need
+            2. Ask them to use their phone's REAR camera to show you the areas
+            3. Use get_visual_input() to analyze what you see
+            4. Describe what you observe and point out any issues
+            5. Guide them to show different angles or get closer when needed
+            6. Document all issues for the estimate
+            7. Keep the inspection efficient (10-15 minutes)
+            
+            Always be specific about what you see and provide professional assessment.
+        
+        post_prompt:
+          role: "assistant"
+          text: |
+            Thank you for showing me around. Based on what I've seen, I've documented all the issues and will prepare your detailed estimate. You'll receive it within 24 hours with a complete breakdown of recommended repairs and costs.
+    
+    # Vision analysis loop - continuously analyze frames
+    - loop:
+        - ai:
+            function: get_visual_input
+            arguments:
+              focus_area: "general inspection"
+        - ai:
+            prompt: |
+              Based on what I see, describe any issues and guide the customer to show the next area.
+              If you see damage, use capture_issue to document it.
+              Ask specific questions about what you're seeing.
+        - wait: 2  # Wait 2 seconds between analyses
+    
+    # Complete the inspection
+    - ai:
+        function: complete_inspection
+        arguments:
+          summary: "Inspection completed successfully"
+          total_issues: 0
+          priority_repairs: []
+          estimated_total: "$0"
+
+SWAIG:
+  functions:
+    - function: get_visual_input
+      purpose: "Analyze the current camera view to see what the customer is showing"
+      arguments:
+        type: "object"
+        properties:
+          focus_area:
+            type: "string"
+            description: "What to focus on in the image"
+            default: "general inspection"
+      returns:
+        type: "string"
+        description: "Description of what is visible in the camera view"
+    
+    - function: capture_issue
+      purpose: "Document an issue that was identified during inspection"
+      arguments:
+        type: "object"
+        properties:
+          location:
+            type: "string"
+            description: "Where the issue is located"
+          issue_type:
+            type: "string"
+            description: "Type of issue observed"
+          severity:
+            type: "string"
+            enum: ["minor", "moderate", "major", "critical"]
+            description: "How serious is this issue"
+          visual_description:
+            type: "string"
+            description: "What I can see in the image"
+          estimated_cost_range:
+            type: "string"
+            description: "Rough cost estimate"
+        required: ["location", "issue_type", "severity", "visual_description"]
+      web_hook_url: "${env.SUPABASE_URL}/functions/v1/ai-estimating-webhook"
+      web_hook_auth: "Bearer ${env.SUPABASE_ANON_KEY}"
+    
+    - function: request_different_angle
+      purpose: "Ask the customer to show a different angle or get closer"
+      arguments:
+        type: "object"
+        properties:
+          instruction:
+            type: "string"
+            description: "Specific instruction for camera positioning"
+          reason:
+            type: "string"
+            description: "Why this angle is needed"
+        required: ["instruction"]
+    
+    - function: complete_inspection
+      purpose: "Finalize the inspection and generate estimate"
+      arguments:
+        type: "object"
+        properties:
+          summary:
+            type: "string"
+            description: "Summary of all issues found"
+          total_issues:
+            type: "number"
+          priority_repairs:
+            type: "array"
+            description: "List of urgent repairs needed"
+          estimated_total:
+            type: "string"
+            description: "Total estimated cost range"
+      web_hook_url: "${env.SUPABASE_URL}/functions/v1/complete-video-estimate"
+      web_hook_auth: "Bearer ${env.SUPABASE_ANON_KEY}"

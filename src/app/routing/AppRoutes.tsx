@@ -20,6 +20,7 @@ import AutomationDemoPage from '../pages/test/AutomationDemoPage'
 import TrackingPage from '../pages/tracking/TrackingPage'
 import CustomerPortalPage from '../pages/customer-portal/CustomerPortalPage'
 import VideoEstimatePage from '../pages/customer-portal/VideoEstimatePage'
+import VideoEstimateMinimal from '../pages/customer-portal/VideoEstimateMinimal'
 import VideoEstimateMockPage from '../pages/customer-portal/VideoEstimateMockPage'
 import VideoEstimateTestPage from '../pages/test/VideoEstimateTestPage'
 import  SignalWireSyncTestPage from '../pages/test/SignalWireSyncTestPage'
@@ -27,6 +28,8 @@ import SignalWireDebugPage from '../pages/test/SignalWireDebugPage'
 import DatabaseTestPage from '../pages/test/DatabaseTestPage'
 import TrackingMigrationPage from '../pages/test/TrackingMigrationPage'
 import SimpleTrackingTest from '../pages/test/SimpleTrackingTest'
+import VideoDebugPage from '../pages/test/VideoDebugPage'
+import SimpleVideoTest from '../pages/test/SimpleVideoTest'
 import LandingPage from '../pages/marketing/LandingPage'
 import SignupPage from '../pages/marketing/SignupPage'
 import HomeownerSignupPage from '../pages/marketing/HomeownerSignupPage'
@@ -114,6 +117,7 @@ const AppRoutes: FC = () => {
         <Route path='customer/:customerId/track/:trackingToken' element={<CustomerPortalPage />} />
         <Route path='portal/:token' element={<CustomerPortalPage />} />
         <Route path='customer-portal/video-estimate' element={<VideoEstimatePage />} />
+        <Route path='customer-portal/video-estimate-minimal' element={<VideoEstimateMinimal />} />
         <Route path='customer-portal/video-estimate-mock' element={<VideoEstimateMockPage />} />
         
         {/* Public booking routes */}
@@ -152,6 +156,8 @@ const AppRoutes: FC = () => {
         <Route path='test-password-reset' element={<SimplePasswordResetTest />} />
         <Route path='automation-demo' element={<AutomationDemoPage />} />
         <Route path='test-mobile-redirect' element={<MobileRedirectTest />} />
+        <Route path='test-video-debug' element={<VideoDebugPage />} />
+        <Route path='test-simple-video' element={<SimpleVideoTest />} />
         
         {/* Error pages and logout - wrapped in App for consistent layout */}
         <Route element={<App />}>

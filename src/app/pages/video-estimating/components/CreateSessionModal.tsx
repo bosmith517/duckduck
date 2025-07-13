@@ -105,6 +105,28 @@ export const CreateSessionModal: React.FC<CreateSessionModalProps> = ({
         
         console.log('Video estimating session created:', session)
 
+        // Try to add AI to the room
+        try {
+          // IMPORTANT: Use meeting.room_id which is the actual SignalWire room name
+          console.log('Adding AI to room:', meeting.room_id)
+          const { data: aiResult } = await supabase.functions.invoke('add-ai-to-video-room', {
+            body: {
+              room_name: meeting.room_id, // This is the sanitized room name SignalWire uses
+              session_id: session.id,
+              trade_type: values.trade_type
+            }
+          })
+          
+          if (aiResult?.success) {
+            console.log('AI added to room successfully')
+          } else {
+            console.log('AI not added:', aiResult?.error)
+          }
+        } catch (aiError) {
+          console.log('Could not add AI to room:', aiError)
+          // Continue anyway
+        }
+
         // TODO: Implement proper SignalWire integration
         // For now, we'll skip token generation and notifications
         

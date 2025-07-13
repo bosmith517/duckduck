@@ -99,9 +99,8 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           call_handler: 'laml_webhooks',
-          call_request_url: `https://${signalwireSpaceUrl}/api/laml/swml`,
-          call_request_method: 'POST',
-          call_request_body: JSON.stringify(swml)
+          call_request_url: Deno.env.get('SIGNALWIRE_AI_RELAY_BIN_URL') || 'https://taurustech.signalwire.com/relay-bins/2806d214-e1a6-4e2a-a51a-8e73f5c8052f',
+          call_request_method: 'POST'
         }),
       }
     )

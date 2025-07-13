@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../../supabaseClient'
 import { VideoSession } from '../video-estimating/VideoEstimatingHub'
-import * as SignalWire from '@signalwire/js'
+import { SignalWireVideoRoom } from '../../components/video/SignalWireVideoRoom'
+import { SimpleSignalWireRoom } from '../../components/video/SimpleSignalWireRoom'
 
 const VideoEstimatePage: React.FC = () => {
   const [searchParams] = useSearchParams()
   const [session, setSession] = useState<VideoSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
-  const videoContainerRef = useRef<HTMLDivElement>(null)
+  const [aiStatus, setAiStatus] = useState<string>('')
+  const [roomSession, setRoomSession] = useState<any>(null)
   
   const sessionId = searchParams.get('session')
   const token = searchParams.get('token') // Portal JWT for Supabase
@@ -48,18 +49,21 @@ const VideoEstimatePage: React.FC = () => {
             throw new Error('Invalid session link')
           }
         } catch (err) {
-          console.error('Invalid token:', err)
-          throw new Error('Invalid session link')
+          console.error('Token validation error:', err)
+          // Don't throw here - let it continue if token decode fails
+          console.log('Continuing without token validation')
         }
       }
       
       // Query the video session using anon key (public access)
-      // Security is based on knowing both session ID and room ID from the token
+      console.log('Querying video_sessions for:', sessionId)
       const { data, error: sessionError } = await supabase
         .from('video_sessions')
         .select('*')
         .eq('id', sessionId)
         .single()
+        
+      console.log('Query result:', { data, error: sessionError })
         
       if (sessionError) {
         console.error('Session lookup error:', sessionError)
@@ -72,17 +76,29 @@ const VideoEstimatePage: React.FC = () => {
       }
       
       console.log('Session found:', data)
+      console.log('Room ID from session:', data.room_id)
+      console.log('Room metadata:', data.metadata)
       
-      // No need to validate token - it's a real JWT that we'll use directly for SignalWire
+      // Try to decode the SW token to see what room it's for (non-blocking)
+      try {
+        if (swToken && swToken !== 'null') {
+          const tokenParts = swToken.split('.')
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]))
+            console.log('SW Token payload:', payload)
+            console.log('Token is for room:', payload.r)
+          }
+        }
+      } catch (e) {
+        console.log('Could not decode SW token - continuing anyway')
+      }
       
       if (data.status === 'completed') {
         throw new Error('This session has already ended')
       }
       
       setSession(data)
-      
-      // Connect to video room
-      await connectToRoom(data)
+      setAiStatus('Waiting for AI estimator to join...')
       
     } catch (err: any) {
       console.error('Error loading session:', err)
@@ -91,129 +107,69 @@ const VideoEstimatePage: React.FC = () => {
       setLoading(false)
     }
   }
-  
-  const connectToRoom = async (sessionData: VideoSession) => {
-    try {
-      // Use the SignalWire token for video connection
-      console.log('Using SignalWire token from URL for customer connection')
+
+  const handleRoomJoined = (session: any) => {
+    console.log('Room joined successfully')
+    setRoomSession(session)
+    
+    // Check if AI is already in the room
+    // The AI script should have been executed during room creation
+  }
+
+  const handleMemberJoined = (member: any) => {
+    console.log('Member joined:', member)
+    const memberName = member.name || ''
+    
+    // Check if this is the AI estimator
+    if (memberName.includes('AI') || memberName.includes('Estimator') || 
+        memberName.includes('Alex') || memberName === '+19999999999' ||
+        member.id?.includes('ai') || member.id?.includes('script')) {
+      console.log('AI Estimator has joined the session')
+      setAiStatus('AI estimator Alex is now connected! Say hello and they will guide you through the inspection.')
       
-      if (!swToken) {
-        throw new Error('No SignalWire token provided')
-      }
-      
-      // Initialize SignalWire with the SignalWire JWT
-      await initializeSignalWire(swToken)
-      
-    } catch (err: any) {
-      console.error('Error connecting to room:', err)
-      setError('Failed to connect to video session: ' + (err.message || 'Unknown error'))
+      // Play a sound to indicate AI joined
+      try {
+        const audio = new Audio('/sounds/ai-joined.mp3')
+        audio.play().catch(() => {})
+      } catch {}
     }
   }
+
+  const handleMemberLeft = (member: any) => {
+    console.log('Member left:', member)
+    const memberName = member.name || ''
+    
+    if (memberName.includes('AI') || memberName.includes('Estimator') || memberName.includes('Alex')) {
+      setAiStatus('AI estimator has left the session')
+    }
+  }
+
+  const handleError = (error: any) => {
+    console.error('Video room error:', error)
+    setError(`Video error: ${error.message || 'Connection failed'}`)
+  }
   
-  const initializeSignalWire = async (roomToken: string) => {
+  const handleAddAI = async () => {
+    if (!session) return
+    
     try {
-      // Check if we're in a secure context
-      const isSecureContext = window.isSecureContext
-      const protocol = window.location.protocol
-      const hostname = window.location.hostname
-      
-      console.log('Security context:', { isSecureContext, protocol, hostname })
-      
-      if (!isSecureContext && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-        console.warn('Not in secure context - media devices will not work')
-        setError('⚠️ This page must be accessed over HTTPS for video/audio to work. Currently using ' + protocol + '//' + hostname)
-      }
-      
-      // Request camera and microphone permissions first
-      console.log('Requesting media permissions...')
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          // Request permissions with specific constraints
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: {
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }, 
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true
-            }
-          })
-          console.log('Media permissions granted');
-          // Keep the stream for SignalWire to use
-          (window as any).localStream = stream
-        } catch (mediaError: any) {
-          console.error('Media permission error:', mediaError)
-          
-          // Provide specific error messages but don't stop the connection
-          if (mediaError.name === 'NotAllowedError') {
-            setError('Camera/microphone access was denied. The video session will continue but you won\'t be visible.')
-          } else if (mediaError.name === 'NotFoundError') {
-            setError('No camera or microphone found. The video session will continue in audio-only mode.')
-          } else if (mediaError.name === 'NotReadableError') {
-            setError('Camera/microphone is already in use. The video session will continue but may have limited functionality.')
-          } else {
-            setError(`Media error: ${mediaError.message}. Continuing without media.`)
-          }
+      console.log('Manually adding AI to room:', session.room_id)
+      const { data: aiResult } = await supabase.functions.invoke('add-ai-to-video-room', {
+        body: {
+          room_name: session.room_id,
+          session_id: session.id,
+          trade_type: session.trade_type
         }
+      })
+      
+      if (aiResult?.success) {
+        setAiStatus('AI estimator has been invited to the room')
       } else {
-        console.error('navigator.mediaDevices is not available')
-        if (!isSecureContext) {
-          setError('⚠️ Camera/microphone access requires HTTPS. Please use a secure connection.')
-        } else {
-          setError('⚠️ Your browser does not support camera/microphone access.')
-        }
+        setAiStatus(`Failed to add AI: ${aiResult?.error || 'Unknown error'}`)
       }
-      
-      // Continue without media stream - try to connect anyway
-      console.log('Continuing with SignalWire connection...')
-      
-      // SignalWire SDK is now statically imported
-      console.log('SignalWire SDK available:', !!SignalWire.Video)
-      
-      const roomSession = new SignalWire.Video.RoomSession({
-        token: roomToken,
-        rootElement: videoContainerRef.current,
-        audio: false, // Start with audio/video disabled
-        video: false,
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' }
-        ]
-      })
-      
-      roomSession.on('room.joined', async () => {
-        console.log('Customer joined room')
-        setIsConnected(true)
-        
-        // Try to enable media after joining if we have a secure context
-        if (window.isSecureContext && navigator.mediaDevices) {
-          try {
-            console.log('Attempting to enable media after joining...')
-            await roomSession.audioMute()
-            await roomSession.videoMute()
-            // Then unmute to trigger media request
-            await roomSession.audioUnmute()
-            await roomSession.videoUnmute()
-          } catch (err) {
-            console.log('Could not enable media:', err)
-          }
-        }
-      })
-      
-      roomSession.on('room.left', (params: any) => {
-        console.log('Customer left room')
-        setIsConnected(false)
-        if (params?.error) {
-          console.error('SignalWire error:', params.error)
-          setError('Video connection error: ' + (params.error.message || 'Unknown error'))
-        }
-      })
-      
-      await roomSession.join()
-      
-    } catch (err: any) {
-      console.error('Error initializing SignalWire:', err)
-      setError('Failed to initialize video: ' + (err.message || 'Unknown error'))
+    } catch (error: any) {
+      console.error('Error adding AI:', error)
+      setAiStatus(`Error: ${error.message}`)
     }
   }
   
@@ -244,9 +200,24 @@ const VideoEstimatePage: React.FC = () => {
       </div>
     )
   }
+
+  if (!swToken) {
+    return (
+      <div className='min-vh-100 d-flex align-items-center justify-content-center bg-dark'>
+        <div className='text-center text-white'>
+          <i className='ki-duotone ki-cross-circle fs-5x text-danger mb-3'>
+            <span className='path1'></span>
+            <span className='path2'></span>
+          </i>
+          <h3>Invalid Session Link</h3>
+          <p className='text-muted'>Missing video token. Please use the link provided in your invitation.</p>
+        </div>
+      </div>
+    )
+  }
   
   return (
-    <div className='min-vh-100 bg-dark'>
+    <div className='min-vh-100 bg-dark d-flex flex-column'>
       {/* Header */}
       <div className='bg-white border-bottom px-5 py-3'>
         <div className='d-flex justify-content-between align-items-center'>
@@ -257,41 +228,62 @@ const VideoEstimatePage: React.FC = () => {
             </span>
           </div>
           <div>
-            <span className={`badge badge-${isConnected ? 'success' : 'warning'}`}>
-              {isConnected ? 'Connected' : 'Connecting...'}
+            <span className='badge badge-primary'>
+              <i className='ki-duotone ki-video fs-2 me-1'>
+                <span className='path1'></span>
+                <span className='path2'></span>
+              </i>
+              Live Session
             </span>
           </div>
         </div>
       </div>
       
-      {/* Video Container */}
-      <div 
-        ref={videoContainerRef}
-        className='position-relative'
-        style={{ height: 'calc(100vh - 70px)' }}
-      >
-        {!isConnected && (
-          <div className='position-absolute top-50 start-50 translate-middle text-center text-white'>
-            <div className='spinner-border text-light mb-3' role='status'>
-              <span className='visually-hidden'>Connecting...</span>
+      {/* Video Room - Using Simple Component for Testing */}
+      <div className='flex-grow-1 position-relative'>
+        <SimpleSignalWireRoom
+          token={swToken}
+          onRoomJoined={() => {
+            console.log('Room joined successfully')
+            setAiStatus('Connected to room. Waiting for AI estimator...')
+          }}
+          onMemberJoined={handleMemberJoined}
+          onError={handleError}
+        />
+        
+        {/* AI Status Overlay */}
+        {aiStatus && (
+          <div className='position-absolute bottom-0 start-0 end-0 p-4' style={{ pointerEvents: 'none' }}>
+            <div className='bg-white bg-opacity-90 rounded p-3 shadow mx-auto' style={{ maxWidth: '600px', pointerEvents: 'auto' }}>
+              <h5 className='mb-2'>
+                <i className='ki-duotone ki-message-programming fs-2 me-2'>
+                  <span className='path1'></span>
+                  <span className='path2'></span>
+                </i>
+                AI Assistant Status
+              </h5>
+              <p className='mb-0 text-primary fw-bold'>{aiStatus}</p>
+              {aiStatus.includes('connected') && (
+                <div className='mt-2'>
+                  <small className='text-muted'>
+                    Tips: Use your rear camera for best results. Ensure good lighting. Show problem areas clearly.
+                  </small>
+                </div>
+              )}
+              {!aiStatus.includes('connected') && !aiStatus.includes('invited') && (
+                <div className='mt-2'>
+                  <button 
+                    className='btn btn-sm btn-primary'
+                    onClick={handleAddAI}
+                  >
+                    Add AI Estimator to Room
+                  </button>
+                </div>
+              )}
             </div>
-            <div>Connecting to video session...</div>
           </div>
         )}
       </div>
-      
-      {/* Instructions Overlay */}
-      {isConnected && (
-        <div className='position-fixed bottom-0 start-0 end-0 p-4'>
-          <div className='bg-white bg-opacity-90 rounded p-3 shadow mx-auto' style={{ maxWidth: '600px' }}>
-            <h5 className='mb-2'>Video Estimate Instructions</h5>
-            <p className='mb-0'>
-              Our technician will guide you through showing the areas that need inspection. 
-              Please have good lighting and a stable internet connection.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

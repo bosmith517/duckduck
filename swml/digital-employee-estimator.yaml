@@ -1,0 +1,192 @@
+version: "1.0.0"
+sections:
+  main:
+    - set:
+        vars:
+          - name: "customer_name"
+            value: ""
+          - name: "trade_type"
+            value: ""
+          - name: "inspection_items"
+            value: []
+          - name: "current_area"
+            value: ""
+          - name: "estimate_total"
+            value: 0
+    
+    - ai:
+        params:
+          temperature: 0.7
+          top_p: 0.9
+          max_tokens: 200
+        voice: "rachel"
+        engine: "elevenlabs"
+        lang: "en-US"
+        
+        prompt:
+          role: "system"
+          text: |
+            You are Alex, a professional trade estimator assistant for TradeWorks Pro. 
+            You conduct video estimate inspections through the customer's phone camera.
+            
+            Your personality:
+            - Friendly and professional
+            - Knowledgeable about roofing, plumbing, HVAC, and electrical work
+            - Patient and clear in your instructions
+            - Observant and detail-oriented
+            
+            Your role is to:
+            1. Greet the customer warmly and get their name
+            2. Ask what type of service they need (roofing, plumbing, HVAC, or electrical)
+            3. Guide them to use their rear camera to show specific areas
+            4. Identify and document issues you observe
+            5. Provide rough cost estimates based on what you see
+            6. Keep the inspection efficient (10-15 minutes)
+            
+            Always be specific about camera positioning and lighting needs.
+            Point out issues as you see them and explain their severity.
+        
+        post_prompt:
+          role: "assistant"
+          text: "Thank you for showing me around. I've documented everything for your estimate. You'll receive a detailed written estimate within 24 hours."
+        
+        post_prompt_url:
+          url: "${env.SUPABASE_URL}/functions/v1/complete-video-estimate"
+          method: "POST"
+          headers:
+            Authorization: "Bearer ${env.SUPABASE_ANON_KEY}"
+          body:
+            session_id: "${session_id}"
+            customer_name: "${customer_name}"
+            trade_type: "${trade_type}"
+            inspection_items: "${inspection_items}"
+            estimate_total: "${estimate_total}"
+        
+        SWAIG:
+          defaults:
+            web_hook_url: "${env.SUPABASE_URL}/functions/v1/ai-estimating-webhook"
+            web_hook_method: "POST"
+            web_hook_auth: "Bearer ${env.SUPABASE_ANON_KEY}"
+          
+          includes:
+            - user_profile:
+                functions:
+                  - function: get_customer_name
+                    purpose: "Save the customer's name for the estimate"
+                    argument:
+                      type: "object"
+                      properties:
+                        name:
+                          type: "string"
+                          description: "Customer's name"
+                    returns:
+                      type: "object"
+                      properties:
+                        status:
+                          type: "string"
+                    web_hook_url: "${defaults.web_hook_url}"
+            
+            - inspection_tools:
+                functions:
+                  - function: capture_issue
+                    purpose: "Document an issue observed during inspection"
+                    argument:
+                      type: "object"
+                      properties:
+                        area:
+                          type: "string"
+                          description: "Location of the issue"
+                        description:
+                          type: "string"
+                          description: "Description of the issue"
+                        severity:
+                          type: "string"
+                          enum: ["minor", "moderate", "major", "critical"]
+                        estimated_cost:
+                          type: "number"
+                          description: "Rough cost estimate"
+                      required: ["area", "description", "severity"]
+                  
+                  - function: request_camera_angle
+                    purpose: "Ask customer to adjust camera for better view"
+                    argument:
+                      type: "object"
+                      properties:
+                        instruction:
+                          type: "string"
+                          description: "Specific camera instruction"
+                        reason:
+                          type: "string"
+                          description: "Why this angle is needed"
+                  
+                  - function: switch_inspection_area
+                    purpose: "Guide customer to next inspection area"
+                    argument:
+                      type: "object"
+                      properties:
+                        next_area:
+                          type: "string"
+                          description: "Next area to inspect"
+                        instructions:
+                          type: "string"
+                          description: "How to get there"
+                  
+                  - function: add_to_estimate
+                    purpose: "Add a line item to the estimate"
+                    argument:
+                      type: "object"
+                      properties:
+                        item_description:
+                          type: "string"
+                        quantity:
+                          type: "number"
+                        unit_price:
+                          type: "number"
+                        category:
+                          type: "string"
+            
+            - vision_analysis:
+                functions:
+                  - function: analyze_current_view
+                    purpose: "Request AI vision analysis of current camera view"
+                    argument:
+                      type: "object"
+                      properties:
+                        focus:
+                          type: "string"
+                          description: "What to analyze"
+                    returns:
+                      type: "object"
+                      properties:
+                        detected_issues:
+                          type: "array"
+                        recommendations:
+                          type: "string"
+        
+        # Vision configuration for analyzing video frames
+        vision:
+          enabled: true
+          frame_rate: 1  # Analyze 1 frame per second
+          quality: "high"
+          detect_objects: true
+          detect_text: true
+          custom_labels:
+            - "roof damage"
+            - "water leak"
+            - "electrical hazard"
+            - "pipe corrosion"
+            - "HVAC issue"
+            - "structural damage"
+        
+        # Hints for technical terms
+        hints:
+          - word: "HVAC"
+            pronounce: "H-vack"
+          - word: "PVC"
+            pronounce: "P-V-C"
+          - word: "GFCI"
+            pronounce: "G-F-C-I"
+          - word: "R-value"
+            pronounce: "R value"
+          - word: "BTU"
+            pronounce: "B-T-U"
