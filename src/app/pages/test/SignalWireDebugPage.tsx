@@ -4,15 +4,19 @@ import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { showToast } from '../../utils/toast'
+import { useSoftphoneContext } from '../../contexts/SoftphoneContext'
+import { WebRTCSoftphoneDialer } from '../../components/communications'
 
 const SignalWireDebugPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
+  const { showDialer, startCall } = useSoftphoneContext()
   const [tenantInfo, setTenantInfo] = useState<any>(null)
   const [phoneNumbers, setPhoneNumbers] = useState<any[]>([])
   const [sipConfig, setSipConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [testNumber, setTestNumber] = useState('+15555551234')
+  const [showFixedDialer, setShowFixedDialer] = useState(false)
 
   useEffect(() => {
     loadDebugInfo()
@@ -201,7 +205,13 @@ ${data.manual_setup_needed ? `\nMANUAL SETUP REQUIRED:\n${data.instructions}` : 
       }
     } catch (err: any) {
       console.error('Error creating endpoint:', err)
-      showToast.error(`Failed to create endpoint: ${err.message}`)
+      // Try to get the actual error message from the response
+      let errorMessage = err.message
+      if (err.details) {
+        console.error('Error details:', err.details)
+        errorMessage = err.details
+      }
+      showToast.error(`Failed to create endpoint: ${errorMessage}`)
     }
   }
 
@@ -267,6 +277,27 @@ Check console for full details.
     }
   }
 
+  const updateSipEndpointPhone = async () => {
+    try {
+      showToast.loading('Updating SIP endpoint with phone number...')
+      
+      const { data, error } = await supabase.functions.invoke('update-sip-endpoint-phone')
+      
+      if (error) throw error
+      
+      console.log('Update result:', data)
+      showToast.success('SIP endpoint updated!')
+      
+      alert(`SIP Endpoint Updated!\n\nPhone Number: ${data.phone_number}\nEndpoint ID: ${data.endpoint_id}\n\nYour outbound calls should now work properly.`)
+      
+      // Reload debug info
+      loadDebugInfo()
+    } catch (err: any) {
+      console.error('Error updating SIP endpoint:', err)
+      showToast.error(`Failed to update: ${err.message}`)
+    }
+  }
+
   const testServerSideCall = async () => {
     try {
       showToast.loading('Initiating test call from server...')
@@ -286,7 +317,167 @@ Check console for full details.
       alert(`Server Call Success!\n\nCall SID: ${data.call_sid}\nFrom: ${data.from}\nTo: ${data.to}`)
     } catch (err: any) {
       console.error('Server call error:', err)
-      showToast.error(`Server call failed: ${err.message}`)
+      let errorMessage = err.message
+      if (err.details) {
+        console.error('Server error details:', err.details)
+        errorMessage = err.details
+      }
+      showToast.error(`Server call failed: ${errorMessage}`)
+    }
+  }
+
+  const testTurnConnectivity = async () => {
+    try {
+      showToast.loading('Testing TURN server connectivity...')
+      
+      const { data, error } = await supabase.functions.invoke('test-turn-connectivity-simple')
+      
+      if (error) throw error
+      
+      console.log('TURN connectivity test:', data)
+      showToast.success('TURN connectivity test complete')
+      
+      const message = `
+TURN Server Connectivity Test:
+
+${data.summary.recommendation}
+
+TURN Servers:
+- Total: ${data.summary.turnServers.total}
+- Reachable: ${data.summary.turnServers.reachable}
+- Unreachable: ${data.summary.turnServers.unreachable}
+
+STUN Servers:
+- Total: ${data.summary.stunServers.total}
+- Reachable: ${data.summary.stunServers.reachable}
+
+Details in console.
+      `
+      alert(message)
+    } catch (err: any) {
+      console.error('TURN test error:', err)
+      showToast.error(`TURN test failed: ${err.message}`)
+    }
+  }
+
+  const getIceServers = async () => {
+    try {
+      showToast.loading('Getting ICE servers from SignalWire...')
+      
+      const { data, error } = await supabase.functions.invoke('get-signalwire-ice-servers')
+      
+      if (error) throw error
+      
+      console.log('ICE servers:', data)
+      showToast.success('Retrieved ICE servers')
+      
+      let message = `ICE Servers Configuration:\n\n`
+      
+      if (data.iceServers && data.iceServers.length > 0) {
+        message += `Found ${data.iceServers.length} ICE servers:\n\n`
+        data.iceServers.forEach((server: any, i: number) => {
+          message += `${i + 1}. ${server.urls}\n`
+          if (server.username) {
+            message += `   Username: ${server.username}\n`
+          }
+        })
+      } else {
+        message += 'No ICE servers configured\n'
+      }
+      
+      if (data.recommendations) {
+        message += `\nRecommendations:\n`
+        data.recommendations.forEach((rec: string, i: number) => {
+          message += `${i + 1}. ${rec}\n`
+        })
+      }
+      
+      alert(message)
+    } catch (err: any) {
+      console.error('ICE servers error:', err)
+      showToast.error(`Failed to get ICE servers: ${err.message}`)
+    }
+  }
+
+  const getMySipCredentials = async () => {
+    try {
+      showToast.loading('Getting your SIP credentials...')
+      
+      const { data, error } = await supabase.functions.invoke('get-my-sip-credentials')
+      
+      if (error) throw error
+      
+      console.log('SIP credentials:', data)
+      showToast.success('Retrieved SIP credentials')
+      
+      let message = `YOUR SIP CREDENTIALS FOR TESTING:\n\n`
+      message += `Username: ${data.credentials.username}\n`
+      message += `Password: ${data.credentials.password}\n`
+      message += `Domain: ${data.credentials.domain}\n`
+      message += `Proxy: ${data.credentials.proxy}\n\n`
+      
+      message += `ZOIPER CONFIGURATION:\n`
+      message += `Account Name: ${data.credentials.zoiper_config.account_name}\n`
+      message += `Transport: ${data.credentials.zoiper_config.transport}\n`
+      message += `Port: ${data.credentials.zoiper_config.port}\n`
+      message += `STUN Server: ${data.credentials.zoiper_config.stun_server}\n\n`
+      
+      message += data.instructions.join('\n')
+      
+      // Also log password to console for easy copy
+      console.log('SIP Password:', data.credentials.password)
+      
+      alert(message)
+    } catch (err: any) {
+      console.error('Error getting SIP credentials:', err)
+      showToast.error(`Failed to get credentials: ${err.message}`)
+    }
+  }
+
+  const checkSipEndpointConfig = async () => {
+    try {
+      showToast.loading('Checking SIP endpoint configuration...')
+      
+      const { data, error } = await supabase.functions.invoke('check-sip-endpoint-config')
+      
+      if (error) throw error
+      
+      console.log('SIP endpoint config:', data)
+      showToast.success('SIP configuration check complete')
+      
+      let message = `SIP Endpoint Configuration Check:\n\n${data.summary}\n\n`
+      
+      if (data.signalwireEndpoint) {
+        message += `SignalWire Endpoint:\n`
+        message += `- Username: ${data.signalwireEndpoint.username}\n`
+        message += `- Phone Number: ${data.signalwireEndpoint.send_as || 'NOT SET'}\n`
+        message += `- Caller ID: ${data.signalwireEndpoint.caller_id || 'Not set'}\n`
+        message += `- Status: ${data.signalwireEndpoint.status || 'Unknown'}\n\n`
+      }
+      
+      if (data.issues.length > 0) {
+        message += `Issues Found:\n`
+        data.issues.forEach((issue: any, i: number) => {
+          message += `${i + 1}. ${issue}\n`
+        })
+        message += `\nRecommendations:\n`
+        data.recommendations.forEach((rec: any, i: number) => {
+          message += `${i + 1}. ${rec}\n`
+        })
+      }
+      
+      message += `\nPhone Numbers: ${data.phoneNumbers.length} found`
+      if (data.phoneNumbers.length > 0) {
+        const active = data.phoneNumbers.find((p: any) => p.is_active)
+        if (active) {
+          message += ` (Active: ${active.number})`
+        }
+      }
+      
+      alert(message)
+    } catch (err: any) {
+      console.error('SIP config check error:', err)
+      showToast.error(`SIP config check failed: ${err.message}`)
     }
   }
 
@@ -364,6 +555,24 @@ Check console for full details.
                 >
                   Test WebRTC
                 </button>
+                <button 
+                  className="btn btn-warning"
+                  onClick={updateSipEndpointPhone}
+                >
+                  Update SIP Phone Number
+                </button>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={checkSipEndpointConfig}
+                >
+                  Check SIP Config
+                </button>
+                <button 
+                  className="btn btn-danger"
+                  onClick={getMySipCredentials}
+                >
+                  Get My SIP Credentials
+                </button>
               </div>
             </div>
           )}
@@ -439,6 +648,50 @@ Check console for full details.
               >
                 Test Server Call
               </button>
+              <button 
+                className="btn btn-info ms-2"
+                onClick={testTurnConnectivity}
+              >
+                Test TURN Connectivity
+              </button>
+              <button 
+                className="btn btn-primary ms-2"
+                onClick={getIceServers}
+              >
+                Get ICE Servers
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h5>Test WebRTC Call (Browser)</h5>
+            <p className="text-muted">Test WebRTC calling directly from the browser</p>
+            <div className="d-flex gap-2">
+              <button 
+                className="btn btn-success"
+                onClick={showDialer}
+              >
+                Open Softphone
+              </button>
+              <button 
+                className="btn btn-success"
+                onClick={() => {
+                  if (testNumber) {
+                    startCall('Test Call', testNumber)
+                  } else {
+                    showToast.error('Please enter a phone number above')
+                  }
+                }}
+                disabled={!testNumber}
+              >
+                Quick Dial Test Number
+              </button>
+              <button 
+                className="btn btn-warning ms-2"
+                onClick={() => setShowFixedDialer(true)}
+              >
+                Open Fixed Dialer
+              </button>
             </div>
           </div>
 
@@ -498,6 +751,12 @@ Check console for full details.
           )}
         </KTCardBody>
       </KTCard>
+      
+      {/* Fixed WebRTC Dialer */}
+      <WebRTCSoftphoneDialer 
+        isVisible={showFixedDialer} 
+        onClose={() => setShowFixedDialer(false)} 
+      />
     </>
   )
 }

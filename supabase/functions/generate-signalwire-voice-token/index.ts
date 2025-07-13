@@ -143,9 +143,8 @@ serve(async (req) => {
       
       console.log('Generated SIP username from email:', user.email, '->', sipUsername);
       
-      // Construct the SIP domain (existing endpoint)
-      const last12 = projectId.replace(/-/g, '').slice(-12);
-      const sipDomain = `taurustech-${last12}.sip.signalwire.com`;
+      // Use the correct SIP domain
+      const sipDomain = 'taurustech-tradeworkspro.sip.signalwire.com';
       
       console.log('Creating SIP credentials for existing endpoint:', sipDomain);
       console.log('Generated SIP username:', sipUsername);
@@ -236,20 +235,13 @@ serve(async (req) => {
       });
     }
 
-    // Use the actual SIP domain from config or construct it from project ID
+    // Use the actual SIP domain from config or the correct default
     let sipDomain = sipConfig.sip_domain;
     
-    // If no domain in config, construct it from project ID (taurustech + last 12 chars)
-    if (!sipDomain && projectId) {
-      const last12 = projectId.replace(/-/g, '').slice(-12);
-      sipDomain = `taurustech-${last12}.sip.signalwire.com`;
-      console.log('Constructed SIP domain from project ID:', sipDomain);
-    }
-    
-    // Final fallback to your specific domain
-    if (!sipDomain) {
-      sipDomain = 'taurustech-9b70eb096555.sip.signalwire.com';
-      console.log('Using fallback SIP domain:', sipDomain);
+    // If domain doesn't match the correct format, use the correct one
+    if (!sipDomain || !sipDomain.includes('taurustech-tradeworkspro')) {
+      sipDomain = 'taurustech-tradeworkspro.sip.signalwire.com';
+      console.log('Using correct SIP domain:', sipDomain);
     }
     
     const websocketServer = `wss://${sipDomain}`;

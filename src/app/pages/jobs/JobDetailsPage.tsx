@@ -44,6 +44,7 @@ interface JobWithRelations {
   location_state?: string
   location_zip?: string
   notes?: string
+  estimate_id?: string
   account?: {
     id: string
     name: string
@@ -53,6 +54,14 @@ interface JobWithRelations {
     first_name: string
     last_name: string
   }
+  estimates?: Array<{
+    id: string
+    estimate_number: string
+    total_amount: number
+    status: string
+    created_at: string
+    version?: number
+  }>
 }
 
 const JobDetailsPage: React.FC = () => {
@@ -115,7 +124,18 @@ const JobDetailsPage: React.FC = () => {
         return
       }
 
-      setJob(data)
+      // Get ALL estimates related to this job
+      // This includes estimates that reference this job OR that this job references
+      const { data: allEstimates } = await supabase
+        .from('estimates')
+        .select('id, estimate_number, total_amount, status, created_at, version')
+        .or(`job_id.eq.${id},id.eq.${data.estimate_id}`)
+        .order('created_at', { ascending: false })
+
+      setJob({
+        ...data,
+        estimates: allEstimates || []
+      })
     } catch (error) {
       console.error('Error fetching job:', error)
       navigate('/jobs')
@@ -464,6 +484,22 @@ const JobDetailsPage: React.FC = () => {
                 </div>
                 <span className='text-muted fw-semibold fs-7'>
                   {job.job_number} • Created {new Date(job.created_at).toLocaleDateString()}
+                  {job.estimates && job.estimates.length > 0 && (
+                    <>
+                      {' • '}
+                      <span className='text-primary'>
+                        {job.estimates.length === 1 ? (
+                          <a href={`/estimates`}>
+                            Estimate {job.estimates[0].estimate_number}
+                          </a>
+                        ) : (
+                          <a href={`/estimates`}>
+                            {job.estimates.length} Estimates
+                          </a>
+                        )}
+                      </span>
+                    </>
+                  )}
                 </span>
               </div>
               <div className='card-toolbar'>
@@ -546,6 +582,23 @@ const JobDetailsPage: React.FC = () => {
                     }}
                   >
                     Job Costing
+                  </a>
+                </li>
+                <li className='nav-item'>
+                  <a
+                    className={`nav-link text-active-primary pb-4 ${activeTab === 'estimates' ? 'active' : ''}`}
+                    href='#'
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setActiveTab('estimates')
+                    }}
+                  >
+                    Estimates
+                    {job.estimates && job.estimates.length > 0 && (
+                      <span className='badge badge-sm badge-circle badge-light-primary ms-2'>
+                        {job.estimates.length}
+                      </span>
+                    )}
                   </a>
                 </li>
                 <li className='nav-item'>
@@ -866,6 +919,82 @@ const JobDetailsPage: React.FC = () => {
 
           {activeTab === 'costing' && (
             <JobCostingDashboard jobId={job.id} />
+          )}
+
+          {activeTab === 'estimates' && (
+            <KTCard>
+              <div className='card-header'>
+                <h3 className='card-title'>Related Estimates</h3>
+                <div className='card-toolbar'>
+                  <a href={`/estimates?job_id=${job.id}`} className='btn btn-sm btn-primary'>
+                    Create New Estimate
+                  </a>
+                </div>
+              </div>
+              <KTCardBody>
+                {job.estimates && job.estimates.length > 0 ? (
+                  <div className='table-responsive'>
+                    <table className='table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4'>
+                      <thead>
+                        <tr className='fw-bold text-muted'>
+                          <th>Estimate #</th>
+                          <th>Status</th>
+                          <th>Amount</th>
+                          <th>Version</th>
+                          <th>Created</th>
+                          <th className='text-end'>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {job.estimates.map((estimate) => (
+                          <tr key={estimate.id}>
+                            <td>
+                              <a href={`/estimates`} className='text-dark fw-bold text-hover-primary'>
+                                {estimate.estimate_number}
+                              </a>
+                            </td>
+                            <td>
+                              <span className={`badge badge-light-${
+                                estimate.status === 'approved' ? 'success' : 
+                                estimate.status === 'rejected' ? 'danger' : 
+                                estimate.status === 'sent' ? 'info' : 
+                                'secondary'
+                              }`}>
+                                {estimate.status}
+                              </span>
+                            </td>
+                            <td>
+                              <span className='text-dark fw-bold'>${estimate.total_amount.toLocaleString()}</span>
+                            </td>
+                            <td>
+                              {estimate.version ? `v${estimate.version}` : 'v1'}
+                            </td>
+                            <td>
+                              {new Date(estimate.created_at).toLocaleDateString()}
+                            </td>
+                            <td className='text-end'>
+                              <a 
+                                href={`/estimates`} 
+                                className='btn btn-sm btn-light-primary'
+                              >
+                                View
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className='text-center py-10'>
+                    <div className='text-muted mb-5'>No estimates have been created for this job yet.</div>
+                    <a href={`/estimates?job_id=${job.id}`} className='btn btn-primary'>
+                      Create First Estimate
+                    </a>
+                  </div>
+                )}
+              </KTCardBody>
+            </KTCard>
           )}
 
           {activeTab === 'photos' && (

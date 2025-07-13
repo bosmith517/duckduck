@@ -3,7 +3,8 @@ import { supabase } from '../../supabaseClient'
 export interface Invoice {
   id: string
   tenant_id: string
-  account_id: string
+  account_id?: string
+  contact_id?: string
   job_id?: string
   status: string
   total_amount: number
@@ -33,6 +34,12 @@ export interface InvoiceWithDetails extends Invoice {
     id: string
     name: string
   } | null
+  contacts?: {
+    id: string
+    name?: string
+    first_name?: string
+    last_name?: string
+  } | null
   jobs?: {
     id: string
     title: string
@@ -48,7 +55,8 @@ class InvoicesService {
         .from('invoices')
         .select(`
           *,
-          accounts!inner(id, name),
+          accounts(id, name),
+          contacts(id, name, first_name, last_name),
           jobs(id, title, job_number),
           invoice_items(*)
         `)

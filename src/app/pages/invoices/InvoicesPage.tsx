@@ -356,7 +356,12 @@ const InvoicesPage: React.FC = () => {
                           </td>
                           <td>
                             <span className='text-dark fw-bold d-block fs-6'>
-                              {invoice.accounts?.name || 'Unknown Client'}
+                              {invoice.accounts?.name || 
+                               (invoice.contacts ? (
+                                 invoice.contacts.name || 
+                                 `${invoice.contacts.first_name || ''} ${invoice.contacts.last_name || ''}`.trim()
+                               ) : '') || 
+                               'Unknown Client'}
                             </span>
                           </td>
                           <td>

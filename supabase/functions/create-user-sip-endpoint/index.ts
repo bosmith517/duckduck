@@ -38,23 +38,54 @@ serve(async (req) => {
     )
 
     // Check if user already has SIP configuration
-    const { data: existingSip } = await supabaseAdmin
+    let { data: existingSip } = await supabaseAdmin
       .from('sip_configurations')
       .select('*')
       .eq('user_id', userId)
       .eq('tenant_id', tenantId)
       .single()
+      
+    // Also check for old tenant-level configurations
+    if (!existingSip) {
+      const { data: tenantSip } = await supabaseAdmin
+        .from('sip_configurations')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .is('user_id', null)
+        .single()
+        
+      if (tenantSip) {
+        console.log('Found old tenant-level configuration, will clean it up')
+        existingSip = tenantSip
+      }
+    }
 
     if (existingSip) {
-      console.log('User already has SIP configuration:', existingSip.sip_username)
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'SIP endpoint already exists',
-        sipConfig: existingSip
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      })
+      console.log('User has existing SIP configuration:', existingSip.sip_username, existingSip.sip_domain)
+      
+      // Check if it's using the old incorrect domain
+      if (existingSip.sip_domain !== 'taurustech-tradeworkspro.sip.signalwire.com' || 
+          existingSip.sip_username.startsWith('tenant-')) {
+        console.log('Existing config uses old format, deleting it...')
+        
+        // Delete the old configuration
+        await supabaseAdmin
+          .from('sip_configurations')
+          .delete()
+          .eq('id', existingSip.id)
+          
+        console.log('Old configuration deleted, creating new one...')
+      } else {
+        // Config is already correct
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'SIP endpoint already exists with correct configuration',
+          sipConfig: existingSip
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        })
+      }
     }
 
     // SignalWire credentials
@@ -82,19 +113,29 @@ serve(async (req) => {
     
     // Use the standard domain: taurustech-tradeworkspro.sip.signalwire.com
     const sipDomain = 'taurustech-tradeworkspro.sip.signalwire.com'
-    const endpointName = 'taurustech-tradeworkspro'
+    
+    // Get active phone number for the tenant
+    const { data: phoneNumbers } = await supabaseAdmin
+      .from('signalwire_phone_numbers')
+      .select('number')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .limit(1)
+      
+    const activePhoneNumber = phoneNumbers?.[0]?.number || null
+    console.log('Active phone number for tenant:', activePhoneNumber)
 
-    console.log('Creating SIP user:', {
+    console.log('Creating SIP endpoint:', {
       username: sipUsername,
       domain: sipDomain,
-      endpoint: endpointName
+      send_as: activePhoneNumber
     })
 
-    // Create SIP user in SignalWire
+    // Create SIP endpoint in SignalWire using the correct API
     const auth = btoa(`${projectId}:${apiToken}`)
-    const createUserUrl = `https://${spaceUrl}/api/relay/rest/sip_endpoints/${endpointName}/users`
+    const createEndpointUrl = `https://${spaceUrl}/api/relay/rest/endpoints/sip`
     
-    const createResponse = await fetch(createUserUrl, {
+    const createResponse = await fetch(createEndpointUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${auth}`,
@@ -104,23 +145,26 @@ serve(async (req) => {
       body: JSON.stringify({
         username: sipUsername,
         password: sipPassword,
-        caller_id: null, // Will be set when they get a phone number
-        enabled: true
+        caller_id: null, // Caller ID for display
+        send_as: activePhoneNumber // Phone number to use for outbound calls
       })
     })
 
     let userCreatedInSignalWire = false
+    let signalWireEndpointId = null
     
     if (createResponse.ok) {
-      console.log('SIP user created successfully in SignalWire')
+      const endpointData = await createResponse.json()
+      console.log('SIP endpoint created successfully in SignalWire:', endpointData)
       userCreatedInSignalWire = true
+      signalWireEndpointId = endpointData.id
     } else {
       const errorText = await createResponse.text()
-      console.error('Failed to create SIP user in SignalWire:', errorText)
+      console.error('Failed to create SIP endpoint in SignalWire:', errorText)
       
-      // If 409, user might already exist
+      // If 409, endpoint might already exist
       if (createResponse.status === 409) {
-        console.log('User might already exist, continuing...')
+        console.log('Endpoint might already exist, continuing...')
         userCreatedInSignalWire = true
       }
     }
@@ -136,6 +180,7 @@ serve(async (req) => {
         sip_domain: sipDomain,
         sip_proxy: sipDomain,
         signalwire_project_id: projectId,
+        signalwire_endpoint_id: signalWireEndpointId,
         is_active: true,
         service_plan: 'basic',
         monthly_rate: 0, // User-level, billed at tenant level

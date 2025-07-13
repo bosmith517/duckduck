@@ -123,7 +123,12 @@ const SchedulePage: React.FC = () => {
           return {
             id: job.id,
             title: job.title || 'Untitled Job',
-            client: job.account?.name || job.contact?.first_name + ' ' + job.contact?.last_name || 'Unknown Client',
+            client: job.account?.name || 
+                    (job.contact ? (
+                      job.contact.name || 
+                      `${job.contact.first_name || ''} ${job.contact.last_name || ''}`.trim()
+                    ) : '') || 
+                    'Unknown Client',
             jobId: job.job_number || `JOB-${job.id.slice(0, 8)}`,
             type: determineJobType(job.title || '', job.description || ''),
             startTime: startDate.toTimeString().slice(0, 5),

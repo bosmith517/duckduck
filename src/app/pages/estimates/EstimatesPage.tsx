@@ -4,6 +4,7 @@ import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import { estimatesService, EstimateWithAccount } from '../../services/estimatesService'
 import { ConvertToJobModal } from './components/ConvertToJobModal'
 import { EstimateForm } from './components/EstimateForm'
+import { EstimateStatusModal } from './components/EstimateStatusModal'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { jobActivityService } from '../../services/jobActivityService'
 
@@ -17,6 +18,11 @@ const EstimatesPage: React.FC = () => {
   const [showConvertModal, setShowConvertModal] = useState(false)
   const [selectedEstimate, setSelectedEstimate] = useState<EstimateWithAccount | null>(null)
   const [editingEstimate, setEditingEstimate] = useState<EstimateWithAccount | null>(null)
+  const [statusChangeModal, setStatusChangeModal] = useState<{
+    estimateId: string
+    currentStatus: string
+    newStatus: string
+  } | null>(null)
 
   useEffect(() => {
     loadEstimates()
@@ -116,15 +122,20 @@ const EstimatesPage: React.FC = () => {
     }
   }
 
-  const handleStatusChange = async (estimateId: string, newStatus: string) => {
+  const handleStatusChange = async (estimateId: string, newStatus: string, feedback?: string) => {
     try {
-      await estimatesService.updateEstimateStatus(estimateId, newStatus)
+      await estimatesService.updateEstimateStatus(estimateId, newStatus, feedback)
       loadEstimates()
+      setStatusChangeModal(null)
       alert(`✅ Estimate status updated to ${newStatus}`)
     } catch (error) {
       console.error('Error updating estimate status:', error)
       alert('Failed to update estimate status')
     }
+  }
+
+  const initiateStatusChange = (estimateId: string, currentStatus: string, newStatus: string) => {
+    setStatusChangeModal({ estimateId, currentStatus, newStatus })
   }
 
 
@@ -286,9 +297,14 @@ const EstimatesPage: React.FC = () => {
                           <td>
                             <div className='d-flex flex-column'>
                               <span className='text-dark fw-bold d-block fs-6'>
-                                {estimate.accounts?.name || estimate.contact?.name || 'Unknown Client'}
+                                {estimate.accounts?.name || 
+                                 (estimate.contacts ? (
+                                   estimate.contacts.name || 
+                                   `${estimate.contacts.first_name || ''} ${estimate.contacts.last_name || ''}`.trim()
+                                 ) : null) || 
+                                 'Unknown Client'}
                               </span>
-                              {estimate.contact && (
+                              {estimate.contacts && (
                                 <span className='badge badge-light-info fs-8'>Customer</span>
                               )}
                               {estimate.accounts && (
@@ -356,7 +372,7 @@ const EstimatesPage: React.FC = () => {
                                   title='Send to Client'
                                   onClick={(e) => {
                                     e.preventDefault()
-                                    handleStatusChange(estimate.id, 'sent')
+                                    initiateStatusChange(estimate.id, estimate.status, 'sent')
                                   }}
                                 >
                                   <i className='ki-duotone ki-send fs-3'>
@@ -373,7 +389,7 @@ const EstimatesPage: React.FC = () => {
                                   title='Mark Approved'
                                   onClick={(e) => {
                                     e.preventDefault()
-                                    handleStatusChange(estimate.id, 'approved')
+                                    initiateStatusChange(estimate.id, estimate.status, 'approved')
                                   }}
                                 >
                                   <i className='ki-duotone ki-check fs-3'>
@@ -417,7 +433,7 @@ const EstimatesPage: React.FC = () => {
                                 </>
                               )}
 
-                              {estimate.status === 'approved' && (
+                              {estimate.status === 'approved' && !estimate.job_id && (
                                 <a
                                   href='#'
                                   className='btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1'
@@ -429,6 +445,20 @@ const EstimatesPage: React.FC = () => {
                                   }}
                                 >
                                   <i className='ki-duotone ki-briefcase fs-3'>
+                                    <span className='path1'></span>
+                                    <span className='path2'></span>
+                                  </i>
+                                </a>
+                              )}
+
+                              {/* Go to Job button for converted estimates */}
+                              {estimate.job_id && (
+                                <a
+                                  href={`/jobs/${estimate.job_id}`}
+                                  className='btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1'
+                                  title='Go to Job'
+                                >
+                                  <i className='ki-duotone ki-arrow-right fs-3'>
                                     <span className='path1'></span>
                                     <span className='path2'></span>
                                   </i>
@@ -488,6 +518,21 @@ const EstimatesPage: React.FC = () => {
             setShowConvertModal(false)
             setSelectedEstimate(null)
           }}
+        />
+      )}
+
+      {/* Status Change Modal */}
+      {statusChangeModal && (
+        <EstimateStatusModal
+          estimateId={statusChangeModal.estimateId}
+          currentStatus={statusChangeModal.currentStatus}
+          newStatus={statusChangeModal.newStatus}
+          onConfirm={(feedback) => handleStatusChange(
+            statusChangeModal.estimateId, 
+            statusChangeModal.newStatus,
+            feedback
+          )}
+          onCancel={() => setStatusChangeModal(null)}
         />
       )}
     </>

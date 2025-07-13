@@ -366,7 +366,12 @@ const DispatchPage: React.FC = () => {
                           <div>
                             <div className='fw-bold text-dark'>{job.title}</div>
                             <div className='text-muted fs-7'>
-                              {job.account?.name || 'Unknown Client'} - {job.job_number}
+                              {job.account?.name || 
+                               (job.contact ? (
+                                 job.contact.name || 
+                                 `${job.contact.first_name || ''} ${job.contact.last_name || ''}`.trim()
+                               ) : '') || 
+                               'Unknown Client'} - {job.job_number}
                             </div>
                             <span className={`badge ${getPriorityBadge(job.priority)} fs-8`}>
                               {job.priority?.toUpperCase() || 'MEDIUM'}

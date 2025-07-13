@@ -177,6 +177,48 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
         const wsServer = credentials.websocket.server
 
         console.log('SIP Configuration:', { sipUsername, sipDomain, wsServer })
+        
+        // Try to get better ICE servers from SignalWire
+        let iceServers = []
+        try {
+          const { data: iceData } = await supabase.functions.invoke('get-signalwire-ice-servers')
+          if (iceData?.iceServers) {
+            console.log('[Mobile Debug] Got ICE servers from SignalWire:', iceData.iceServers)
+            iceServers = iceData.iceServers
+          }
+        } catch (iceError) {
+          console.error('[Mobile Debug] Failed to get ICE servers:', iceError)
+        }
+        
+        // Fallback to default ICE servers if none provided
+        if (iceServers.length === 0) {
+          iceServers = [
+            // Google STUN servers
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            // SignalWire STUN
+            { urls: `stun:${sipDomain}` },
+            // Public TURN servers
+            {
+              urls: 'turn:openrelay.metered.ca:80',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            }
+          ]
+        }
 
         // Validate WebSocket URL format
         if (!wsServer.startsWith('wss://')) {
@@ -210,30 +252,15 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
             },
             // @ts-ignore - peerConnectionConfiguration is valid but not in types
             peerConnectionConfiguration: {
-              iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' },
-                // Add SignalWire STUN/TURN servers if available
-                { urls: `stun:${credentials.sip.domain}` },
-                // Public TURN servers as fallback (mobile networks often need TURN)
-                {
-                  urls: 'turn:openrelay.metered.ca:80',
-                  username: 'openrelayproject',
-                  credential: 'openrelayproject'
-                },
-                {
-                  urls: 'turn:openrelay.metered.ca:443',
-                  username: 'openrelayproject',
-                  credential: 'openrelayproject'
-                }
-              ],
+              iceServers: iceServers,
               iceCandidatePoolSize: 10,
               bundlePolicy: 'max-bundle',
               rtcpMuxPolicy: 'require',
-              iceTransportPolicy: 'all' // Allow both STUN and TURN
+              iceTransportPolicy: 'all', // Allow both STUN and TURN
+              // Increase ICE timeout for better connectivity
+              iceCandidateTimeout: 15000, // 15 seconds
+              // Add ICE restart capability
+              iceRestartEnabled: true
             }
           },
           delegate: {
@@ -254,6 +281,14 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
         // Create UserAgent
         const userAgent = new UserAgent(userAgentOptions)
         userAgentRef.current = userAgent
+
+        // Set up delegate for incoming calls
+        userAgent.delegate = {
+          onInvite: (invitation) => {
+            console.log('[Mobile Debug] Incoming call received:', invitation.remoteIdentity?.uri?.user)
+            handleIncomingCall(invitation)
+          }
+        }
 
         // Add a small delay to ensure everything is ready
         await new Promise(resolve => setTimeout(resolve, 500))
@@ -286,6 +321,11 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
         // Add registration state monitoring
         registerer.stateChange.addListener((state) => {
           console.log('[Mobile Debug] Registerer state changed:', state)
+          if (state === 'Registered') {
+            setConnectionState('connected')
+            showToast.dismiss()
+            showToast.success('Connected to VoIP system!')
+          }
         })
 
         console.log('Registering with SIP server...')
@@ -421,8 +461,35 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
             const state = sdh.peerConnection.iceConnectionState
             console.log('[Mobile Debug] ICE Connection State changed to:', state)
             
-            if (state === 'failed') {
+            // Log more details about the connection
+            if (state === 'checking') {
+              console.log('[Mobile Debug] ICE checking - gathering candidates...')
+            } else if (state === 'connected' || state === 'completed') {
+              console.log('[Mobile Debug] ICE connected successfully!')
+              // Log selected candidates
+              sdh.peerConnection.getStats().then((stats: RTCStatsReport) => {
+                stats.forEach((report) => {
+                  if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                    console.log('[Mobile Debug] Selected candidate pair:', {
+                      local: report.localCandidateId,
+                      remote: report.remoteCandidateId
+                    })
+                  }
+                })
+              }).catch(console.error)
+            } else if (state === 'failed') {
               console.error('[Mobile Debug] ICE connection failed')
+              
+              // Try to get more details about the failure
+              sdh.peerConnection.getStats().then((stats: RTCStatsReport) => {
+                console.log('[Mobile Debug] Connection stats at failure:')
+                stats.forEach((report) => {
+                  if (report.type === 'candidate-pair') {
+                    console.log('[Mobile Debug] Candidate pair:', report)
+                  }
+                })
+              }).catch(console.error)
+              
               showToast.error('Network connection failed. Please check your internet connection.')
               handleHangup()
             } else if (state === 'disconnected') {
@@ -443,27 +510,22 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           
           // Monitor track events
           sdh.peerConnection.ontrack = (event: RTCTrackEvent) => {
-            console.log('[Mobile Debug] Track received:', event.track.kind)
-            if (event.track.kind === 'audio' && event.streams[0]) {
-              console.log('[Mobile Debug] Audio track received, attaching to audio element')
-              if (audioRef.current) {
-                audioRef.current.srcObject = event.streams[0]
-                // Force play on mobile
+            if (event.track.kind === 'audio') {
+              const stream = event.streams[0]
+              if (audioRef.current && stream) {
+                audioRef.current.srcObject = stream
+                audioRef.current.load()
                 audioRef.current.play().then(() => {
-                  console.log('[Mobile Debug] Audio playback started successfully')
-                }).catch(e => {
-                  console.error('[Mobile Debug] Failed to play audio:', e)
-                  // Try to play on user interaction
-                  const playAudio = () => {
+                  console.log('[Audio] Playback started')
+                }).catch(err => {
+                  console.warn('[Audio] Playback blocked, waiting for user interaction')
+                  const unlock = () => {
                     audioRef.current?.play().then(() => {
-                      console.log('[Mobile Debug] Audio playback started after user interaction')
-                      document.removeEventListener('click', playAudio)
-                    }).catch(err => {
-                      console.error('[Mobile Debug] Still failed to play audio:', err)
-                    })
+                      console.log('[Audio] Playback started after interaction')
+                      document.removeEventListener('click', unlock)
+                    }).catch(() => {})
                   }
-                  document.addEventListener('click', playAudio)
-                  showToast.info('Tap anywhere to enable audio')
+                  document.addEventListener('click', unlock)
                 })
               }
             }
@@ -484,51 +546,7 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           console.log('[Mobile Debug] Call established')
           setCallState('active')
           showToast.success('Call connected!')
-          
-          // Handle remote media with better mobile support
-          if (session.sessionDescriptionHandler) {
-            const sdh = session.sessionDescriptionHandler as any
-            console.log('[Mobile Debug] Session description handler:', sdh)
-            
-            // Try multiple ways to get the remote stream
-            const remoteStream = sdh.remoteMediaStream || 
-                                (sdh.peerConnection?.getRemoteStreams && sdh.peerConnection.getRemoteStreams()[0]) ||
-                                null
-                                
-            console.log('[Mobile Debug] Remote stream:', remoteStream)
-            
-            if (remoteStream && audioRef.current) {
-              console.log('[Mobile Debug] Setting up audio element with remote stream')
-              audioRef.current.srcObject = remoteStream
-              audioRef.current.volume = 1.0
-              
-              // Mobile-specific audio setup
-              if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                console.log('[Mobile Debug] Mobile device detected, applying mobile-specific settings')
-                audioRef.current.setAttribute('playsinline', 'true')
-                audioRef.current.setAttribute('webkit-playsinline', 'true')
-              }
-              
-              audioRef.current.play().then(() => {
-                console.log('[Mobile Debug] Audio playback started')
-              }).catch(e => {
-                console.error('[Mobile Debug] Failed to play audio:', e)
-                // On mobile, we might need user interaction
-                showToast.info('Tap to enable audio')
-                
-                // Try to play on next user interaction
-                const playOnInteraction = () => {
-                  audioRef.current?.play().then(() => {
-                    console.log('[Mobile Debug] Audio started after interaction')
-                    document.removeEventListener('click', playOnInteraction)
-                  })
-                }
-                document.addEventListener('click', playOnInteraction)
-              })
-            } else {
-              console.error('[Mobile Debug] No remote stream available')
-            }
-          }
+          // Audio should already be playing from ontrack handler
           break
         case SessionState.Terminating:
           console.log('[Mobile Debug] Call terminating...')
@@ -572,11 +590,24 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
       console.log('[Mobile Debug] SIP domain:', domain)
       
       // Clean and format phone number for SIP
-      const cleanNumber = phoneNumber.replace(/[^\d+]/g, '')
-      const sipNumber = cleanNumber.startsWith('+') ? cleanNumber.substring(1) : cleanNumber
-      console.log('[Mobile Debug] Formatted number:', { original: phoneNumber, clean: cleanNumber, sip: sipNumber })
+      let cleanNumber = phoneNumber.replace(/[^\d+]/g, '')
       
-      const target = new URI('sip', sipNumber, domain)
+      // Ensure number has + prefix for PSTN calls
+      if (!cleanNumber.startsWith('+')) {
+        // Assume US number if no country code
+        if (cleanNumber.length === 10) {
+          cleanNumber = '+1' + cleanNumber
+        } else if (cleanNumber.length === 11 && cleanNumber.startsWith('1')) {
+          cleanNumber = '+' + cleanNumber
+        } else {
+          // For other formats, just add +
+          cleanNumber = '+' + cleanNumber
+        }
+      }
+      
+      console.log('[Mobile Debug] Formatted number:', { original: phoneNumber, clean: cleanNumber })
+      
+      const target = new URI('sip', cleanNumber, domain)
       console.log('[Mobile Debug] Target URI:', target.toString())
       
       // Options for the call
@@ -605,6 +636,7 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
           // @ts-ignore
           peerConnectionConfiguration: {
             iceServers: [
+              // Google STUN servers
               { urls: 'stun:stun.l.google.com:19302' },
               { urls: 'stun:stun1.l.google.com:19302' },
               { urls: 'stun:stun2.l.google.com:19302' },
@@ -612,7 +644,7 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
               { urls: 'stun:stun4.l.google.com:19302' },
               // Add SignalWire STUN server
               { urls: `stun:${userAgentRef.current.configuration.uri.host}` },
-              // Public TURN servers as fallback (mobile networks often need TURN)
+              // Multiple public TURN servers for better connectivity
               {
                 urls: 'turn:openrelay.metered.ca:80',
                 username: 'openrelayproject',
@@ -622,12 +654,32 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
                 urls: 'turn:openrelay.metered.ca:443',
                 username: 'openrelayproject',
                 credential: 'openrelayproject'
+              },
+              {
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              },
+              // Additional TURN servers for redundancy
+              {
+                urls: 'turn:relay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              },
+              {
+                urls: 'turn:relay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
               }
             ],
             iceCandidatePoolSize: 10,
             bundlePolicy: 'max-bundle',
             rtcpMuxPolicy: 'require',
-            iceTransportPolicy: 'all' // Allow both STUN and TURN
+            iceTransportPolicy: 'all', // Allow both STUN and TURN
+            // Increase ICE timeout for better connectivity
+            iceCandidateTimeout: 15000, // 15 seconds
+            // Add ICE restart capability
+            iceRestartEnabled: true
           }
         } as any
       }
@@ -655,6 +707,7 @@ const WebRTCSoftphoneDialer: React.FC<SoftphoneDialerProps> = ({ isVisible, onCl
         showToast.loading(`Calling ${name}...`)
       } catch (inviteError) {
         console.error('[Mobile Debug] Invite failed:', inviteError)
+        showToast.error('Call failed to connect. Please try again.')
         throw inviteError
       }
 

@@ -337,7 +337,12 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
             complexity: 'standard',
             jobTitle: jobDetails?.title || '',
             jobDescription: jobDetails?.description || '',
-            customerName: jobDetails?.accounts?.name || '',
+            customerName: jobDetails?.accounts?.name || 
+                          (jobDetails?.contacts ? (
+                            jobDetails.contacts.name || 
+                            `${jobDetails.contacts.first_name || ''} ${jobDetails.contacts.last_name || ''}`.trim()
+                          ) : '') || 
+                          '',
             propertyAddress: jobDetails?.location_address || ''
           }
         }
@@ -1324,7 +1329,12 @@ if (data?.narrative) {
                     <div className="card-body">
                       <div className="row">
                         <div className="col-md-6">
-                          <h5>{jobDetails.accounts?.name}</h5>
+                          <h5>{jobDetails.accounts?.name || 
+                              (jobDetails.contacts ? (
+                                jobDetails.contacts.name || 
+                                `${jobDetails.contacts.first_name || ''} ${jobDetails.contacts.last_name || ''}`.trim()
+                              ) : '') || 
+                              'Unknown Client'}</h5>
                           <p className="text-muted mb-0">
                             {jobDetails.accounts?.address_line1}<br/>
                             {jobDetails.accounts?.city}, {jobDetails.accounts?.state} {jobDetails.accounts?.zip_code}

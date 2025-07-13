@@ -62,18 +62,17 @@ serve(async (req) => {
       throw new Error('SignalWire credentials not configured');
     }
 
-    // Construct the SIP domain (existing endpoint)
-    const last12 = projectId.replace(/-/g, '').slice(-12);
-    const sipDomain = `taurustech-${last12}.sip.signalwire.com`;
-    const endpointName = sipDomain.split('.')[0]; // taurustech-9b70eb096555
+    // Use the correct SIP endpoint
+    const sipDomain = 'taurustech-tradeworkspro.sip.signalwire.com';
+    const endpointName = 'taurustech-tradeworkspro';
 
     console.log('Working with SIP endpoint:', sipDomain);
 
-    // Check if SIP configuration already exists for this tenant
+    // Check if SIP configuration already exists for this user
     let { data: sipConfig } = await supabaseAdmin
       .from('sip_configurations')
       .select('*')
-      .eq('tenant_id', userProfile.tenant_id)
+      .eq('user_id', user.id)
       .eq('is_active', true)
       .single();
 
@@ -233,8 +232,9 @@ serve(async (req) => {
       }
     }
 
-    // Store/update SIP configuration in database
+    // Store/update SIP configuration in database (user-specific)
     const sipConfigData = {
+      user_id: user.id,
       tenant_id: userProfile.tenant_id,
       sip_username: sipUsername,
       sip_password_encrypted: sipPassword,
@@ -243,10 +243,10 @@ serve(async (req) => {
       signalwire_project_id: projectId,
       is_active: true,
       service_plan: 'basic',
-      monthly_rate: 29.99,
-      per_minute_rate: 0.02,
-      included_minutes: 1000,
-      notes: `${sipUserCreated ? 'Auto-created' : 'Manual creation needed'} - ${new Date().toISOString()}`
+      monthly_rate: 0, // User-level configs don't have individual rates
+      per_minute_rate: 0,
+      included_minutes: 0,
+      notes: `${sipUserCreated ? 'Auto-created' : 'Manual creation needed'} for ${user.email} - ${new Date().toISOString()}`
     };
 
     if (sipConfig) {

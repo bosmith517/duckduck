@@ -56,17 +56,23 @@ export const ConvertToJobModal: React.FC<ConvertToJobModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState(1) // 1: Job Details, 2: Payment Schedule
+  
+  // Set default due dates: today for start, 30 days from now for completion
+  const today = new Date()
+  const thirtyDaysFromNow = new Date(today)
+  thirtyDaysFromNow.setDate(today.getDate() + 30)
+  
   const [paymentSchedule, setPaymentSchedule] = useState<PaymentMilestone[]>([
     {
       milestone_name: 'Project Start (50%)',
       amount_due: estimate.total_amount * 0.5,
-      due_date: '',
+      due_date: today.toISOString().split('T')[0], // Format as YYYY-MM-DD
       status: 'Pending'
     },
     {
       milestone_name: 'Project Completion (50%)',
       amount_due: estimate.total_amount * 0.5,
-      due_date: '',
+      due_date: thirtyDaysFromNow.toISOString().split('T')[0], // Format as YYYY-MM-DD
       status: 'Pending'
     }
   ])
@@ -76,8 +82,8 @@ export const ConvertToJobModal: React.FC<ConvertToJobModalProps> = ({
       title: estimate.project_title || '',
       description: estimate.description || '',
       priority: 'medium',
-      start_date: '',
-      due_date: '',
+      start_date: today.toISOString().split('T')[0], // Default to today
+      due_date: thirtyDaysFromNow.toISOString().split('T')[0], // Default to 30 days from now
       notes: estimate.notes || '',
     },
     validationSchema: jobSchema,
@@ -109,9 +115,22 @@ export const ConvertToJobModal: React.FC<ConvertToJobModalProps> = ({
     setPaymentSchedule(paymentSchedule.filter((_, i) => i !== index))
   }
 
+  const handleUpdateMilestoneDate = (index: number, newDate: string) => {
+    const updatedSchedule = [...paymentSchedule]
+    updatedSchedule[index].due_date = newDate
+    setPaymentSchedule(updatedSchedule)
+  }
+
   const handleConvertToJob = async () => {
     if (paymentSchedule.length === 0) {
       alert('Please add at least one payment milestone')
+      return
+    }
+
+    // Check if all milestones have valid due dates
+    const invalidMilestones = paymentSchedule.filter(m => !m.due_date)
+    if (invalidMilestones.length > 0) {
+      alert('Please set due dates for all payment milestones')
       return
     }
 
@@ -124,9 +143,11 @@ export const ConvertToJobModal: React.FC<ConvertToJobModalProps> = ({
     setLoading(true)
     try {
       await onConvert(jobFormik.values, paymentSchedule)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error converting to job:', error)
-      alert('Error converting estimate to job. Please try again.')
+      // Show more specific error message to user
+      const errorMessage = error?.message || 'Error converting estimate to job. Please try again.'
+      alert(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -414,7 +435,14 @@ export const ConvertToJobModal: React.FC<ConvertToJobModalProps> = ({
                                   <span className='text-dark fw-bold'>${milestone.amount_due.toFixed(2)}</span>
                                 </td>
                                 <td>
-                                  <span className='text-dark'>{new Date(milestone.due_date).toLocaleDateString()}</span>
+                                  <input
+                                    type='date'
+                                    className='form-control form-control-sm'
+                                    value={milestone.due_date}
+                                    onChange={(e) => handleUpdateMilestoneDate(index, e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    required
+                                  />
                                 </td>
                                 <td>
                                   <span className='badge badge-light-secondary'>{milestone.status}</span>
@@ -464,7 +492,7 @@ export const ConvertToJobModal: React.FC<ConvertToJobModalProps> = ({
                       type='button'
                       className='btn btn-primary'
                       onClick={handleConvertToJob}
-                      disabled={loading || paymentSchedule.length === 0 || Math.abs(totalScheduleAmount - estimate.total_amount) > 0.01}
+                      disabled={loading || paymentSchedule.length === 0 || Math.abs(totalScheduleAmount - estimate.total_amount) > 0.01 || paymentSchedule.some(m => !m.due_date)}
                     >
                       {loading ? (
                         <>

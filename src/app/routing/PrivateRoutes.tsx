@@ -87,6 +87,8 @@ const PrivateRoutes = () => {
   const HomeownerPortalPage = lazy(() => import('../pages/homeowner/HomeownerPortalPage'))
   const MenuTestPage = lazy(() => import('../pages/MenuTestPage'))
   const AutomationDemoPage = lazy(() => import('../pages/test/AutomationDemoPage'))
+  const EstimateDebugPage = lazy(() => import('../pages/test/EstimateDebugPage'))
+  const JobLoadingTestPage = lazy(() => import('../pages/test/JobLoadingTestPage'))
   const DatabaseTestPage = lazy(() => import('../pages/test/DatabaseTestPage'))
   const SignalWireTestPage = lazy(() => import('../pages/test/SignalWireTestPage'))
   const SignalWireSyncTestPage = lazy(() => import('../pages/test/SignalWireSyncTestPage'))
@@ -764,6 +766,22 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <AutomationDemoPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/estimate-debug'
+          element={
+            <SuspensedView>
+              <EstimateDebugPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/job-loading'
+          element={
+            <SuspensedView>
+              <JobLoadingTestPage />
             </SuspensedView>
           }
         />

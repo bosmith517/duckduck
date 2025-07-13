@@ -41,6 +41,7 @@ interface EstimateFormValues {
 interface Job {
   id: string
   title: string
+  job_number?: string
   account_id: string | null
   contact_id: string | null
   accounts?: { name: string } | null
@@ -124,8 +125,15 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
   const [availablePhotos, setAvailablePhotos] = useState<EstimatePhoto[]>([])
   const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [selectedAccountType, setSelectedAccountType] = useState<'business' | 'residential' | null>(null)
+  const [selectedAccountType, setSelectedAccountType] = useState<'business' | 'residential' | null>(
+    estimate ? (estimate.account_id ? 'business' : estimate.contact_id ? 'residential' : null) : null
+  )
   const [availableJobs, setAvailableJobs] = useState<Job[]>([])
+  
+  // Debug: log when availableJobs changes
+  useEffect(() => {
+    console.log('Available jobs updated:', availableJobs.length, 'jobs', availableJobs)
+  }, [availableJobs])
   const [showNewJobForm, setShowNewJobForm] = useState(false)
   const [newJobTitle, setNewJobTitle] = useState('')
   const [creatingJob, setCreatingJob] = useState(false)
@@ -133,9 +141,14 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
   const formik = useFormik<EstimateFormValues>({
     initialValues: {
-      clientCustomer: estimate?.accounts?.name || (estimate?.contact ? `${estimate.contact.first_name} ${estimate.contact.last_name}`.trim() : '') || '',
+      clientCustomer: estimate?.accounts?.name || 
+                      (estimate?.contacts ? (
+                        estimate.contacts.name || 
+                        `${estimate.contacts.first_name || ''} ${estimate.contacts.last_name || ''}`.trim()
+                      ) : '') || 
+                      '',
       accountId: estimate?.account_id || estimate?.contact_id || '',
-      jobId: jobId || '', // Use provided jobId or empty for selection
+      jobId: jobId || estimate?.job_id || '', // Use provided jobId, or estimate's job_id, or empty
       projectTitle: estimate?.project_title || '',
       description: estimate?.description || '',
       status: estimate?.status || 'draft',
@@ -156,7 +169,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
         
         const submitData = {
           account_id: isResidentialClient ? null : values.accountId,
-          contact_id: isResidentialClient ? values.accountId : null,
+          contact_id: isResidentialClient ? values.accountId : null,  // Using accountId which contains the contact ID for residential
           job_id: values.jobId, // Include the selected job ID
           project_title: values.projectTitle,
           description: values.description,
@@ -175,10 +188,33 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
     },
   })
 
-  // Load accounts, job details, and photos
+  // Load accounts only once when component mounts with tenant_id
   useEffect(() => {
     if (userProfile?.tenant_id) {
       loadAccounts()
+    }
+  }, [userProfile?.tenant_id])
+
+  // Simple effect to load jobs when we have an estimate
+  useEffect(() => {
+    if (estimate && userProfile?.tenant_id) {
+      // Small delay to ensure component is mounted
+      const timer = setTimeout(() => {
+        console.log('Auto-loading jobs for estimate:', estimate.estimate_number)
+        if (estimate.account_id) {
+          loadJobsForAccount(estimate.account_id, 'business')
+        } else if (estimate.contact_id) {
+          loadJobsForAccount(estimate.contact_id, 'residential')
+        }
+      }, 100)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [estimate?.id, userProfile?.tenant_id])
+
+  // Load job details and photos separately
+  useEffect(() => {
+    if (userProfile?.tenant_id) {
       if (jobId) {
         loadJobDetails()
       }
@@ -187,6 +223,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
       }
     }
   }, [userProfile?.tenant_id, jobId, accountId, estimate?.account_id])
+
 
   const loadJobDetails = async () => {
     if (!jobId) return
@@ -251,7 +288,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
       // Load residential clients (contacts table - those without account_id are residential)
       const { data: contactsData, error: contactsError } = await supabase
         .from('contacts')
-        .select('id, first_name, last_name')
+        .select('id, first_name, last_name, name')
         .eq('tenant_id', userProfile.tenant_id)
         .is('account_id', null)  // Residential clients don't have an associated business account
         .order('last_name')
@@ -270,14 +307,17 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
       const residentialClients = (contactsData || []).map(contact => ({
         id: contact.id,
-        name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact',
+        name: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact',
         type: 'residential' as const
       }))
 
       const combined = [...businessClients, ...residentialClients]
+      console.log('Accounts loaded:', combined.length, 'total accounts')
       setAccounts(combined)
     } catch (error) {
       console.error('Error loading accounts and customers:', error)
+      showToast.error('Failed to load clients. Please refresh and try again.')
+      setAccounts([]) // Ensure accounts is set even on error
     }
   }
 
@@ -298,16 +338,17 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
   const loadJobsForAccount = async (accountId: string, accountType: 'business' | 'residential') => {
     try {
+      console.log('Loading jobs for:', { accountId, accountType, tenantId: userProfile?.tenant_id })
+      
       let query = supabase
         .from('jobs')
         .select(`
           id,
           title,
+          job_number,
           account_id,
           contact_id,
-          status,
-          accounts(name),
-          contacts(first_name, last_name)
+          status
         `)
         .eq('tenant_id', userProfile?.tenant_id)
         .order('created_at', { ascending: false })
@@ -324,11 +365,10 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
       if (error) throw error
 
-      setAvailableJobs((data || []).map(job => ({
-        ...job,
-        accounts: job.accounts ? job.accounts[0] : null,
-        contacts: job.contacts ? job.contacts[0] : null
-      })))
+      console.log('Jobs loaded:', data?.length || 0, 'jobs found')
+      console.log('Jobs data:', data)
+
+      setAvailableJobs(data || [])
     } catch (error) {
       console.error('Error loading jobs:', error)
       setAvailableJobs([])
@@ -598,7 +638,25 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
                 {/* Job Selection */}
                 <div className='col-md-12 mb-7'>
-                  <label className='required fw-semibold fs-6 mb-2'>Select Job</label>
+                  <label className='required fw-semibold fs-6 mb-2'>
+                    Select Job
+                    {estimate && availableJobs.length === 0 && (
+                      <button
+                        type='button'
+                        className='btn btn-link btn-sm ms-2'
+                        onClick={() => {
+                          console.log('Manual job load triggered')
+                          if (estimate.account_id) {
+                            loadJobsForAccount(estimate.account_id, 'business')
+                          } else if (estimate.contact_id) {
+                            loadJobsForAccount(estimate.contact_id, 'residential')
+                          }
+                        }}
+                      >
+                        (Load Jobs)
+                      </button>
+                    )}
+                  </label>
                   {!showNewJobForm ? (
                     <div className='d-flex gap-2'>
                       <select
@@ -622,7 +680,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                         </option>
                         {availableJobs.map(job => (
                           <option key={job.id} value={job.id}>
-                            {job.title} ({job.status})
+                            {job.job_number ? `${job.job_number} - ` : ''}{job.title} ({job.status})
                           </option>
                         ))}
                       </select>

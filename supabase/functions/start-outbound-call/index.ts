@@ -259,7 +259,7 @@ serve(async (req) => {
 
     // Find active phone number
     const activePhoneNumber = phoneNumbers?.find(p => p.is_active === true)
-    const fromPhoneNumber = activePhoneNumber?.phone_number || null
+    const fromPhoneNumber = activePhoneNumber?.number || null
 
     console.log('Active phone number found:', activePhoneNumber)
     console.log('Final fromPhoneNumber:', fromPhoneNumber)
