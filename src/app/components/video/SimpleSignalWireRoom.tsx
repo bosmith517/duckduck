@@ -55,6 +55,18 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
       return
     }
 
+// 🔵🔵  NEW — pull SignalWire’s TURN creds from the JWT
+const payload     = JSON.parse(atob(token.split('.')[1]))
+const { ice_servers } = payload            // short username + credential
+
+// Create room session …
+console.log('Creating room session…')
+const roomSession = new Video.RoomSession({
+  token,
+  rootElement: videoContainerRef.current,
+  iceServers: ice_servers,                 // 👈 use the proper list
+})
+
     const initializeRoom = async () => {
       // Prevent multiple simultaneous initializations
       if (isInitializingRef.current || isConnectedRef.current) {
