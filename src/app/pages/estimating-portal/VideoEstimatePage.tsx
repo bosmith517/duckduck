@@ -28,17 +28,7 @@ const VideoEstimatePage: React.FC = () => {
     }
   }, [sessionId, token])
   
-  // Auto-add AI when room is joined
-  useEffect(() => {
-    if (hasJoinedRoom && session && !isAddingAI) {
-      console.log('Auto-adding AI to room after join')
-      const timer = setTimeout(() => {
-        handleAddAI()
-      }, 2000) // Wait 2 seconds for room to stabilize
-      
-      return () => clearTimeout(timer)
-    }
-  }, [hasJoinedRoom, session, isAddingAI, handleAddAI])
+  // Moved after handleAddAI definition
   
   const loadSession = async () => {
     try {
@@ -192,6 +182,18 @@ const VideoEstimatePage: React.FC = () => {
       setIsAddingAI(false)
     }
   }, [session, isAddingAI])
+  
+  // Auto-add AI when room is joined
+  useEffect(() => {
+    if (hasJoinedRoom && session && !isAddingAI) {
+      console.log('Auto-adding AI to room after join')
+      const timer = setTimeout(() => {
+        handleAddAI()
+      }, 2000) // Wait 2 seconds for room to stabilize
+      
+      return () => clearTimeout(timer)
+    }
+  }, [hasJoinedRoom, session, isAddingAI, handleAddAI])
   
   if (loading) {
     return (

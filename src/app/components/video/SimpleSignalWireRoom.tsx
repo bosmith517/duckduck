@@ -65,23 +65,49 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
       try {
         setIsConnecting(true)
         setError(null)
+        
+        // Pre-request media permissions to speed up connection
+        console.log('Pre-requesting media permissions...')
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: true, 
+            video: isMobile ? {
+              facingMode: { exact: 'environment' }
+            } : true
+          })
+          console.log('✅ Media permissions granted')
+          // Release the stream - we just wanted to trigger permission
+          stream.getTracks().forEach(track => track.stop())
+        } catch (permErr) {
+          console.warn('Media permission pre-request failed:', permErr)
+          // Continue anyway - permissions will be requested during join
+        }
 
-        // Create room session with ICE server configuration
+        // Create room session with optimized configuration
         console.log('Creating room session...')
         const roomSession = new SignalWire.Video.RoomSession({
           token: token,
           rootElement: videoContainerRef.current,
           iceServers: [
             { urls: 'stun:stun.signalwire.com' },
-            { urls: 'stun:stun.l.google.com:19302' }
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
           ]
         })
 
         roomSessionRef.current = roomSession
 
+        // Monitor connection progress
+        const startTime = Date.now()
+        console.log('⏱️ Connection started at:', new Date().toISOString())
+
         // Simple event handlers
         roomSession.on('room.joined', (params) => {
-          console.log('✅ Room joined:', params)
+          const connectionTime = Date.now() - startTime
+          console.log(`✅ Room joined in ${connectionTime}ms (${(connectionTime / 1000).toFixed(1)}s)`)
+          console.log('Room details:', params)
+          
           if (isMountedRef.current) {
             setIsConnected(true)
             isConnectedRef.current = true
@@ -128,16 +154,17 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
 
         // Join the room with audio/video parameters
         console.log('Joining room with audio/video...')
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
         
         try {
+          const joinStart = Date.now()
           await roomSession.join({
             audio: true,
             video: isMobile ? {
               facingMode: { exact: 'environment' } // Use rear camera on mobile for inspections
             } : true
           })
-          console.log('✅ Join request sent')
+          const joinTime = Date.now() - joinStart
+          console.log(`✅ Join request completed in ${joinTime}ms`)
           clearTimeout(joinTimeout)
         } catch (joinErr) {
           clearTimeout(joinTimeout)
