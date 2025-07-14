@@ -68,9 +68,9 @@ serve(async (req) => {
     // Video Scripts API parameters
     const executePayload = {
       room_name: room_name,
-      params: {
-        display_name: 'Estimator Alex',
-        permissions: ['room.self.audio_mute', 'room.self.audio_unmute', 'room.self.video_mute', 'room.self.video_unmute']
+      display_name: 'Estimator Alex',
+      join_params: {
+        permissions: ['room.subscribe', 'room.publish']
       }
     }
     

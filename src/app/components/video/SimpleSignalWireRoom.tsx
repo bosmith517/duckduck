@@ -66,15 +66,18 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         setIsConnecting(true)
         setError(null)
         
-        // Don't pre-request permissions - let SignalWire handle it
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
-        // Create room session - let SignalWire handle ICE configuration
-        console.log('Creating room session...')
+        // Create room session with TURN-only configuration
+        console.log('Creating room session with TURN relay...')
         const roomSession = new SignalWire.Video.RoomSession({
           token: token,
-          rootElement: videoContainerRef.current
-        })
+          rootElement: videoContainerRef.current,
+          iceServers: [
+            { urls: 'turns:relay.signalwire.com?transport=tcp' }  // Force TURN over TCP
+          ],
+          iceTransportPolicy: 'relay' as RTCIceTransportPolicy // Skip STUN, use TURN only
+        } as any)
 
         roomSessionRef.current = roomSession
 
@@ -135,16 +138,16 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           }
         }, 30000) // 30 second timeout
 
-        // Join the room with audio/video parameters
-        console.log('Joining room with audio/video...')
+        // Join the room - let SDK handle media capture
+        console.log('Joining room with TURN relay...')
         
         try {
           const joinStart = Date.now()
           await roomSession.join({
             audio: true,
-            video: isMobile ? {
-              facingMode: { exact: 'environment' } // Use rear camera on mobile for inspections
-            } : true
+            video: isMobile ? 
+              { facingMode: { exact: 'environment' } } 
+              : true
           })
           const joinTime = Date.now() - joinStart
           console.log(`✅ Join request completed in ${joinTime}ms`)
