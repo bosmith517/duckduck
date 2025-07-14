@@ -3,18 +3,15 @@ import React, {
   useRef,
   useState
 } from 'react'
- import { Video } from '@signalwire/js'
- import type {
-   RoomSessionEventParams,
-   MemberJoinedEventParams,
-   MemberLeftEventParams
- } from '@signalwire/core'
+import {
+  Video,
+} from '@signalwire/js'
 
 interface SimpleSignalWireRoomProps {
   token: string
   onError?: (error: any) => void
   onRoomJoined?: () => void
- onMemberJoined?: (member: MemberJoinedEventParams['member']) => void
+ onMemberJoined?: (member: any) => void
 }
 
 export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
@@ -93,7 +90,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         console.log('⏱️ Connection started at:', new Date().toISOString())
 
         // Simple event handlers
-        roomSession.on('room.joined', (params: RoomSessionEventParams) => {
+        roomSession.on('room.joined', (params: any) => {
           const connectionTime = Date.now() - startTime
           console.log(`✅ Room joined in ${connectionTime}ms (${(connectionTime / 1000).toFixed(1)}s)`)
           console.log('Room details:', params)
@@ -113,16 +110,16 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           }
         })
 
-        roomSession.on('member.joined', (params: MemberJoinedEventParams) => {
+        roomSession.on('member.joined', (params: any) => {
           console.log('👤 Member joined:', params.member.name || params.member.id)
           onMemberJoinedRef.current?.(params.member)
         })
 
-        roomSession.on('member.left', (params: MemberLeftEventParams) => {
+        roomSession.on('member.left', (params: any) => {
           console.log('👤 Member left:', params.member.name || params.member.id)
         })
 
-        roomSession.on('room.left', (params: RoomSessionEventParams) => {
+        roomSession.on('room.left', (params: any) => {
           console.log('❌ Room left:', params)
           // Only update state if we were actually connected
           if (isConnectedRef.current) {

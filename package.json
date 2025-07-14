@@ -85,11 +85,12 @@
   "devDependencies": {
     "@capacitor/cli": "^7.4.0",
     "@rollup/rollup-win32-x64-msvc": "^4.44.1",
+    "@signalwire/core": "^4.3.0",
     "@swc/core-win32-x64-msvc": "^1.12.7",
     "@types/bootstrap": "5.2.10",
     "@types/chart.js": "2.9.41",
     "@types/jest": "29.5.12",
-    "@types/node": "22.0.0",
+    "@types/node": "^20.14.2",
     "@types/prismjs": "1.26.4",
     "@types/qs": "6.9.15",
     "@types/react": "18.3.3",
