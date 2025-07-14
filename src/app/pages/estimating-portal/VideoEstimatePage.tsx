@@ -222,9 +222,9 @@ const VideoEstimatePage: React.FC = () => {
       <div className='bg-white border-bottom px-5 py-3'>
         <div className='d-flex justify-content-between align-items-center'>
           <div>
-            <h3 className='mb-0'>Video Estimate Session</h3>
+            <h3 className='mb-0'>Video Estimating Session</h3>
             <span className='text-muted'>
-              {session?.trade_type} Inspection
+              {session?.trade_type} Inspection - Estimating Portal
             </span>
           </div>
           <div>
@@ -266,7 +266,7 @@ const VideoEstimatePage: React.FC = () => {
               {aiStatus.includes('connected') && (
                 <div className='mt-2'>
                   <small className='text-muted'>
-                    Tips: Use your rear camera for best results. Ensure good lighting. Show problem areas clearly.
+                    Tips: Use your rear camera to show areas to the AI. Point your camera at problem areas. Ensure good lighting. Move slowly for best results.
                   </small>
                 </div>
               )}

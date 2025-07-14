@@ -65,7 +65,7 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
         video: enableVideo ? {
           width: { min: 320, ideal: 640, max: 1280 },
           height: { min: 240, ideal: 480, max: 720 },
-          facingMode: isMobile ? { exact: 'environment' } : { ideal: 'user' }
+          facingMode: isMobile ? { exact: 'environment' } : { ideal: 'user' } // Rear camera on mobile for inspections
         } : false
       }
 

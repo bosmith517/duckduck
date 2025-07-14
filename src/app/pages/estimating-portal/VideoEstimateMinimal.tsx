@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as SignalWire from '@signalwire/js'
+import { CameraToggle } from '../../components/video/CameraToggle'
 
 const VideoEstimateMinimal: React.FC = () => {
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState('Initializing...')
   const [error, setError] = useState<string | null>(null)
+  const [roomSession, setRoomSession] = useState<any>(null)
   const videoRef = React.useRef<HTMLDivElement>(null)
   
   const swToken = searchParams.get('sw_token')
@@ -16,41 +18,46 @@ const VideoEstimateMinimal: React.FC = () => {
       return
     }
     
-    let roomSession: any = null
+    let session: any = null
     
     const connect = async () => {
       try {
         setStatus('Creating room session...')
         
         // Create minimal room session
-        roomSession = new SignalWire.Video.RoomSession({
+        session = new SignalWire.Video.RoomSession({
           token: swToken,
           rootElement: videoRef.current
         })
         
+        setRoomSession(session)
+        
         // Set up basic handlers
-        roomSession.on('room.joined', (e: any) => {
+        session.on('room.joined', (e: any) => {
           console.log('✅ Joined room:', e)
           setStatus('Connected to room')
         })
         
-        roomSession.on('member.joined', (e: any) => {
+        session.on('member.joined', (e: any) => {
           console.log('👤 Member joined:', e.member.name)
           if (e.member.name?.includes('Alex') || e.member.name?.includes('Estimator')) {
             setStatus('AI Estimator has joined!')
           }
         })
         
-        roomSession.on('room.left', (e: any) => {
+        session.on('room.left', (e: any) => {
           console.log('❌ Left room:', e)
           setStatus('Disconnected')
         })
         
-        // Join with media
+        // Join with media - use rear camera for AI estimator
         setStatus('Joining room...')
-        await roomSession.join({
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+        await session.join({
           audio: true,
-          video: true
+          video: isMobile ? {
+            facingMode: { exact: 'environment' } // Rear camera for showing inspection areas
+          } : true
         })
         
       } catch (err: any) {
@@ -63,8 +70,8 @@ const VideoEstimateMinimal: React.FC = () => {
     
     // Cleanup
     return () => {
-      if (roomSession) {
-        roomSession.leave().catch(console.error)
+      if (session) {
+        session.leave().catch(console.error)
       }
     }
   }, [swToken])
@@ -82,6 +89,11 @@ const VideoEstimateMinimal: React.FC = () => {
         <h2>Video Estimate - Minimal Test</h2>
         <p>Status: {status}</p>
         {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+        {roomSession && (
+          <div style={{ marginTop: '10px' }}>
+            <CameraToggle roomSession={roomSession} />
+          </div>
+        )}
       </div>
       
       <div 

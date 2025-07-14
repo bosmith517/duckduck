@@ -156,7 +156,8 @@ const VideoDebugPage: React.FC = () => {
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop())
       }
-      if (roomSession) {
+      // Only try to leave if the session is connected
+      if (roomSession && roomSession.active) {
         roomSession.leave().catch(console.error)
       }
     }

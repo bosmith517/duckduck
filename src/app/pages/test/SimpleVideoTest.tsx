@@ -11,19 +11,23 @@ const SimpleVideoTest: React.FC = () => {
     setError('')
     
     try {
-      const { data, error } = await supabase.functions.invoke('create-simple-video-room')
+      const response = await supabase.functions.invoke('create-simple-video-room')
       
-      if (error) {
-        throw error
+      // Check if we got data even with an error (SignalWire sometimes returns 400 but still works)
+      if (response.data && response.data.room) {
+        console.log('Room created:', response.data)
+        setRoomInfo(response.data)
+        setStatus('Room created successfully!')
+        
+        // Open debug page in new tab
+        if (response.data.debug_url) {
+          window.open(response.data.debug_url, '_blank')
+        }
+        return
       }
       
-      console.log('Room created:', data)
-      setRoomInfo(data)
-      setStatus('Room created successfully!')
-      
-      // Open debug page in new tab
-      if (data.debug_url) {
-        window.open(data.debug_url, '_blank')
+      if (response.error) {
+        throw response.error
       }
       
     } catch (err: any) {
@@ -78,11 +82,11 @@ const SimpleVideoTest: React.FC = () => {
             </li>
             <li>
               <a 
-                href={`/customer-portal/video-estimate-minimal?sw_token=${encodeURIComponent(roomInfo.token)}`} 
+                href={`/estimating-portal/video-session-minimal?sw_token=${encodeURIComponent(roomInfo.token)}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
               >
-                Open Minimal Video Page
+                Open Minimal Video Page (Estimating Portal)
               </a>
             </li>
           </ul>

@@ -19,9 +19,9 @@ import SignalWireTestPage from '../pages/test/SignalWireTestPage'
 import AutomationDemoPage from '../pages/test/AutomationDemoPage'
 import TrackingPage from '../pages/tracking/TrackingPage'
 import CustomerPortalPage from '../pages/customer-portal/CustomerPortalPage'
-import VideoEstimatePage from '../pages/customer-portal/VideoEstimatePage'
-import VideoEstimateMinimal from '../pages/customer-portal/VideoEstimateMinimal'
-import VideoEstimateMockPage from '../pages/customer-portal/VideoEstimateMockPage'
+import VideoEstimatePage from '../pages/estimating-portal/VideoEstimatePage'
+import VideoEstimateMinimal from '../pages/estimating-portal/VideoEstimateMinimal'
+import VideoEstimateMockPage from '../pages/estimating-portal/VideoEstimateMockPage'
 import VideoEstimateTestPage from '../pages/test/VideoEstimateTestPage'
 import  SignalWireSyncTestPage from '../pages/test/SignalWireSyncTestPage'
 import SignalWireDebugPage from '../pages/test/SignalWireDebugPage'
@@ -116,9 +116,9 @@ const AppRoutes: FC = () => {
         <Route path='customer/:customerId' element={<CustomerPortalPage />} />
         <Route path='customer/:customerId/track/:trackingToken' element={<CustomerPortalPage />} />
         <Route path='portal/:token' element={<CustomerPortalPage />} />
-        <Route path='customer-portal/video-estimate' element={<VideoEstimatePage />} />
-        <Route path='customer-portal/video-estimate-minimal' element={<VideoEstimateMinimal />} />
-        <Route path='customer-portal/video-estimate-mock' element={<VideoEstimateMockPage />} />
+        <Route path='estimating-portal/video-session' element={<VideoEstimatePage />} />
+        <Route path='estimating-portal/video-session-minimal' element={<VideoEstimateMinimal />} />
+        <Route path='estimating-portal/video-session-mock' element={<VideoEstimateMockPage />} />
         
         {/* Public booking routes */}
         <Route path='book/:slug' element={<PublicBookingPage />} />

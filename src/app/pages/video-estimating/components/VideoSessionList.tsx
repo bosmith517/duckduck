@@ -43,7 +43,7 @@ export const VideoSessionList: React.FC<VideoSessionListProps> = ({
       const host = window.location.hostname === 'localhost' ? '10.0.0.196' : window.location.hostname
       const port = window.location.port ? `:${window.location.port}` : ''
       const protocol = window.location.protocol
-      const magicLink = `${protocol}//${host}${port}/customer-portal/video-estimate?session=${session.id}&token=${encodeURIComponent(tokenData.portal_token)}&sw_token=${encodeURIComponent(tokenData.signalwire_token)}`
+      const magicLink = `${protocol}//${host}${port}/estimating-portal/video-session?session=${session.id}&token=${encodeURIComponent(tokenData.portal_token)}&sw_token=${encodeURIComponent(tokenData.signalwire_token)}`
       
       // Store the customer tokens for auditing
       try {
@@ -71,7 +71,7 @@ export const VideoSessionList: React.FC<VideoSessionListProps> = ({
       console.log('Magic link:', magicLink)
       
       // Show the link in a modal or alert for easy copying
-      const message = `Customer Portal Link:\n\n${magicLink}\n\nThis link has been copied to your clipboard. Send it to the customer.`
+      const message = `Video Estimating Portal Link:\n\n${magicLink}\n\nThis link has been copied to your clipboard. Send it to the customer for their video estimate session.`
       alert(message)
       
       // TODO: Re-enable email sending once the edge function is fixed

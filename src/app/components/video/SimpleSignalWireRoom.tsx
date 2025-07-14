@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import * as SignalWire from '@signalwire/js'
 
 interface SimpleSignalWireRoomProps {
@@ -19,6 +19,19 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
   const [isConnecting, setIsConnecting] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isInitializingRef = useRef(false)
+  const [retryCount, setRetryCount] = useState(0)
+  
+  // Store callbacks in refs to avoid stale closures
+  const onErrorRef = useRef(onError)
+  const onRoomJoinedRef = useRef(onRoomJoined)
+  const onMemberJoinedRef = useRef(onMemberJoined)
+  
+  useEffect(() => {
+    onErrorRef.current = onError
+    onRoomJoinedRef.current = onRoomJoined
+    onMemberJoinedRef.current = onMemberJoined
+  }, [onError, onRoomJoined, onMemberJoined])
 
   useEffect(() => {
     if (!token || token === 'null' || !videoContainerRef.current) {
@@ -30,6 +43,14 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
     }
 
     const initializeRoom = async () => {
+      // Prevent multiple simultaneous initializations
+      if (isInitializingRef.current || isConnected) {
+        console.log('Already initializing or connected, skipping...')
+        return
+      }
+      
+      isInitializingRef.current = true
+      
       console.log('=== Simple SignalWire Room Init ===')
       console.log('Token present:', !!token)
       console.log('Container ready:', !!videoContainerRef.current)
@@ -54,7 +75,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           console.log('✅ Room joined:', params)
           setIsConnected(true)
           setIsConnecting(false)
-          onRoomJoined?.()
+          onRoomJoinedRef.current?.()
           
           // Log room details
           if (params.room) {
@@ -66,7 +87,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
 
         roomSession.on('member.joined', (params) => {
           console.log('👤 Member joined:', params.member.name || params.member.id)
-          onMemberJoined?.(params.member)
+          onMemberJoinedRef.current?.(params.member)
         })
 
         roomSession.on('member.left', (params) => {
@@ -79,23 +100,54 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           if (params && 'error' in params && params.error) {
             const errorMsg = (params.error as any).message || 'Connection lost'
             setError(errorMsg)
-            onError?.(params.error)
+            onErrorRef.current?.(params.error)
           }
         })
 
         // Join the room with audio/video parameters
         console.log('Joining room with audio/video...')
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
         await roomSession.join({
           audio: true,
-          video: true
+          video: isMobile ? {
+            facingMode: { exact: 'environment' } // Use rear camera on mobile for inspections
+          } : true
         })
         console.log('✅ Join request sent')
 
       } catch (err: any) {
         console.error('❌ Failed to initialize room:', err)
-        setError(err.message || 'Failed to join room')
-        onError?.(err)
+        
+        // Handle specific error types
+        let errorMessage = err.message || 'Failed to join room'
+        let canRetry = false
+        
+        if (err.name === 'NotReadableError' || errorMessage.includes('Device in use')) {
+          errorMessage = 'Camera or microphone is in use by another application. Please close other video apps or browser tabs and try again.'
+          canRetry = true
+        } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          errorMessage = 'Camera and microphone access denied. Please allow access and refresh the page.'
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          errorMessage = 'No camera or microphone found. Please connect a device and try again.'
+        } else if (err.name === 'OverconstrainedError') {
+          errorMessage = 'Camera settings not supported. Please try using a different camera.'
+        }
+        
+        setError(errorMessage)
+        onErrorRef.current?.(err)
         setIsConnecting(false)
+        
+        // Auto-retry for device in use errors
+        if (canRetry && retryCount < 3) {
+          console.log(`Device in use - will retry in 3 seconds (attempt ${retryCount + 1}/3)`)
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1)
+            setError(null)
+            initializeRoom()
+          }, 3000)
+        }
+      } finally {
+        isInitializingRef.current = false
       }
     }
 
@@ -104,11 +156,18 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
     // Cleanup
     return () => {
       if (roomSessionRef.current) {
-        console.log('Leaving room...')
-        roomSessionRef.current.leave().catch(console.error)
+        console.log('Cleanup: roomSession exists, isConnected:', isConnected)
+        if (isConnected) {
+          console.log('Leaving room...')
+          roomSessionRef.current.leave().catch((err: any) => {
+            console.log('Error leaving room (expected if not fully connected):', err.message)
+          })
+        }
+        roomSessionRef.current = null
       }
+      isInitializingRef.current = false
     }
-  }, [token, onError, onRoomJoined, onMemberJoined])
+  }, [token]) // Only reinitialize when token changes
 
   return (
     <div className="simple-signalwire-room" style={{ width: '100%', height: '100%' }}>
@@ -138,15 +197,46 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         {error && (
           <div style={{
             position: 'absolute',
-            top: '10px',
-            left: '10px',
-            right: '10px',
-            backgroundColor: 'rgba(255, 0, 0, 0.8)',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
             color: 'white',
-            padding: '10px',
-            borderRadius: '5px'
+            padding: '20px',
+            borderRadius: '10px',
+            maxWidth: '500px',
+            textAlign: 'center',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
           }}>
-            Error: {error}
+            <div style={{ fontSize: '24px', marginBottom: '10px' }}>⚠️</div>
+            <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>Connection Issue</div>
+            <div style={{ marginBottom: '15px' }}>{error}</div>
+            {error.includes('in use') && (
+              <>
+                <div style={{ fontSize: '14px', opacity: 0.8, marginBottom: '10px' }}>
+                  Tip: Check if you have other video calls open in browser tabs or apps like Zoom, Teams, or Skype.
+                </div>
+                {retryCount > 0 && retryCount < 3 && (
+                  <div style={{ fontSize: '14px', color: '#ffc107' }}>
+                    Retrying automatically... (Attempt {retryCount}/3)
+                  </div>
+                )}
+              </>
+            )}
+            <button 
+              onClick={() => window.location.reload()}
+              style={{
+                marginTop: '15px',
+                padding: '8px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              Refresh Page
+            </button>
           </div>
         )}
       </div>

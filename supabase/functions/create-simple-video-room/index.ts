@@ -29,8 +29,6 @@ serve(async (req) => {
       name: roomName,
       display_name: 'Test Video Room',
       max_members: 10,
-      layout: 'grid',
-      quality: 'high',
       join_audio_muted: false,
       join_video_muted: false
     }
