@@ -1,11 +1,20 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
-import * as SignalWire from '@signalwire/js'
+import React, {
+  useEffect,
+  useRef,
+  useState
+} from 'react'
+ import { Video } from '@signalwire/js'
+ import type {
+   RoomSessionEventParams,
+   MemberJoinedEventParams,
+   MemberLeftEventParams
+ } from '@signalwire/core'
 
 interface SimpleSignalWireRoomProps {
   token: string
   onError?: (error: any) => void
   onRoomJoined?: () => void
-  onMemberJoined?: (member: any) => void
+ onMemberJoined?: (member: MemberJoinedEventParams['member']) => void
 }
 
 export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
@@ -14,15 +23,16 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
   onRoomJoined,
   onMemberJoined
 }) => {
-  const videoContainerRef = useRef<HTMLDivElement>(null)
-  const roomSessionRef = useRef<any>(null)
+ const videoContainerRef   = useRef<HTMLDivElement>(null)
+  const roomSessionRef = useRef<InstanceType<typeof Video.RoomSession> | null>(null)
+  const isInitializingRef   = useRef(false)
+  const isConnectedRef      = useRef(false)
+  const isMountedRef        = useRef(true)
+
   const [isConnecting, setIsConnecting] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const isInitializingRef = useRef(false)
-  const [retryCount, setRetryCount] = useState(0)
-  const isConnectedRef = useRef(false)
-  const isMountedRef = useRef(true)
+  const [isConnected,  setIsConnected]  = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
+  const [retryCount,   setRetryCount]   = useState(0)
   
   // Store callbacks in refs to avoid stale closures
   const onErrorRef = useRef(onError)
@@ -36,8 +46,8 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
   }, [onError, onRoomJoined, onMemberJoined])
 
   useEffect(() => {
-    console.log('=== SimpleSignalWireRoom Effect Running ===')
-    console.log('Token changed to:', token?.substring(0, 20) + '...')
+    console.log('=== SimpleSignalWireRoom Effect ===')
+    console.log('Token snippet:', token?.slice(0, 15), '…')
     isMountedRef.current = true
     
     if (!token || token === 'null' || !videoContainerRef.current) {
@@ -69,11 +79,12 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
         // Create room session with TURN-only configuration
-        console.log('Creating room session with TURN relay...')
-        const roomSession = new SignalWire.Video.RoomSession({
-          token: token,
-          rootElement: videoContainerRef.current,
-         as any)
+         console.log('Creating room session...')
+	 const roomSession = new Video.RoomSession({
+          token,
+          rootElement: videoContainerRef.current
+        })
+
 
         roomSessionRef.current = roomSession
 
@@ -82,7 +93,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         console.log('⏱️ Connection started at:', new Date().toISOString())
 
         // Simple event handlers
-        roomSession.on('room.joined', (params) => {
+        roomSession.on('room.joined', (params: RoomSessionEventParams) => {
           const connectionTime = Date.now() - startTime
           console.log(`✅ Room joined in ${connectionTime}ms (${(connectionTime / 1000).toFixed(1)}s)`)
           console.log('Room details:', params)
@@ -102,16 +113,16 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           }
         })
 
-        roomSession.on('member.joined', (params) => {
+        roomSession.on('member.joined', (params: MemberJoinedEventParams) => {
           console.log('👤 Member joined:', params.member.name || params.member.id)
           onMemberJoinedRef.current?.(params.member)
         })
 
-        roomSession.on('member.left', (params) => {
+        roomSession.on('member.left', (params: MemberLeftEventParams) => {
           console.log('👤 Member left:', params.member.name || params.member.id)
         })
 
-        roomSession.on('room.left', (params) => {
+        roomSession.on('room.left', (params: RoomSessionEventParams) => {
           console.log('❌ Room left:', params)
           // Only update state if we were actually connected
           if (isConnectedRef.current) {
@@ -141,8 +152,8 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           const joinStart = Date.now()
           await roomSession.join({
             audio: true,
-            video: isMobile ? 
-              { facingMode: { exact: 'environment' } } 
+            video: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) 
+              ? { facingMode: { exact: 'environment' } } 
               : true
           })
           const joinTime = Date.now() - joinStart
