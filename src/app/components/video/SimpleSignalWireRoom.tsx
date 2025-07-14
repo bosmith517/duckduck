@@ -73,11 +73,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         const roomSession = new SignalWire.Video.RoomSession({
           token: token,
           rootElement: videoContainerRef.current,
-          iceServers: [
-            { urls: 'turns:relay.signalwire.com?transport=tcp' }  // Force TURN over TCP
-          ],
-          iceTransportPolicy: 'relay' as RTCIceTransportPolicy // Skip STUN, use TURN only
-        } as any)
+         as any)
 
         roomSessionRef.current = roomSession
 
