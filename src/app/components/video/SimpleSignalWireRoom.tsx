@@ -56,16 +56,19 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
     }
 
 // 🔵🔵  NEW — pull SignalWire’s TURN creds from the JWT
-const payload     = JSON.parse(atob(token.split('.')[1]))
-const { ice_servers } = payload            // short username + credential
+//const payload     = JSON.parse(atob(token.split('.')[1]))
+//const { ice_servers } = payload            // short username + credential
+
+//console.log('ICE list that will be passed:', ice_servers)
 
 // Create room session …
-console.log('Creating room session…')
-const roomSession = new Video.RoomSession({
-  token,
-  rootElement: videoContainerRef.current,
-  iceServers: ice_servers,                 // 👈 use the proper list
-})
+//console.log('Creating room session…')
+//const roomSession = new Video.RoomSession({
+//  token,
+ // rootElement: videoContainerRef.current,
+//  iceServers: ice_servers,                 // 👈 use the proper list
+//})
+
 
     const initializeRoom = async () => {
       // Prevent multiple simultaneous initializations
@@ -89,17 +92,21 @@ const roomSession = new Video.RoomSession({
 
         // Create room session with TURN-only configuration
          console.log('Creating room session...')
-	 const SIGNALWIRE_TURN = {
-  urls: 'turns:relay.signalwire.com:443?transport=tcp',
-  username: token,          // JWT works for both fields
-  credential: token
-}
+	const payload = JSON.parse(atob(token.split('.')[1]))
+const { ice_servers } = payload
+console.log('ICE list that will be passed:', ice_servers)
+
+const safeIceServers = (ice_servers || []).filter(server => {
+  if (!server.username) return true
+  return server.username.length <= 256
+})
+
 
 const roomSession = new Video.RoomSession({
   token,
   rootElement: videoContainerRef.current,
   iceServers: [
-    SIGNALWIRE_TURN,                           // TCP TURN (connects anywhere)
+...safeIceServers,                           // TCP TURN (connects anywhere)
     { urls: 'stun:relay.signalwire.com:3478' } // UDP STUN fallback
   ]
 })            // keep default iceTransportPolicy = "all"
