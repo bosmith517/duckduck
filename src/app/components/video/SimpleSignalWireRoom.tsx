@@ -77,10 +77,20 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
 
         // Create room session with TURN-only configuration
          console.log('Creating room session...')
-	 const roomSession = new Video.RoomSession({
-          token,
-          rootElement: videoContainerRef.current
-        })
+	 const SIGNALWIRE_TURN = {
+  urls: 'turns:relay.signalwire.com:443?transport=tcp',
+  username: token,          // JWT works for both fields
+  credential: token
+}
+
+const roomSession = new Video.RoomSession({
+  token,
+  rootElement: videoContainerRef.current,
+  iceServers: [
+    SIGNALWIRE_TURN,                           // TCP TURN (connects anywhere)
+    { urls: 'stun:relay.signalwire.com:3478' } // UDP STUN fallback
+  ]
+})            // keep default iceTransportPolicy = "all"
 
 
         roomSessionRef.current = roomSession
