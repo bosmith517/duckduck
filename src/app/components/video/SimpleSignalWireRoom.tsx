@@ -96,7 +96,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
 const { ice_servers } = payload
 console.log('ICE list that will be passed:', ice_servers)
 
-const safeIceServers = (ice_servers || []).filter(server => {
+const safeIceServers = (ice_servers || []).filter((server: any) => {
   if (!server.username) return true
   return server.username.length <= 256
 })
