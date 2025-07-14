@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../../supabaseClient'
 import { VideoSession } from '../video-estimating/VideoEstimatingHub'
@@ -108,15 +108,12 @@ const VideoEstimatePage: React.FC = () => {
     }
   }
 
-  const handleRoomJoined = (session: any) => {
+  const handleRoomJoined = useCallback(() => {
     console.log('Room joined successfully')
-    setRoomSession(session)
-    
-    // Check if AI is already in the room
-    // The AI script should have been executed during room creation
-  }
+    setAiStatus('Connected to room. Waiting for AI estimator...')
+  }, [])
 
-  const handleMemberJoined = (member: any) => {
+  const handleMemberJoined = useCallback((member: any) => {
     console.log('Member joined:', member)
     const memberName = member.name || ''
     
@@ -133,21 +130,21 @@ const VideoEstimatePage: React.FC = () => {
         audio.play().catch(() => {})
       } catch {}
     }
-  }
+  }, [])
 
-  const handleMemberLeft = (member: any) => {
+  const handleMemberLeft = useCallback((member: any) => {
     console.log('Member left:', member)
     const memberName = member.name || ''
     
     if (memberName.includes('AI') || memberName.includes('Estimator') || memberName.includes('Alex')) {
       setAiStatus('AI estimator has left the session')
     }
-  }
+  }, [])
 
-  const handleError = (error: any) => {
+  const handleError = useCallback((error: any) => {
     console.error('Video room error:', error)
     setError(`Video error: ${error.message || 'Connection failed'}`)
-  }
+  }, [])
   
   const handleAddAI = async () => {
     if (!session) return
@@ -243,10 +240,7 @@ const VideoEstimatePage: React.FC = () => {
       <div className='flex-grow-1 position-relative'>
         <SimpleSignalWireRoom
           token={swToken}
-          onRoomJoined={() => {
-            console.log('Room joined successfully')
-            setAiStatus('Connected to room. Waiting for AI estimator...')
-          }}
+          onRoomJoined={handleRoomJoined}
           onMemberJoined={handleMemberJoined}
           onError={handleError}
         />

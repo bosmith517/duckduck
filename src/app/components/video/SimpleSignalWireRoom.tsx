@@ -21,6 +21,8 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
   const [error, setError] = useState<string | null>(null)
   const isInitializingRef = useRef(false)
   const [retryCount, setRetryCount] = useState(0)
+  const isConnectedRef = useRef(false)
+  const isMountedRef = useRef(true)
   
   // Store callbacks in refs to avoid stale closures
   const onErrorRef = useRef(onError)
@@ -34,6 +36,10 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
   }, [onError, onRoomJoined, onMemberJoined])
 
   useEffect(() => {
+    console.log('=== SimpleSignalWireRoom Effect Running ===')
+    console.log('Token changed to:', token?.substring(0, 20) + '...')
+    isMountedRef.current = true
+    
     if (!token || token === 'null' || !videoContainerRef.current) {
       console.log('Waiting for valid token and container...', { token: !!token, tokenValue: token, container: !!videoContainerRef.current })
       if (token === 'null') {
@@ -44,7 +50,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
 
     const initializeRoom = async () => {
       // Prevent multiple simultaneous initializations
-      if (isInitializingRef.current || isConnected) {
+      if (isInitializingRef.current || isConnectedRef.current) {
         console.log('Already initializing or connected, skipping...')
         return
       }
@@ -73,15 +79,18 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         // Simple event handlers
         roomSession.on('room.joined', (params) => {
           console.log('✅ Room joined:', params)
-          setIsConnected(true)
-          setIsConnecting(false)
-          onRoomJoinedRef.current?.()
-          
-          // Log room details
-          if (params.room) {
-            console.log('Room name:', params.room.name)
-            console.log('Room ID:', (params.room as any).id || 'N/A')
-            console.log('Members:', Object.keys('members' in params.room ? params.room.members : {}).length)
+          if (isMountedRef.current) {
+            setIsConnected(true)
+            isConnectedRef.current = true
+            setIsConnecting(false)
+            onRoomJoinedRef.current?.()
+            
+            // Log room details
+            if (params.room) {
+              console.log('Room name:', params.room.name)
+              console.log('Room ID:', (params.room as any).id || 'N/A')
+              console.log('Members:', Object.keys('members' in params.room ? params.room.members : {}).length)
+            }
           }
         })
 
@@ -97,6 +106,7 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         roomSession.on('room.left', (params) => {
           console.log('❌ Room left:', params)
           setIsConnected(false)
+          isConnectedRef.current = false
           if (params && 'error' in params && params.error) {
             const errorMsg = (params.error as any).message || 'Connection lost'
             setError(errorMsg)
@@ -104,16 +114,32 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           }
         })
 
+        // Add timeout handler
+        const joinTimeout = setTimeout(() => {
+          if (!isConnectedRef.current) {
+            console.error('Join timeout - took too long to connect')
+            setError('Connection timeout. Please check your network and try again.')
+            setIsConnecting(false)
+          }
+        }, 30000) // 30 second timeout
+
         // Join the room with audio/video parameters
         console.log('Joining room with audio/video...')
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-        await roomSession.join({
-          audio: true,
-          video: isMobile ? {
-            facingMode: { exact: 'environment' } // Use rear camera on mobile for inspections
-          } : true
-        })
-        console.log('✅ Join request sent')
+        
+        try {
+          await roomSession.join({
+            audio: true,
+            video: isMobile ? {
+              facingMode: { exact: 'environment' } // Use rear camera on mobile for inspections
+            } : true
+          })
+          console.log('✅ Join request sent')
+          clearTimeout(joinTimeout)
+        } catch (joinErr) {
+          clearTimeout(joinTimeout)
+          throw joinErr
+        }
 
       } catch (err: any) {
         console.error('❌ Failed to initialize room:', err)
@@ -155,17 +181,26 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
 
     // Cleanup
     return () => {
+      console.log('=== Cleanup started ===')
+      console.log('isConnectedRef.current:', isConnectedRef.current)
+      console.log('roomSessionRef.current exists:', !!roomSessionRef.current)
+      
+      isMountedRef.current = false
+      
       if (roomSessionRef.current) {
-        console.log('Cleanup: roomSession exists, isConnected:', isConnected)
-        if (isConnected) {
+        if (isConnectedRef.current) {
           console.log('Leaving room...')
-          roomSessionRef.current.leave().catch((err: any) => {
-            console.log('Error leaving room (expected if not fully connected):', err.message)
-          })
+          try {
+            roomSessionRef.current.leave()
+          } catch (err: any) {
+            console.log('Error leaving room:', err.message)
+          }
         }
         roomSessionRef.current = null
       }
+      
       isInitializingRef.current = false
+      isConnectedRef.current = false
     }
   }, [token]) // Only reinitialize when token changes
 
