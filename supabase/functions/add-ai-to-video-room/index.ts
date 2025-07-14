@@ -59,16 +59,17 @@ serve(async (req) => {
 
     console.log('Executing AI script for room:', room_name)
     console.log('Script ID:', aiScriptId)
+    console.log('Space URL:', signalwireSpaceUrl)
 
-    // Execute the AI script with proper parameters
-    const scriptExecuteUrl = `https://${signalwireSpaceUrl}/api/video/scripts/${aiScriptId}/execute`
+    // Use the correct Scripts API endpoint
+    const scriptExecuteUrl = `https://${signalwireSpaceUrl}/api/scripts/${aiScriptId}/execute`
     const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
     
+    // Scripts API expects different parameters
     const executePayload = {
-      room_name: room_name,
-      display_name: 'Estimator Alex',
-      join_params: {
-        permissions: ['room.subscribe', 'room.publish']
+      argument: {
+        room_name: room_name,
+        user_name: 'Estimator Alex'
       }
     }
     

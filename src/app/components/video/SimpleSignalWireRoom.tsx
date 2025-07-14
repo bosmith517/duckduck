@@ -66,12 +66,15 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         setIsConnecting(true)
         setError(null)
 
-        // Create room session with updated SDK pattern
+        // Create room session with ICE server configuration
         console.log('Creating room session...')
         const roomSession = new SignalWire.Video.RoomSession({
           token: token,
-          rootElement: videoContainerRef.current
-          // Don't set audio/video here - deprecated
+          rootElement: videoContainerRef.current,
+          iceServers: [
+            { urls: 'stun:stun.signalwire.com' },
+            { urls: 'stun:stun.l.google.com:19302' }
+          ]
         })
 
         roomSessionRef.current = roomSession
@@ -117,11 +120,11 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         // Add timeout handler
         const joinTimeout = setTimeout(() => {
           if (!isConnectedRef.current) {
-            console.error('Join timeout - took too long to connect')
+            console.error('Join timeout - connection failed')
             setError('Connection timeout. Please check your network and try again.')
             setIsConnecting(false)
           }
-        }, 30000) // 30 second timeout
+        }, 15000) // 15 second timeout
 
         // Join the room with audio/video parameters
         console.log('Joining room with audio/video...')
@@ -223,9 +226,28 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
             left: '50%',
             transform: 'translate(-50%, -50%)',
             textAlign: 'center',
-            color: 'white'
+            color: 'white',
+            zIndex: 10
           }}>
-            <div>Connecting to video room...</div>
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{
+                width: '50px',
+                height: '50px',
+                border: '3px solid rgba(255, 255, 255, 0.3)',
+                borderTop: '3px solid white',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto'
+              }} />
+            </div>
+            <div style={{ fontSize: '18px', marginBottom: '10px' }}>Connecting to video room...</div>
+            <div style={{ fontSize: '14px', opacity: 0.8 }}>Setting up secure connection...</div>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
           </div>
         )}
         

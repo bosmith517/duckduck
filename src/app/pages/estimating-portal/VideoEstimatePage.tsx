@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../../supabaseClient'
 import { VideoSession } from '../video-estimating/VideoEstimatingHub'
@@ -12,6 +12,8 @@ const VideoEstimatePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [aiStatus, setAiStatus] = useState<string>('')
   const [roomSession, setRoomSession] = useState<any>(null)
+  const [isAddingAI, setIsAddingAI] = useState(false)
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false)
   
   const sessionId = searchParams.get('session')
   const token = searchParams.get('token') // Portal JWT for Supabase
@@ -25,6 +27,18 @@ const VideoEstimatePage: React.FC = () => {
       setLoading(false)
     }
   }, [sessionId, token])
+  
+  // Auto-add AI when room is joined
+  useEffect(() => {
+    if (hasJoinedRoom && session && !isAddingAI) {
+      console.log('Auto-adding AI to room after join')
+      const timer = setTimeout(() => {
+        handleAddAI()
+      }, 2000) // Wait 2 seconds for room to stabilize
+      
+      return () => clearTimeout(timer)
+    }
+  }, [hasJoinedRoom, session, isAddingAI, handleAddAI])
   
   const loadSession = async () => {
     try {
@@ -111,6 +125,7 @@ const VideoEstimatePage: React.FC = () => {
   const handleRoomJoined = useCallback(() => {
     console.log('Room joined successfully')
     setAiStatus('Connected to room. Waiting for AI estimator...')
+    setHasJoinedRoom(true)
   }, [])
 
   const handleMemberJoined = useCallback((member: any) => {
@@ -146,12 +161,13 @@ const VideoEstimatePage: React.FC = () => {
     setError(`Video error: ${error.message || 'Connection failed'}`)
   }, [])
   
-  const handleAddAI = async () => {
-    if (!session) return
+  const handleAddAI = useCallback(async () => {
+    if (!session || isAddingAI) return
     
     try {
-      console.log('Manually adding AI to room:', session.room_id)
-      const { data: aiResult } = await supabase.functions.invoke('add-ai-to-video-room', {
+      setIsAddingAI(true)
+      console.log('Adding AI to room:', session.room_id)
+      const { data: aiResult, error: aiError } = await supabase.functions.invoke('add-ai-to-video-room', {
         body: {
           room_name: session.room_id,
           session_id: session.id,
@@ -159,16 +175,23 @@ const VideoEstimatePage: React.FC = () => {
         }
       })
       
-      if (aiResult?.success) {
+      console.log('AI add result:', aiResult, 'Error:', aiError)
+      
+      if (aiError) {
+        setAiStatus(`Failed to add AI: ${aiError.message}`)
+      } else if (aiResult?.success) {
         setAiStatus('AI estimator has been invited to the room')
       } else {
         setAiStatus(`Failed to add AI: ${aiResult?.error || 'Unknown error'}`)
+        console.log('Full AI response:', aiResult)
       }
     } catch (error: any) {
       console.error('Error adding AI:', error)
       setAiStatus(`Error: ${error.message}`)
+    } finally {
+      setIsAddingAI(false)
     }
-  }
+  }, [session, isAddingAI])
   
   if (loading) {
     return (
@@ -269,8 +292,9 @@ const VideoEstimatePage: React.FC = () => {
                   <button 
                     className='btn btn-sm btn-primary'
                     onClick={handleAddAI}
+                    disabled={isAddingAI}
                   >
-                    Add AI Estimator to Room
+                    {isAddingAI ? 'Adding AI...' : 'Add AI Estimator to Room'}
                   </button>
                 </div>
               )}
