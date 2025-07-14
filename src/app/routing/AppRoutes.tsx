@@ -28,6 +28,7 @@ import SignalWireDebugPage from '../pages/test/SignalWireDebugPage'
 import DatabaseTestPage from '../pages/test/DatabaseTestPage'
 import TrackingMigrationPage from '../pages/test/TrackingMigrationPage'
 import SimpleTrackingTest from '../pages/test/SimpleTrackingTest'
+import BasicVideoTest from '../pages/test/BasicVideoTest'
 import VideoDebugPage from '../pages/test/VideoDebugPage'
 import SimpleVideoTest from '../pages/test/SimpleVideoTest'
 import LandingPage from '../pages/marketing/LandingPage'
@@ -158,6 +159,7 @@ const AppRoutes: FC = () => {
         <Route path='test-mobile-redirect' element={<MobileRedirectTest />} />
         <Route path='test-video-debug' element={<VideoDebugPage />} />
         <Route path='test-simple-video' element={<SimpleVideoTest />} />
+        <Route path='test-basic-video' element={<BasicVideoTest />} />
         
         {/* Error pages and logout - wrapped in App for consistent layout */}
         <Route element={<App />}>

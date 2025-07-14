@@ -66,34 +66,14 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         setIsConnecting(true)
         setError(null)
         
-        // Pre-request media permissions to speed up connection
-        console.log('Pre-requesting media permissions...')
+        // Don't pre-request permissions - let SignalWire handle it
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: true, 
-            video: isMobile ? {
-              facingMode: { exact: 'environment' }
-            } : true
-          })
-          console.log('✅ Media permissions granted')
-          // Release the stream - we just wanted to trigger permission
-          stream.getTracks().forEach(track => track.stop())
-        } catch (permErr) {
-          console.warn('Media permission pre-request failed:', permErr)
-          // Continue anyway - permissions will be requested during join
-        }
 
-        // Create room session with optimized configuration
+        // Create room session - let SignalWire handle ICE configuration
         console.log('Creating room session...')
         const roomSession = new SignalWire.Video.RoomSession({
           token: token,
-          rootElement: videoContainerRef.current,
-          iceServers: [
-            { urls: 'stun:stun.signalwire.com' },
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
-          ]
+          rootElement: videoContainerRef.current
         })
 
         roomSessionRef.current = roomSession
@@ -134,8 +114,11 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
 
         roomSession.on('room.left', (params) => {
           console.log('❌ Room left:', params)
-          setIsConnected(false)
-          isConnectedRef.current = false
+          // Only update state if we were actually connected
+          if (isConnectedRef.current) {
+            setIsConnected(false)
+            isConnectedRef.current = false
+          }
           if (params && 'error' in params && params.error) {
             const errorMsg = (params.error as any).message || 'Connection lost'
             setError(errorMsg)
@@ -143,14 +126,14 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           }
         })
 
-        // Add timeout handler
+        // Add timeout handler - increase to 30 seconds
         const joinTimeout = setTimeout(() => {
-          if (!isConnectedRef.current) {
-            console.error('Join timeout - connection failed')
-            setError('Connection timeout. Please check your network and try again.')
+          if (!isConnectedRef.current && isConnecting) {
+            console.error('Join timeout - connection taking too long')
+            setError('Connection is taking longer than expected. Please check your network.')
             setIsConnecting(false)
           }
-        }, 15000) // 15 second timeout
+        }, 30000) // 30 second timeout
 
         // Join the room with audio/video parameters
         console.log('Joining room with audio/video...')
@@ -187,6 +170,9 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
           errorMessage = 'No camera or microphone found. Please connect a device and try again.'
         } else if (err.name === 'OverconstrainedError') {
           errorMessage = 'Camera settings not supported. Please try using a different camera.'
+        } else if (errorMessage.includes('wrong state')) {
+          errorMessage = 'Connection error. Please refresh the page and try again.'
+          console.error('WebRTC state error - this is a SignalWire SDK issue')
         }
         
         setError(errorMessage)
