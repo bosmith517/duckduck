@@ -14,6 +14,7 @@ const VideoEstimatePage: React.FC = () => {
   const [roomSession, setRoomSession] = useState<any>(null)
   const [isAddingAI, setIsAddingAI] = useState(false)
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false)
+  const [aiAttempted, setAiAttempted] = useState(false)
   
   const sessionId = searchParams.get('session')
   const token = searchParams.get('token') // Portal JWT for Supabase
@@ -183,17 +184,18 @@ const VideoEstimatePage: React.FC = () => {
     }
   }, [session, isAddingAI])
   
-  // Auto-add AI when room is joined
+  // Auto-add AI when room is joined (only once)
   useEffect(() => {
-    if (hasJoinedRoom && session && !isAddingAI) {
+    if (hasJoinedRoom && session && !isAddingAI && !aiAttempted) {
       console.log('Auto-adding AI to room after join')
+      setAiAttempted(true) // Prevent multiple attempts
       const timer = setTimeout(() => {
         handleAddAI()
       }, 2000) // Wait 2 seconds for room to stabilize
       
       return () => clearTimeout(timer)
     }
-  }, [hasJoinedRoom, session, isAddingAI, handleAddAI])
+  }, [hasJoinedRoom, session, isAddingAI, aiAttempted, handleAddAI])
   
   if (loading) {
     return (

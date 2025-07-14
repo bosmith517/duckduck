@@ -61,15 +61,16 @@ serve(async (req) => {
     console.log('Script ID:', aiScriptId)
     console.log('Space URL:', signalwireSpaceUrl)
 
-    // Use the correct Scripts API endpoint
-    const scriptExecuteUrl = `https://${signalwireSpaceUrl}/api/scripts/${aiScriptId}/execute`
+    // SignalWire Video Scripts API endpoint
+    const scriptExecuteUrl = `https://${signalwireSpaceUrl}/api/video/scripts/${aiScriptId}/execute`
     const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
     
-    // Scripts API expects different parameters
+    // Video Scripts API parameters
     const executePayload = {
-      argument: {
-        room_name: room_name,
-        user_name: 'Estimator Alex'
+      room_name: room_name,
+      params: {
+        display_name: 'Estimator Alex',
+        permissions: ['room.self.audio_mute', 'room.self.audio_unmute', 'room.self.video_mute', 'room.self.video_unmute']
       }
     }
     
