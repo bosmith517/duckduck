@@ -263,13 +263,19 @@ const VideoEstimatePage: React.FC = () => {
         </div>
       </div>
       
-      {/* Video Room - Using Simple Component for Testing */}
+      {/* Video Room - Using SignalWireVideoRoom */}
       <div className='flex-grow-1 position-relative'>
-        <SimpleSignalWireRoom
+        <SignalWireVideoRoom
           token={swToken}
+          roomName={session?.room_id}
+          userName="Customer"
           onRoomJoined={handleRoomJoined}
           onMemberJoined={handleMemberJoined}
+          onMemberLeft={handleMemberLeft}
           onError={handleError}
+          enableAudio={true}
+          enableVideo={true}
+          layout="grid-responsive"
         />
         
         {/* AI Status Overlay */}

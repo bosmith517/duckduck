@@ -38,9 +38,19 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
   const [members, setMembers] = useState<Map<string, any>>(new Map())
   const [error, setError] = useState<string | null>(null)
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
+  const isInitializingRef = useRef(false)
+  const isMountedRef = useRef(true)
 
   // Initialize room session
   const initializeRoom = useCallback(async () => {
+    // Prevent multiple simultaneous initializations
+    if (isInitializingRef.current || roomSessionRef.current) {
+      console.log('Already initializing or initialized, skipping...')
+      return
+    }
+    
+    isInitializingRef.current = true
+    
     console.log('=== SignalWire Video Room Initialization ===')
     console.log('Token:', token ? 'Present' : 'Missing')
     console.log('Container:', videoContainerRef.current ? 'Ready' : 'Not ready')
@@ -50,6 +60,7 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
     if (!videoContainerRef.current || !token) {
       console.error('Missing video container or token')
       setError('Missing required video configuration')
+      isInitializingRef.current = false
       return
     }
 
@@ -74,17 +85,19 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
         console.log('Got local media stream:', stream)
         setLocalStream(stream)
         
-        // Create preview element to show local video before joining
-        if (enableVideo && videoContainerRef.current) {
-          const previewVideo = document.createElement('video')
-          previewVideo.srcObject = stream
-          previewVideo.autoplay = true
-          previewVideo.muted = true
-          previewVideo.style.width = '100%'
-          previewVideo.style.height = '100%'
-          previewVideo.style.objectFit = 'cover'
-          previewVideo.id = 'local-preview'
-          videoContainerRef.current.appendChild(previewVideo)
+        // Create preview video outside React's managed DOM
+        const previewContainer = document.getElementById('local-preview-container')
+        if (enableVideo && stream && previewContainer && !document.getElementById('local-preview')) {
+          const video = document.createElement('video')
+          video.srcObject = stream
+          video.autoplay = true
+          video.muted = true
+          video.playsInline = true
+          video.id = 'local-preview'
+          video.style.width = '100%'
+          video.style.height = '100%'
+          video.style.objectFit = 'cover'
+          previewContainer.appendChild(video)
         }
       } catch (mediaError: any) {
         console.error('Media access error:', mediaError)
@@ -121,13 +134,16 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
       // Set up event handlers
       roomSession.on('room.joined', (params) => {
         console.log('Room joined:', params)
-        setIsConnected(true)
-        setIsConnecting(false)
+        if (isMountedRef.current) {
+          setIsConnected(true)
+          setIsConnecting(false)
+          isInitializingRef.current = false
+        }
         
-        // Remove preview video
-        const preview = document.getElementById('local-preview')
-        if (preview) {
-          preview.remove()
+        // Hide preview container when room is joined
+        const previewContainer = document.getElementById('local-preview-container')
+        if (previewContainer) {
+          previewContainer.style.display = 'none'
         }
 
         // Update members list
@@ -217,18 +233,26 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
         console.log('Stream ended:', event)
       })
 
-      // Join the room with audio/video parameters
+      // Join the room directly - SignalWire SDK handles initialization internally
       console.log('Joining room with audio/video settings...')
-      await roomSession.join({
-        audio: audioEnabled,
-        video: videoEnabled
-      })
+      
+      try {
+        await roomSession.join({
+          audio: audioEnabled,
+          video: videoEnabled
+        })
+        console.log('✅ Join call completed successfully')
+      } catch (joinError: any) {
+        console.error('❌ Join failed:', joinError)
+        throw joinError
+      }
 
     } catch (err: any) {
       console.error('Error initializing room:', err)
       setError(err.message || 'Failed to join room')
       onError?.(err)
       setIsConnecting(false)
+      isInitializingRef.current = false
     }
   }, [token, enableAudio, enableVideo, currentLayout, onRoomJoined, onMemberJoined, onMemberLeft, onError])
 
@@ -290,19 +314,60 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
 
   // Initialize on mount
   useEffect(() => {
-    if (token && videoContainerRef.current) {
-      initializeRoom()
-    }
+    isMountedRef.current = true
+    
+    // Small delay to ensure DOM is ready
+    const initTimeout = setTimeout(() => {
+      if (token && videoContainerRef.current && !isInitializingRef.current) {
+        initializeRoom()
+      }
+    }, 100)
 
     return () => {
-      if (roomSessionRef.current) {
-        roomSessionRef.current.leave().catch(console.error)
+      isMountedRef.current = false
+      isInitializingRef.current = false
+      clearTimeout(initTimeout)
+      
+      // Only try to leave if we have a session AND we know it's connected
+      if (roomSessionRef.current && isConnected) {
+        const session = roomSessionRef.current
+        // Wrap in try-catch to prevent any errors during cleanup
+        try {
+          if (typeof session.leave === 'function') {
+            session.leave().catch(() => {
+              // Silently ignore leave errors on cleanup
+            })
+          }
+        } catch (err) {
+          // Ignore all errors during cleanup
+        }
       }
+      
+      // Clear the ref
+      roomSessionRef.current = null
+      
+      // Clean up preview video
+      const preview = document.getElementById('local-preview')
+      if (preview && preview.parentNode) {
+        try {
+          preview.parentNode.removeChild(preview)
+        } catch (e) {
+          // Ignore removal errors
+        }
+      }
+      
+      // Clean up local media
       if (localStream) {
-        localStream.getTracks().forEach(track => track.stop())
+        localStream.getTracks().forEach(track => {
+          try {
+            track.stop()
+          } catch (e) {
+            // Ignore track stop errors
+          }
+        })
       }
     }
-  }, [token, initializeRoom])
+  }, [token]) // Only depend on token, not initializeRoom
 
   return (
     <div className={`signalwire-video-room ${className}`}>
@@ -318,15 +383,42 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
           position: 'relative'
         }}
       >
+        {/* Local preview container - outside React's management */}
+        <div 
+          id="local-preview-container" 
+          style={{ 
+            width: '100%', 
+            height: '100%',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 1
+          }}
+        />
         {isConnecting && !isConnected && (
           <div className="position-absolute top-50 start-50 translate-middle text-center text-white">
             <div className="spinner-border text-light mb-3" role="status">
               <span className="visually-hidden">Connecting...</span>
             </div>
-            <div>Connecting to video room...</div>
+            <div className="mb-2">Connecting to video room...</div>
+            <small className="text-muted">This may take a few seconds</small>
             {error && (
               <div className="alert alert-danger mt-3">{error}</div>
             )}
+          </div>
+        )}
+        
+        {/* Show placeholder when connected but video not yet visible */}
+        {isConnected && (
+          <div className="position-absolute top-50 start-50 translate-middle text-center text-white" 
+               style={{ zIndex: -1 }}>
+            <div className="text-muted">
+              <i className="ki-duotone ki-video fs-5x mb-3">
+                <span className="path1"></span>
+                <span className="path2"></span>
+              </i>
+              <div>Video session active</div>
+            </div>
           </div>
         )}
       </div>

@@ -55,19 +55,10 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
       return
     }
 
-// 🔵🔵  NEW — pull SignalWire’s TURN creds from the JWT
-//const payload     = JSON.parse(atob(token.split('.')[1]))
-//const { ice_servers } = payload            // short username + credential
+// 🔵🔵  NEW — pull SignalWire's TURN creds from the JWT
+// Note: payload parsing moved inside initializeRoom function to avoid reference errors
 
-//console.log('ICE list that will be passed:', ice_servers)
-
-// Create room session …
-//console.log('Creating room session…')
-//const roomSession = new Video.RoomSession({
-//  token,
- // rootElement: videoContainerRef.current,
-//  iceServers: ice_servers,                 // 👈 use the proper list
-//})
+// Room session creation moved to initializeRoom function below
 
 
     const initializeRoom = async () => {
@@ -84,6 +75,16 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
       console.log('Container ready:', !!videoContainerRef.current)
       console.log('Protocol:', window.location.protocol)
       
+      // Check for HTTPS requirement
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        const httpsError = 'WebRTC requires HTTPS. Please use https:// instead of http://'
+        console.error(httpsError)
+        setError(httpsError)
+        setIsConnecting(false)
+        isInitializingRef.current = false
+        return
+      }
+      
       try {
         setIsConnecting(true)
         setError(null)
@@ -93,7 +94,9 @@ export const SimpleSignalWireRoom: React.FC<SimpleSignalWireRoomProps> = ({
         // Create room session with TURN-only configuration
          console.log('Creating room session...')
 	const payload = JSON.parse(atob(token.split('.')[1]))
-const { ice_servers } = payload
+// SignalWire puts ice_servers in different locations depending on token type
+const ice_servers = payload?.video?.ice_servers || payload?.ice_servers || payload?.s?.ice_servers || []
+console.log('Full JWT payload:', payload)
 console.log('ICE list that will be passed:', ice_servers)
 
 const safeIceServers = (ice_servers || []).filter((server: any) => {
@@ -110,6 +113,8 @@ const roomSession = new Video.RoomSession({
     { urls: 'stun:relay.signalwire.com:3478' } // UDP STUN fallback
   ]
 })            // keep default iceTransportPolicy = "all"
+
+console.log('[DEBUG] Parsed JWT Payload:', payload)
 
 
         roomSessionRef.current = roomSession
