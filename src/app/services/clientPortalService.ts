@@ -221,45 +221,51 @@ export class ClientPortalService {
    */
   static async validatePortalAccess(token: string): Promise<any | null> {
     try {
-      const { data: portalToken, error } = await supabase
-        .from('client_portal_tokens')
+      // First, use the RPC function to validate the token (bypasses RLS)
+      const { data: tokenData, error: rpcError } = await supabase
+        .rpc('validate_portal_token', { token_string: token })
+        .single() as { data: {
+          token_id: string;
+          job_id: string;
+          customer_id: string;
+          tenant_id: string;
+          is_valid: boolean;
+        } | null; error: any }
+
+      if (rpcError || !tokenData || !tokenData.is_valid) {
+        console.error('Portal token validation failed:', rpcError)
+        return null
+      }
+
+      // Now fetch the job data using the validated job_id
+      // This should work because we have a valid token
+      const { data: jobData, error: jobError } = await supabase
+        .from('jobs')
         .select(`
           *,
-          jobs:job_id(
-            *,
-            accounts:account_id(name, phone, email),
-            contacts:contact_id(first_name, last_name, phone, email)
-          )
+          accounts:account_id(name, phone, email),
+          contacts:contact_id(first_name, last_name, phone, email)
         `)
-        .eq('token', token)
-        .eq('is_active', true)
+        .eq('id', tokenData.job_id)
         .single()
 
-      if (error || !portalToken) {
+      if (jobError || !jobData) {
+        console.error('Failed to fetch job data:', jobError)
         return null
       }
-
-      // Check if token is expired
-      if (new Date(portalToken.expires_at) < new Date()) {
-        return null
-      }
-
-      // Update access count and last accessed
-      await supabase
-        .from('client_portal_tokens')
-        .update({
-          access_count: portalToken.access_count + 1,
-          last_accessed: new Date().toISOString()
-        })
-        .eq('id', portalToken.id)
 
       // Log portal access
-      await this.logPortalActivity(portalToken.id, 'login', {
-        ip_address: this.getClientIP(),
-        user_agent: navigator.userAgent
+      await this.logPortalActivity(tokenData.token_id, 'login', {
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'
       })
 
-      return portalToken
+      // Return the complete portal data
+      return {
+        token_id: tokenData.token_id,
+        customer_id: tokenData.customer_id,
+        tenant_id: tokenData.tenant_id,
+        jobs: jobData
+      }
     } catch (error) {
       console.error('Error validating portal access:', error)
       return null

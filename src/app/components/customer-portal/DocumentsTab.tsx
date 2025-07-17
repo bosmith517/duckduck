@@ -49,9 +49,9 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ jobId, tenantId, contactId 
           document_type,
           description,
           created_at,
-          uploaded_by_id,
-          is_shared_with_customer,
-          user_profiles!job_documents_uploaded_by_fkey(first_name, last_name)
+          uploaded_by,
+          uploaded_by_contact_id,
+          is_shared_with_customer
         `)
         .eq('job_id', jobId)
         .eq('tenant_id', tenantId)
@@ -60,12 +60,43 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ jobId, tenantId, contactId 
 
       if (error) throw error
 
-      // Transform data to include uploaded_by_name
-      const transformedDocs = (data || []).map(doc => ({
-        ...doc,
-        uploaded_by_name: doc.user_profiles 
-          ? `${(doc.user_profiles as any)?.first_name || ''} ${(doc.user_profiles as any)?.last_name || ''}`.trim()
-          : 'Team Member'
+      // For each document, try to get the uploader name
+      const transformedDocs = await Promise.all((data || []).map(async (doc) => {
+        let uploaded_by_name = 'Team Member'
+        
+        try {
+          // Try to get name from user_profiles if uploaded_by exists
+          if (doc.uploaded_by) {
+            const { data: userProfile } = await supabase
+              .from('user_profiles')
+              .select('first_name, last_name')
+              .eq('id', doc.uploaded_by)
+              .single()
+            
+            if (userProfile) {
+              uploaded_by_name = `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim()
+            }
+          }
+          // Try to get name from contacts if uploaded_by_contact_id exists
+          else if (doc.uploaded_by_contact_id) {
+            const { data: contact } = await supabase
+              .from('contacts')
+              .select('first_name, last_name')
+              .eq('id', doc.uploaded_by_contact_id)
+              .single()
+            
+            if (contact) {
+              uploaded_by_name = `${contact.first_name || ''} ${contact.last_name || ''}`.trim()
+            }
+          }
+        } catch (error) {
+          console.warn('Could not fetch uploader name:', error)
+        }
+        
+        return {
+          ...doc,
+          uploaded_by_name: uploaded_by_name || 'Team Member'
+        }
       }))
 
       setDocuments(transformedDocs)

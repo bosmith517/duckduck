@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "npm install --force --omit=dev",
+  "installCommand": "npm install --force",
   "devCommand": "npm run dev",
   "env": {
     "NODE_ENV": "production"
