@@ -47,6 +47,14 @@ interface JobWithRelations {
   location_zip?: string
   notes?: string
   estimate_id?: string
+  estimates?: Array<{
+    id: string
+    estimate_number: string
+    status: string
+    total_amount: number
+    version?: number
+    created_at: string
+  }>
   account?: {
     id: string
     name: string
@@ -56,14 +64,6 @@ interface JobWithRelations {
     first_name: string
     last_name: string
   }
-  estimates?: Array<{
-    id: string
-    estimate_number: string
-    total_amount: number
-    status: string
-    created_at: string
-    version?: number
-  }>
 }
 
 const JobDetailsPage: React.FC = () => {
@@ -128,11 +128,31 @@ const JobDetailsPage: React.FC = () => {
 
       // Get ALL estimates related to this job
       // This includes estimates that reference this job OR that this job references
-      const { data: allEstimates } = await supabase
+      let allEstimates: any[] = []
+      
+      // First get estimates that belong to this job
+      const { data: jobEstimates } = await supabase
         .from('estimates')
         .select('id, estimate_number, total_amount, status, created_at, version')
-        .or(`job_id.eq.${id},id.eq.${data.estimate_id}`)
+        .eq('job_id', id)
         .order('created_at', { ascending: false })
+      
+      if (jobEstimates) {
+        allEstimates = [...jobEstimates]
+      }
+      
+      // If job has an estimate_id, also fetch that estimate
+      if (data.estimate_id) {
+        const { data: sourceEstimate } = await supabase
+          .from('estimates')
+          .select('id, estimate_number, total_amount, status, created_at, version')
+          .eq('id', data.estimate_id)
+          .single()
+        
+        if (sourceEstimate && !allEstimates.find(e => e.id === sourceEstimate.id)) {
+          allEstimates.push(sourceEstimate)
+        }
+      }
 
       setJob({
         ...data,

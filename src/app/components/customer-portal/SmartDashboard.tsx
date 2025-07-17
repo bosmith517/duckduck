@@ -126,98 +126,6 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
         </div>
       </div>
 
-      {/* Next Service Card */}
-      {nextService && (
-        <div className="col-12 col-xl-6">
-          <div className="card card-flush h-lg-100 bg-primary">
-            <div className="card-body text-white p-4 p-lg-6">
-              <div className="d-flex align-items-center mb-4">
-                <i className="ki-duotone ki-calendar-2 fs-2x me-3">
-                  <span className="path1"></span>
-                  <span className="path2"></span>
-                  <span className="path3"></span>
-                  <span className="path4"></span>
-                  <span className="path5"></span>
-                </i>
-                <h3 className="text-white mb-0 fs-5 fs-lg-3">Your Next Service</h3>
-              </div>
-              
-              <div className="mb-4">
-                <h4 className="text-white fw-bold mb-2 fs-6 fs-lg-4">{nextService.service}</h4>
-                <div className="d-flex align-items-center mb-2">
-                  <i className="ki-duotone ki-clock fs-5 me-2">
-                    <span className="path1"></span>
-                    <span className="path2"></span>
-                  </i>
-                  <span className="fs-5">{nextService.date}</span>
-                </div>
-                <div className="d-flex align-items-center mb-3">
-                  <i className="ki-duotone ki-profile-circle fs-5 me-2">
-                    <span className="path1"></span>
-                    <span className="path2"></span>
-                    <span className="path3"></span>
-                  </i>
-                  <span className="fs-6">
-                    Technician: {nextService.technician} • {nextService.timeWindow}
-                  </span>
-                </div>
-              </div>
-
-              {nextService.status === 'On The Way' && currentTrackingData && (
-                <div className="alert alert-light-success border-0 mb-4">
-                  <div className="d-flex align-items-center">
-                    <i className="ki-duotone ki-geolocation fs-3 text-success me-3">
-                      <span className="path1"></span>
-                      <span className="path2"></span>
-                    </i>
-                    <div>
-                      <h6 className="text-dark mb-1">🚐 Your technician is on the way!</h6>
-                      <p className="text-muted mb-0 fs-7">Live tracking is active below</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="d-flex gap-2 gap-lg-3 flex-wrap">
-                <button 
-                  className="btn btn-light btn-sm flex-fill flex-lg-grow-0"
-                  onClick={() => {
-                    if (onContactTechnician) {
-                      onContactTechnician()
-                    } else {
-                      // Fallback - open phone call
-                      window.open('tel:5551234567', '_self')
-                    }
-                  }}
-                >
-                  <i className="ki-duotone ki-message-text-2 fs-6 fs-lg-5 me-1">
-                    <span className="path1"></span>
-                    <span className="path2"></span>
-                    <span className="path3"></span>
-                  </i>
-                  <span className="d-none d-sm-inline">Contact </span>Tech
-                </button>
-                <button 
-                  className="btn btn-light-warning btn-sm flex-fill flex-lg-grow-0"
-                  onClick={() => {
-                    if (onRescheduleJob) {
-                      onRescheduleJob()
-                    } else {
-                      alert('Please call us at (555) 123-4567 to reschedule your appointment.')
-                    }
-                  }}
-                >
-                  <i className="ki-duotone ki-calendar-edit fs-6 fs-lg-5 me-1">
-                    <span className="path1"></span>
-                    <span className="path2"></span>
-                  </i>
-                  <span className="d-none d-sm-inline">Re</span>schedule
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Outstanding Balance Card */}
       {hasOutstandingBalance() && (
@@ -261,7 +169,7 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
       )}
 
       {/* Last Service Summary */}
-      {lastService && !hasOutstandingBalance() && (
+      {lastService && (
         <div className="col-12 col-xl-6">
           <div className="card card-flush h-lg-100">
             <div className="card-body p-4 p-lg-6">

@@ -23,6 +23,7 @@ const ContactTechnicianModal = React.lazy(() => import('../../components/custome
 const JobPhotosTab = React.lazy(() => import('../../components/customer-portal/JobPhotosTab'))
 const DocumentsTab = React.lazy(() => import('../../components/customer-portal/DocumentsTab'))
 const ReferralDashboard = React.lazy(() => import('../../components/customer-portal/ReferralDashboard'))
+const EstimatesTab = React.lazy(() => import('../../components/customer-portal/EstimatesTab'))
 
 // Conditional Mapbox import - only load when needed
 let mapboxgl: any = null
@@ -185,7 +186,7 @@ const CustomerPortalPage: React.FC = () => {
   const [showTracking, setShowTracking] = useState(false)
   const [showSchedulingModal, setShowSchedulingModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals'>('dashboard')
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals' | 'estimates'>('dashboard')
   const [tenantPhone, setTenantPhone] = useState<string | null>(null)
   const [tenantInfo, setTenantInfo] = useState<any>(null)
   const [tenantBranding, setTenantBranding] = useState<any>(null)
@@ -1077,7 +1078,7 @@ const CustomerPortalPage: React.FC = () => {
       <StickyNavigation 
         activeSection={activeSection}
         onSectionChange={(section: string) => {
-          setActiveSection(section as 'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals')
+          setActiveSection(section as 'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals' | 'estimates')
           // Collapse property details when switching sections
           const propertyAccordion = document.getElementById('propertyCollapse')
           if (propertyAccordion && section !== 'dashboard') {
@@ -1129,19 +1130,6 @@ const CustomerPortalPage: React.FC = () => {
         
         <div className="main-content">
         
-        {/* Smart Dashboard - Always visible */}
-        <SmartDashboard 
-          customer={customer}
-          currentJob={currentJob}
-          jobHistory={jobHistory}
-          currentTrackingData={trackingData}
-          onContactTechnician={() => setShowContactModal(true)}
-          onRescheduleJob={() => alert(`Please call us at ${tenantPhone || 'our main number'} to reschedule your appointment.`)}
-          onPayInvoice={() => alert('Payment portal coming soon! Please call us to pay your invoice.')}
-          onViewJobDetails={(jobId) => alert(`Job details for ${jobId} coming soon!`)}
-          onScheduleService={() => setShowSchedulingModal(true)}
-        />
-
         {/* Navigation is now handled by StickyNavigation component */}
         {/* 
             <li className="nav-item">
@@ -1234,9 +1222,89 @@ const CustomerPortalPage: React.FC = () => {
 
         {/* Show property row only on dashboard */}
         {activeSection === 'dashboard' && (
-          <div className="row g-6">
-            {/* Main Content - Property Info or Tracking Map */}
-            <div className="col-lg-8">
+          <>
+            {/* Top Row - Smart Dashboard and Current Job */}
+            <div className="row g-6 mb-6">
+              {/* Smart Dashboard */}
+              <div className="col-lg-8">
+                <SmartDashboard 
+                  customer={customer}
+                  currentJob={currentJob}
+                  jobHistory={jobHistory}
+                  currentTrackingData={trackingData}
+                  onContactTechnician={() => setShowContactModal(true)}
+                  onRescheduleJob={() => alert(`Please call us at ${tenantPhone || 'our main number'} to reschedule your appointment.`)}
+                  onPayInvoice={() => alert('Payment portal coming soon! Please call us to pay your invoice.')}
+                  onViewJobDetails={(jobId) => alert(`Job details for ${jobId} coming soon!`)}
+                  onScheduleService={() => setShowSchedulingModal(true)}
+                />
+              </div>
+              
+              {/* Current Job Card */}
+              <div className="col-lg-4">
+                {currentJob && (
+                  <div className="card shadow-sm h-100">
+                    <div className="card-header">
+                      <h6 className="card-title mb-0">
+                        <i className="ki-duotone ki-wrench fs-4 text-success me-2">
+                          <span className="path1"></span>
+                          <span className="path2"></span>
+                        </i>
+                        Current Service
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <h5 className="text-dark mb-2">{currentJob.title}</h5>
+                      <p className="text-muted fs-6 mb-3">{currentJob.description}</p>
+                      
+                      <div className="separator my-3"></div>
+                      
+                      <div className="d-flex justify-content-between mb-2">
+                        <span className="text-muted fs-7">Scheduled:</span>
+                        <span className="fw-bold fs-7">{formatDate(currentJob.scheduled_date)}</span>
+                      </div>
+                      
+                      <div className="d-flex justify-content-between mb-2">
+                        <span className="text-muted fs-7">Duration:</span>
+                        <span className="fw-bold fs-7">{currentJob.estimated_duration} hours</span>
+                      </div>
+                      
+                      {currentJob.technician_name && (
+                        <>
+                          <div className="d-flex justify-content-between mb-2">
+                            <span className="text-muted fs-7">Technician:</span>
+                            <span className="fw-bold fs-7">{currentJob.technician_name}</span>
+                          </div>
+                          
+                          {currentJob.technician_phone && (
+                            <div className="d-flex justify-content-between mb-2">
+                              <span className="text-muted fs-7">Contact:</span>
+                              <a href={`tel:${currentJob.technician_phone}`} className="fw-bold fs-7 text-primary">
+                                {currentJob.technician_phone}
+                              </a>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      <div className="mt-3">
+                        <span className={`badge badge-light-${
+                          currentJob.status === 'on_the_way' ? 'warning' :
+                          currentJob.status === 'in_progress' ? 'primary' : 'success'
+                        } w-100 py-2`}>
+                          {currentJob.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Second Row - Property Details and Schedule Service */}
+            <div className="row g-6">
+              {/* Main Content - Property Info or Tracking Map */}
+              <div className="col-lg-8">
               {/* Property Details Accordion */}
               <div className="accordion" id="propertyAccordion">
               <div className="accordion-item">
@@ -1850,61 +1918,81 @@ const CustomerPortalPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Sidebar - Job Details & Actions */}
+          {/* Sidebar - Actions */}
           <div className="col-lg-4">
-            {/* Current Job */}
+            {/* Your Next Service */}
             {currentJob && (
-              <div className="card shadow-sm mb-6">
-                <div className="card-header">
-                  <h6 className="card-title mb-0">
-                    <i className="ki-duotone ki-wrench fs-4 text-success me-2">
+              <div className="card shadow-sm mb-6 bg-primary">
+                <div className="card-body text-white">
+                  <div className="d-flex align-items-center mb-3">
+                    <i className="ki-duotone ki-calendar-2 fs-2x me-3">
                       <span className="path1"></span>
                       <span className="path2"></span>
+                      <span className="path3"></span>
+                      <span className="path4"></span>
+                      <span className="path5"></span>
                     </i>
-                    Current Service
-                  </h6>
-                </div>
-                <div className="card-body">
-                  <h5 className="text-dark mb-2">{currentJob.title}</h5>
-                  <p className="text-muted fs-6 mb-3">{currentJob.description}</p>
-                  
-                  <div className="separator my-3"></div>
-                  
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted fs-7">Scheduled:</span>
-                    <span className="fw-bold fs-7">{formatDate(currentJob.scheduled_date)}</span>
+                    <h6 className="text-white mb-0">Your Next Service</h6>
                   </div>
                   
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted fs-7">Duration:</span>
-                    <span className="fw-bold fs-7">{currentJob.estimated_duration} hours</span>
+                  <div className="mb-3">
+                    <h5 className="text-white fw-bold mb-2">{currentJob.title}</h5>
+                    <div className="d-flex align-items-center mb-2">
+                      <i className="ki-duotone ki-clock fs-6 me-2">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      <span className="fs-7">{formatDate(currentJob.scheduled_date)}</span>
+                    </div>
+                    <div className="d-flex align-items-center">
+                      <i className="ki-duotone ki-profile-circle fs-6 me-2">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                        <span className="path3"></span>
+                      </i>
+                      <span className="fs-7">
+                        {currentJob.technician_name || 'Technician TBD'}
+                      </span>
+                    </div>
                   </div>
-                  
-                  {currentJob.technician_name && (
-                    <>
-                      <div className="d-flex justify-content-between mb-2">
-                        <span className="text-muted fs-7">Technician:</span>
-                        <span className="fw-bold fs-7">{currentJob.technician_name}</span>
-                      </div>
-                      
-                      {currentJob.technician_phone && (
-                        <div className="d-flex justify-content-between mb-2">
-                          <span className="text-muted fs-7">Contact:</span>
-                          <a href={`tel:${currentJob.technician_phone}`} className="fw-bold fs-7 text-primary">
-                            {currentJob.technician_phone}
-                          </a>
+
+                  {currentJob.status === 'On The Way' && trackingData && (
+                    <div className="alert alert-light-success border-0 mb-3 p-3">
+                      <div className="d-flex align-items-center">
+                        <i className="ki-duotone ki-geolocation fs-5 text-success me-2">
+                          <span className="path1"></span>
+                          <span className="path2"></span>
+                        </i>
+                        <div>
+                          <div className="text-dark fs-7 fw-bold">🚐 On the way!</div>
+                          <div className="text-muted fs-8">Live tracking active</div>
                         </div>
-                      )}
-                    </>
+                      </div>
+                    </div>
                   )}
-                  
-                  <div className="mt-3">
-                    <span className={`badge badge-light-${
-                      currentJob.status === 'on_the_way' ? 'warning' :
-                      currentJob.status === 'in_progress' ? 'primary' : 'success'
-                    } w-100 py-2`}>
-                      {currentJob.status.replace('_', ' ').toUpperCase()}
-                    </span>
+
+                  <div className="d-flex gap-2">
+                    <button 
+                      className="btn btn-light btn-sm flex-fill"
+                      onClick={() => setShowContactModal(true)}
+                    >
+                      <i className="ki-duotone ki-message-text-2 fs-5 me-1">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                        <span className="path3"></span>
+                      </i>
+                      Contact
+                    </button>
+                    <button 
+                      className="btn btn-light-warning btn-sm flex-fill"
+                      onClick={() => alert(`Please call us at ${tenantPhone || 'our main number'} to reschedule.`)}
+                    >
+                      <i className="ki-duotone ki-calendar-edit fs-5 me-1">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      Reschedule
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2045,14 +2133,12 @@ const CustomerPortalPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+            </div>
+          </>
         )}
 
-        {/* Content Sections based on active navigation */}
-        {activeSection === 'dashboard' && (
-          <div>
             {/* Enhanced Features when job is active */}
-            {currentJob && (
+            {currentJob && activeSection === 'dashboard' && (
               <div className="row g-6 mt-6">
                 {/* Technician Profile */}
                 <div className="col-lg-6">
@@ -2073,14 +2159,14 @@ const CustomerPortalPage: React.FC = () => {
             )}
 
             {/* Job History Timeline */}
-            <div className="mt-8">
-              <JobHistoryTimeline 
-                jobHistory={jobHistory}
-                customer={customer}
-              />
-            </div>
-          </div>
-        )}
+            {activeSection === 'dashboard' && (
+              <div className="mt-8">
+                <JobHistoryTimeline 
+                  jobHistory={jobHistory}
+                  customer={customer}
+                />
+              </div>
+            )}
 
         {activeSection === 'equipment' && (
           <div className="mt-6">
@@ -2156,8 +2242,25 @@ const CustomerPortalPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {activeSection === 'estimates' && currentJob && (
+          <div className="mt-6">
+            <div className="card">
+              <div className="card-body">
+                <Suspense fallback={<LoadingSpinner text="Loading estimate..." />}>
+                  <EstimatesTab 
+                    jobId={currentJob.id}
+                    tenantId={currentJob.tenant_id}
+                    portalTokenId={token}
+                    customerId={customer?.id}
+                  />
+                </Suspense>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
-        </div>
+      </div>
 
       {/* Chat Widget - Always visible */}
       <ChatWidget />

@@ -53,6 +53,12 @@ const StickyNavigation: React.FC<StickyNavigationProps> = ({
       isActive: activeSection === 'quotes'
     },
     {
+      id: 'estimates',
+      label: 'Estimates',
+      icon: 'ki-bill',
+      isActive: activeSection === 'estimates'
+    },
+    {
       id: 'photos',
       label: 'Photos',
       icon: 'ki-picture',

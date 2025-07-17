@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.6?dts";
 import { PDFDocument } from "https://cdn.skypack.dev/pdf-lib?dts";
 import { getDocument } from "https://esm.sh/pdfjs-dist@3.11.174/legacy/build/pdf.mjs";
+import { encode } from "https://deno.land/std@0.203.0/encoding/base64.ts";
 
 // ─────────────────────────────────────────────
 // 0.  DEFAULT LOCATION OF *YOUR* PDF
@@ -22,14 +23,51 @@ interface FieldResult {
 }
 
 // CORS helper
-const cors = {
+const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type"
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-api-token",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
+// Helper function to generate suggested values based on field name/type
+function generateSuggestedValue(fieldName: string, fieldType: string): string {
+  const lowerName = fieldName.toLowerCase();
+  
+  // For signature fields, return empty
+  if (fieldType === "signature") return "";
+  
+  // Common field patterns
+  if (lowerName.includes("name") && !lowerName.includes("company") && !lowerName.includes("business")) {
+    if (lowerName.includes("first")) return "John";
+    if (lowerName.includes("last")) return "Smith";
+    if (lowerName.includes("middle")) return "M";
+    return "John Smith";
+  }
+  
+  if (lowerName.includes("email")) return "john.smith@example.com";
+  if (lowerName.includes("phone") || lowerName.includes("mobile") || lowerName.includes("cell")) return "(555) 123-4567";
+  if (lowerName.includes("address") || lowerName.includes("street")) return "123 Main Street";
+  if (lowerName.includes("city")) return "Anytown";
+  if (lowerName.includes("state")) return "CA";
+  if (lowerName.includes("zip") || lowerName.includes("postal")) return "12345";
+  if (lowerName.includes("date") && !lowerName.includes("birth")) return new Date().toISOString().split('T')[0];
+  if (lowerName.includes("birth") || lowerName.includes("dob")) return "1990-01-01";
+  if (lowerName.includes("company") || lowerName.includes("business")) return "Acme Corporation";
+  if (lowerName.includes("ssn") || lowerName.includes("social")) return "XXX-XX-1234";
+  if (lowerName.includes("license") || lowerName.includes("driver")) return "D1234567";
+  
+  // For checkboxes/radio, return false/unchecked by default
+  if (fieldType === "checkbox" || fieldType === "radio") return "false";
+  
+  // Default empty for other fields
+  return "";
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   try {
     // ─────────────────────────────────────────
@@ -198,72 +236,126 @@ serve(async (req) => {
     }
 
     // ─────────────────────────────────────────
-    // 5. Optional GPT enrichment with full text context
+    // 5. Enhanced GPT-4 Analysis
     // ─────────────────────────────────────────
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (OPENAI_API_KEY) {
-      // If we have few or no fields, or if we want to enhance existing fields
-      if (fields.length < 5 || fields.some(f => !f.suggestedValue)) {
-        // Get full text for context
-        const pdf = await getDocument({ data: pdfBytes }).promise;
-        let fullText = "";
+      try {
+        console.log("Starting enhanced GPT-4 analysis...");
         
-        for (let i = 1; i <= Math.min(3, pdf.numPages); i++) { // First 3 pages for context
+        // For GPT-4 Vision, we need to convert PDF to images
+        // However, since PDF-to-image conversion requires external services
+        // and can be complex in Deno, we'll use an enhanced text-based approach
+        // that preserves document structure better
+        
+        // Extract comprehensive document structure
+        const pdf = await getDocument({ data: pdfBytes }).promise;
+        let documentPages: any[] = [];
+        
+        for (let i = 1; i <= Math.min(2, pdf.numPages); i++) {
           const page = await pdf.getPage(i);
-          const tc = await page.getTextContent();
-          fullText += tc.items.map((it: any) => it.str).join(" ") + "\n";
+          const textContent = await page.getTextContent();
+          const viewport = page.getViewport({ scale: 1.0 });
+          
+          // Create a visual representation of the page
+          let pageMap: string[] = new Array(Math.ceil(viewport.height / 10)).fill('');
+          
+          textContent.items.forEach((item: any) => {
+            const x = Math.round(item.transform[4] / 10);
+            const y = Math.round(item.transform[5] / 10);
+            const row = Math.floor(viewport.height / 10) - y;
+            
+            if (row >= 0 && row < pageMap.length) {
+              // Pad the string to the x position
+              while (pageMap[row].length < x) {
+                pageMap[row] += ' ';
+              }
+              pageMap[row] += item.str;
+            }
+          });
+          
+          documentPages.push({
+            pageNumber: i,
+            width: viewport.width,
+            height: viewport.height,
+            textMap: pageMap.join('\n'),
+            items: textContent.items
+          });
         }
         
-        const prompt = `Analyze this PDF form text and identify ALL fillable fields. 
-Look for:
-1. Fields with blanks (____), dots (....), or dashes (----)
-2. Fields ending with colons (:)
-3. Common form fields (name, address, phone, email, date, etc.)
-4. Checkbox or radio button options
-5. Signature lines
-6. Any other fillable areas
+        // Create a comprehensive prompt for GPT-4
+        const analysisPrompt = `You are analyzing a PDF form. I'll provide you with the text layout from the document.
 
-PDF Text (first 3 pages):
-${fullText.substring(0, 3000)}
+DOCUMENT STRUCTURE:
+${documentPages.map(p => `
+=== PAGE ${p.pageNumber} (${Math.round(p.width)}x${Math.round(p.height)}px) ===
+${p.textMap}
+`).join('\n')}
 
-Current detected fields:
-${JSON.stringify(fields, null, 2)}
+INSTRUCTIONS:
+Identify ALL fillable fields in this form. Look for:
+1. Text followed by lines, underscores, dots: "Name: _____" or "Address: ....."
+2. Empty spaces after labels where users would write
+3. Checkbox indicators: □, ☐, [ ], ( ) 
+4. Fields in tables or structured layouts
+5. Common form fields: Name, Address, Phone, Email, Date, Signature, SSN, etc.
+6. Any label followed by blank space or lines
 
-Please identify any additional fields I missed and enhance the existing ones.
-For each field, provide:
-- fieldName: clear, concise field name
-- fieldType: text, date, phone, email, checkbox, radio, signature, etc.
-- suggestedValue: a reasonable example value (leave empty for signatures)
-- confidence: 0-100 how confident you are this is a fillable field
+For each field found, provide:
+- fieldName: exact label from the form
+- fieldType: text, checkbox, radio, signature, date, phone, email, number, etc.
+- required: true if marked with * or "required"
+- location: which page and approximate position
 
-Return ONLY valid JSON in format: { "fields": [...] }`;
+Be thorough - identify EVERY possible field, even if uncertain.
 
-        const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-          method : "POST",
+Return ONLY valid JSON: { "fields": [...] }`;
+
+        // Send to GPT-4 for analysis
+        const gptResp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
           headers: {
             Authorization: `Bearer ${OPENAI_API_KEY}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
+            model: "gpt-4o",
+            messages: [{ role: "user", content: analysisPrompt }],
             temperature: 0.1,
-            max_tokens: 2000
+            max_tokens: 4000
           })
         });
 
-        if (resp.ok) {
+        if (gptResp.ok) {
+          const { choices } = await gptResp.json();
+          const gptResponse = choices[0].message.content;
+          console.log("GPT-4 analysis complete");
+          
           try {
-            const { choices } = await resp.json();
-            const gptResponse = choices[0].message.content;
             const gpt = JSON.parse(gptResponse);
             if (Array.isArray(gpt.fields) && gpt.fields.length > 0) {
-              fields = gpt.fields;
+              // Use GPT's enhanced analysis
+              fields = gpt.fields.map((f: any) => ({
+                fieldName: f.fieldName,
+                fieldType: f.fieldType || "text",
+                suggestedValue: generateSuggestedValue(f.fieldName, f.fieldType || "text"),
+                confidence: f.confidence || 90,
+                required: f.required || false,
+                location: f.location || "",
+                pageNumber: f.pageNumber || 1
+              }));
+              console.log(`GPT-4 identified ${fields.length} fields`);
             }
-          } catch (e) { 
-            console.error("GPT JSON parse error:", e);
+          } catch (parseError) {
+            console.error("GPT response parse error:", parseError);
+            console.log("GPT response:", gptResponse);
           }
+        } else {
+          console.error("GPT-4 API error:", await gptResp.text());
         }
+      } catch (gptError: any) {
+        console.error("GPT analysis error:", gptError);
+        // Keep regex-detected fields as fallback
       }
     }
 
@@ -272,12 +364,12 @@ Return ONLY valid JSON in format: { "fields": [...] }`;
     // ─────────────────────────────────────────
     return new Response(
       JSON.stringify({ success: true, bucket, path, documentName, fields }),
-      { headers: { ...cors, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
     return new Response(
       JSON.stringify({ success: false, error: err.message }),
-      { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

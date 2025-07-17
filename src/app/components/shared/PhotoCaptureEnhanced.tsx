@@ -5,7 +5,7 @@ import { showToast } from '../../utils/toast'
 import { MobileService, PhotoResult } from '../../services/mobileService'
 import { Capacitor } from '@capacitor/core'
 import { CameraPreview } from '@capacitor-community/camera-preview'
-import { Camera, CameraResultType, CameraSource, GalleryPhotos } from '@capacitor/camera'
+import { Camera, CameraResultType, CameraSource, GalleryPhotos, PermissionStatus } from '@capacitor/camera'
 import type { CameraPreviewOptions, CameraPreviewPictureOptions } from '@capacitor-community/camera-preview'
 
 interface PhotoCaptureEnhancedProps {
@@ -53,6 +53,7 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set())
   const [batchDescription, setBatchDescription] = useState('')
   const [continuousCapture, setContinuousCapture] = useState(true)
+  const [debugNoFallback, setDebugNoFallback] = useState(false) // Debug flag to disable fallback
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -131,6 +132,14 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
           return
         } catch (error) {
           console.error('[PhotoCapture] Camera preview error:', error)
+          
+          if (debugNoFallback) {
+            console.log('[PhotoCapture] Debug mode: Fallback disabled, showing error')
+            showToast.error('Camera preview failed (fallback disabled in debug mode)')
+            setCameraLoading(false)
+            return
+          }
+          
           console.log('[PhotoCapture] Falling back to native camera (MobileService.takePhoto)')
           // Fall back to native camera
           await captureWithNativeCamera()
@@ -168,15 +177,19 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
   }
 
   const stopCamera = async () => {
+    console.log('[PhotoCapture] Stopping camera - showCamera:', showCamera)
     if (isMobileDevice && Capacitor.isNativePlatform() && showCamera) {
       try {
+        console.log('[PhotoCapture] Stopping CameraPreview')
         await CameraPreview.stop()
+        console.log('[PhotoCapture] CameraPreview stopped successfully')
       } catch (error) {
-        console.error('Error stopping camera preview:', error)
+        console.error('[PhotoCapture] Error stopping camera preview:', error)
       }
     }
     
     if (streamRef.current) {
+      console.log('[PhotoCapture] Stopping browser media stream')
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
@@ -186,7 +199,12 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
 
   const captureWithNativeCamera = async () => {
     try {
+      console.log('[PhotoCapture] Using MobileService.takePhoto fallback')
+      console.log('[PhotoCapture] Current photo count:', photos.length, 'Max photos:', maxPhotos)
+      console.log('[PhotoCapture] Continuous capture enabled:', continuousCapture)
+      
       const photo = await MobileService.takePhoto()
+      console.log('[PhotoCapture] Photo captured via MobileService.takePhoto')
       
       const response = await fetch(photo.dataUrl)
       const blob = await response.blob()
@@ -206,21 +224,30 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
         status: 'pending'
       }
       
-      setPhotos(prev => [...prev, newPhoto])
+      setPhotos(prev => {
+        const updatedPhotos = [...prev, newPhoto]
+        
+        // Check continuous capture with updated photo count
+        if (continuousCapture && updatedPhotos.length < maxPhotos) {
+          console.log('[PhotoCapture] Continuous capture: Scheduling next capture in 500ms (photos:', updatedPhotos.length, '/', maxPhotos, ')')
+          setTimeout(() => captureWithNativeCamera(), 500)
+        } else {
+          console.log('[PhotoCapture] Stopping capture - continuousCapture:', continuousCapture, 'reached limit:', updatedPhotos.length >= maxPhotos)
+        }
+        
+        return updatedPhotos
+      })
       showToast.success(`Photo ${photos.length + 1} captured!`)
-      
-      // If continuous capture, restart camera
-      if (continuousCapture && photos.length < maxPhotos - 1) {
-        setTimeout(() => captureWithNativeCamera(), 500)
-      }
     } catch (error) {
-      console.error('Native camera error:', error)
+      console.error('[PhotoCapture] Native camera error:', error)
       showToast.error('Failed to capture photo')
       setCameraLoading(false)
     }
   }
 
   const capturePhoto = async () => {
+    console.log('[PhotoCapture] capturePhoto called - Current photo count:', photos.length, 'Max:', maxPhotos)
+    
     if (photos.length >= maxPhotos) {
       showToast.warning(`Maximum ${maxPhotos} photos reached`)
       return
@@ -229,11 +256,13 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
     // Mobile camera preview capture
     if (isMobileDevice && Capacitor.isNativePlatform() && showCamera) {
       try {
+        console.log('[PhotoCapture] Using CameraPreview.capture')
         const captureOptions: CameraPreviewPictureOptions = {
           quality: 90
         }
         
         const result = await CameraPreview.capture(captureOptions)
+        console.log('[PhotoCapture] CameraPreview.capture successful')
         const base64 = `data:image/jpeg;base64,${result.value}`
         
         const response = await fetch(base64)
@@ -256,6 +285,7 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
         
         setPhotos(prev => [...prev, newPhoto])
         showToast.success(`Photo ${photos.length + 1} captured!`)
+        console.log('[PhotoCapture] Photo added. Total photos:', photos.length + 1, 'showCamera still:', showCamera)
         
         // Haptic feedback on mobile
         if (MobileService.isNativePlatform()) {
@@ -264,7 +294,7 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
         
         return
       } catch (error) {
-        console.error('Camera preview capture error:', error)
+        console.error('[PhotoCapture] Camera preview capture error:', error)
         showToast.error('Failed to capture photo')
         return
       }
@@ -318,8 +348,12 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
   }
 
   const selectMultiplePhotosFromGallery = async () => {
+    console.log('[PhotoCapture] selectMultiplePhotosFromGallery called')
+    console.log('[PhotoCapture] Platform check - isMobileDevice:', isMobileDevice, 'isNativePlatform:', Capacitor.isNativePlatform())
+    
     if (!isMobileDevice || !Capacitor.isNativePlatform()) {
       // For desktop, trigger file input
+      console.log('[PhotoCapture] Desktop mode - triggering file input')
       fileInputRef.current?.click()
       return
     }
@@ -328,11 +362,20 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
       setCameraLoading(true)
       
       // Use Camera.pickImages for multiple selection if available
-      if ('pickImages' in Camera) {
+      const hasPickImages = 'pickImages' in Camera
+      console.log('[PhotoCapture] Camera.pickImages available:', hasPickImages)
+      
+      if (hasPickImages) {
+        console.log('[PhotoCapture] Using Camera.pickImages for multi-selection')
+        const remainingSlots = maxPhotos - photos.length
+        console.log('[PhotoCapture] Requesting up to', remainingSlots, 'photos')
+        
         const result = await (Camera as any).pickImages({
           quality: 90,
-          limit: maxPhotos - photos.length
+          limit: remainingSlots
         }) as GalleryPhotos
+        
+        console.log('[PhotoCapture] pickImages result:', result.photos.length, 'photos returned')
         
         const newPhotos: CapturedPhoto[] = []
         const position = await getLocation()
@@ -357,8 +400,10 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
         
         setPhotos(prev => [...prev, ...newPhotos])
         showToast.success(`${newPhotos.length} photos selected!`)
+        console.log('[PhotoCapture] Total photos after gallery selection:', photos.length + newPhotos.length)
       } else {
         // Fallback to single selection
+        console.log('[PhotoCapture] Falling back to MobileService.selectPhoto (single selection)')
         const photo = await MobileService.selectPhoto()
         
         const response = await fetch(photo.dataUrl)
@@ -381,9 +426,10 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
         
         setPhotos(prev => [...prev, newPhoto])
         showToast.success('Photo selected!')
+        console.log('[PhotoCapture] Total photos after single selection:', photos.length + 1)
       }
     } catch (error) {
-      console.error('Gallery selection error:', error)
+      console.error('[PhotoCapture] Gallery selection error:', error)
       showToast.error('Failed to select photos')
     } finally {
       setCameraLoading(false)
@@ -806,18 +852,36 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
                       </button>
                       
                       {isMobileDevice && (
-                        <div className="form-check form-switch">
-                          <input
-                            className="form-check-input"
-                            type="checkbox"
-                            id="continuousCapture"
-                            checked={continuousCapture}
-                            onChange={(e) => setContinuousCapture(e.target.checked)}
-                          />
-                          <label className="form-check-label text-white" htmlFor="continuousCapture">
-                            Continuous
-                          </label>
-                        </div>
+                        <>
+                          <div className="form-check form-switch">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              id="continuousCapture"
+                              checked={continuousCapture}
+                              onChange={(e) => setContinuousCapture(e.target.checked)}
+                            />
+                            <label className="form-check-label text-white" htmlFor="continuousCapture">
+                              Continuous
+                            </label>
+                          </div>
+                          
+                          {/* Debug toggle - only show in development */}
+                          {process.env.NODE_ENV === 'development' && (
+                            <div className="form-check form-switch">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id="debugNoFallback"
+                                checked={debugNoFallback}
+                                onChange={(e) => setDebugNoFallback(e.target.checked)}
+                              />
+                              <label className="form-check-label text-white" htmlFor="debugNoFallback">
+                                Debug: No Fallback
+                              </label>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

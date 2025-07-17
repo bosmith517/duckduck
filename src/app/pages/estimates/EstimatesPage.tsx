@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import { estimatesService, EstimateWithAccount } from '../../services/estimatesService'
@@ -13,6 +14,8 @@ import { showToast } from '../../utils/toast'
 
 const EstimatesPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
+  const [searchParams] = useSearchParams()
+  const jobIdFromUrl = searchParams.get('job_id')
   const journeyLead = useCustomerJourneyStore(state => state.lead)
   const journeyJob = useCustomerJourneyStore(state => state.job)
   const [estimates, setEstimates] = useState<EstimateWithAccount[]>([])
@@ -36,6 +39,13 @@ const EstimatesPage: React.FC = () => {
   useEffect(() => {
     loadEstimates()
   }, [searchTerm, statusFilter])
+
+  // Auto-open form when job_id is in URL
+  useEffect(() => {
+    if (jobIdFromUrl && !showEstimateForm) {
+      setShowEstimateForm(true)
+    }
+  }, [jobIdFromUrl])
 
   const loadEstimates = async () => {
     try {
@@ -573,8 +583,9 @@ const EstimatesPage: React.FC = () => {
             setEditingEstimate(null)
           }}
           leadId={editingEstimate?.lead_id || journeyLead?.id}
-          jobId={editingEstimate?.job_id || journeyJob?.id}
+          jobId={editingEstimate?.job_id || jobIdFromUrl || journeyJob?.id}
           accountId={editingEstimate?.account_id || editingEstimate?.contact_id || undefined}
+          estimateContext={jobIdFromUrl ? 'job' : undefined}
         />
       )}
 
