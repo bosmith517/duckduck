@@ -7,6 +7,9 @@ interface FloatingCTABarProps {
   onPayInvoice: () => void
   currentJob?: any
   hasUnpaidInvoices?: boolean
+  hasActiveEstimate?: boolean
+  onViewEstimates?: () => void
+  onViewPhotos?: () => void
 }
 
 const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
@@ -15,7 +18,10 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
   onContactTechnician,
   onPayInvoice,
   currentJob,
-  hasUnpaidInvoices = false
+  hasUnpaidInvoices = false,
+  hasActiveEstimate = false,
+  onViewEstimates,
+  onViewPhotos
 }) => {
   const [isVisible, setIsVisible] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -193,6 +199,61 @@ const FloatingCTABar: React.FC<FloatingCTABarProps> = ({
 
       {/* Mobile Sticky CTA Bar */}
       <div className="d-lg-none">
+        {/* Quick Access Bar for Photos & Estimates */}
+        {(hasActiveEstimate || currentJob) && isVisible && (
+          <div 
+            className="position-fixed bg-white border-bottom shadow w-100"
+            style={{ 
+              top: '60px', /* Below header */
+              left: '0',
+              right: '0',
+              zIndex: 1041
+            }}
+          >
+            <div className="container-fluid px-2 py-2">
+              <div className="row g-2">
+                {/* View Estimates Button */}
+                {hasActiveEstimate && onViewEstimates && (
+                  <div className="col-6">
+                    <button
+                      className="btn btn-light-primary btn-sm w-100 d-flex align-items-center justify-content-center"
+                      onClick={onViewEstimates}
+                    >
+                      <i className="ki-duotone ki-bill fs-5 me-1">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                        <span className="path3"></span>
+                        <span className="path4"></span>
+                        <span className="path5"></span>
+                        <span className="path6"></span>
+                      </i>
+                      Estimates
+                      <span className="badge badge-sm badge-circle badge-primary ms-1">!</span>
+                    </button>
+                  </div>
+                )}
+                
+                {/* View Photos Button */}
+                {onViewPhotos && (
+                  <div className={hasActiveEstimate ? "col-6" : "col-12"}>
+                    <button
+                      className="btn btn-light-info btn-sm w-100 d-flex align-items-center justify-content-center"
+                      onClick={onViewPhotos}
+                    >
+                      <i className="ki-duotone ki-picture fs-5 me-1">
+                        <span className="path1"></span>
+                        <span className="path2"></span>
+                      </i>
+                      Photos
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Action Bar */}
         <div 
           className="position-fixed bg-white border-top shadow-lg w-100"
           style={{ 

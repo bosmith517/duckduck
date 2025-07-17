@@ -186,7 +186,7 @@ const CustomerPortalPage: React.FC = () => {
   const [showTracking, setShowTracking] = useState(false)
   const [showSchedulingModal, setShowSchedulingModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals' | 'estimates'>('dashboard')
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'equipment' | 'maintenance' | 'quotes' | 'photos' | 'documents' | 'referrals' | 'estimates' | 'history'>('dashboard')
   const [tenantPhone, setTenantPhone] = useState<string | null>(null)
   const [tenantInfo, setTenantInfo] = useState<any>(null)
   const [tenantBranding, setTenantBranding] = useState<any>(null)
@@ -362,7 +362,9 @@ const CustomerPortalPage: React.FC = () => {
           
         if (tenantData) {
           setTenantInfo(tenantData)
-          const phoneNumber = tenantData.signalwire_number || tenantData.business_contact_phone || tenantData.selected_phone_during_onboarding
+          // Priority: 1. Business Account Phone, 2. Tenant Business Info
+          // Never use SignalWire numbers for customer portal display
+          const phoneNumber = tenantData.business_contact_phone || tenantData.selected_phone_during_onboarding
           setTenantPhone(phoneNumber)
         }
       }
@@ -604,8 +606,9 @@ const CustomerPortalPage: React.FC = () => {
 
         if (!tenantError && tenantData) {
           setTenantInfo(tenantData)
-          // Set phone number from the view - prioritize signalwire_number, then business_contact_phone, then selected_phone_during_onboarding
-          const phoneNumber = tenantData.signalwire_number || tenantData.business_contact_phone || tenantData.selected_phone_during_onboarding
+          // Priority: 1. Business Account Phone, 2. Tenant Business Info
+          // Never use SignalWire numbers for customer portal display
+          const phoneNumber = tenantData.business_contact_phone || tenantData.selected_phone_during_onboarding
           setTenantPhone(phoneNumber)
         }
         
@@ -2282,6 +2285,15 @@ const CustomerPortalPage: React.FC = () => {
         onPayInvoice={() => alert('Payment portal coming soon! Please call us to pay your invoice.')}
         currentJob={currentJob}
         hasUnpaidInvoices={false} // TODO: Get real invoice status
+        hasActiveEstimate={currentJob !== null} // Show estimates button when there's a current job
+        onViewEstimates={() => {
+          setActiveSection('estimates')
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
+        onViewPhotos={() => {
+          setActiveSection('photos')
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
       />
 
       {/* Service Scheduling Modal */}
