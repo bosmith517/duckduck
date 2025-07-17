@@ -10,7 +10,7 @@ interface PhotoCaptureProps {
   onPhotoSaved: (photoUrl: string, photoId: string) => void
   jobId?: string
   costEntryId?: string
-  photoType: 'receipt' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'
+  photoType: 'site_visit' | 'receipt' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'
   title?: string
   maxPhotos?: number
 }
