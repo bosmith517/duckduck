@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../supabaseClient'
 import { showToast } from '../../utils/toast'
 import PhotoViewer from '../shared/PhotoViewer'
+import './JobPhotosTab.css'
 
 interface JobPhoto {
   id: string
@@ -153,106 +154,129 @@ const JobPhotosTab: React.FC<JobPhotosTabProps> = ({ jobId, tenantId }) => {
 
   return (
     <div className="job-photos-customer">
-      <div className="mb-4">
-        <h5 className="mb-1">
-          <i className="ki-duotone ki-picture fs-3 text-primary me-2">
+      <div className="mb-5">
+        <h3 className="mb-2">
+          <i className="ki-duotone ki-picture fs-2 text-primary me-3">
             <span className="path1"></span>
             <span className="path2"></span>
           </i>
           Job Progress Photos
-        </h5>
-        <p className="text-muted fs-6 mb-0">
-          View real-time photos from your project ({photos.length} photo{photos.length !== 1 ? 's' : ''})
+        </h3>
+        <p className="text-muted fs-5 mb-0">
+          View all photos from your project • {photos.length} photo{photos.length !== 1 ? 's' : ''} total
         </p>
       </div>
 
-      {/* Photo Timeline */}
+      {/* Photo Gallery by Date */}
       {sortedDates.map((date) => (
-        <div key={date} className="mb-6">
+        <div key={date} className="mb-8">
           {/* Date Header */}
-          <div className="d-flex align-items-center mb-4">
-            <div className="bg-primary rounded-circle p-2 me-3">
-              <i className="ki-duotone ki-calendar fs-4 text-white">
+          <div className="d-flex align-items-center mb-4 pb-2 border-bottom">
+            <div className="bg-light-primary rounded p-3 me-3">
+              <i className="ki-duotone ki-calendar fs-2x text-primary">
                 <span className="path1"></span>
                 <span className="path2"></span>
               </i>
             </div>
             <div>
-              <h5 className="mb-0">{date}</h5>
-              <span className="text-muted fs-7">
-                {Object.values(groupedPhotosByDate[date]).reduce((sum, photos) => sum + photos.length, 0)} photos
+              <h4 className="mb-0">{date}</h4>
+              <span className="text-muted fs-6">
+                {Object.values(groupedPhotosByDate[date]).reduce((sum, photos) => sum + photos.length, 0)} photos uploaded
               </span>
             </div>
           </div>
           
           {/* Photos by Type for this Date */}
           {Object.entries(groupedPhotosByDate[date]).map(([photoType, typePhotos]) => (
-            <div key={`${date}-${photoType}`} className="mb-4 ms-5">
-              <div className="d-flex align-items-center mb-3">
-                <span className={`badge badge-light-${getPhotoTypeColor(photoType)} me-2`}>
+            <div key={`${date}-${photoType}`} className="mb-6">
+              <div className="d-flex align-items-center mb-4">
+                <span className={`badge badge-lg badge-light-${getPhotoTypeColor(photoType)} me-3`}>
                   {getPhotoTypeLabel(photoType)}
                 </span>
-                <span className="text-muted fs-8">
+                <span className="text-muted fs-6">
                   {typePhotos.length} photo{typePhotos.length !== 1 ? 's' : ''}
                 </span>
               </div>
               
-              {/* Horizontal Scrollable Photo Slider */}
-              <div 
-                className="photo-slider-container overflow-auto pb-3" 
-                style={{ 
-                  whiteSpace: 'nowrap',
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: '#6c757d #f8f9fa'
-                }}
-              >
-                <div className="d-inline-flex gap-3">
-                  {typePhotos.map((photo, index) => (
-                    <div 
-                      key={photo.id} 
-                      className="photo-slide"
-                      style={{ width: '200px', flexShrink: 0 }}
-                    >
-                      <div className="card h-100 shadow-sm">
-                        <div className="position-relative">
-                          <img
-                            src={photo.file_url}
-                            alt={photo.description || `${getPhotoTypeLabel(photo.photo_type)} photo`}
-                            className="card-img-top cursor-pointer"
-                            style={{ height: '150px', objectFit: 'cover' }}
-                            onClick={() => handlePhotoClick(photo)}
-                          />
-                          
-                          {/* Photo number badge */}
-                          <span className="badge badge-dark position-absolute top-0 start-0 m-2 fs-8">
-                            {index + 1} of {typePhotos.length}
+              {/* Photo Grid */}
+              <div className="row g-4">
+                {typePhotos.map((photo, index) => (
+                  <div key={photo.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                    <div className="card h-100 shadow-sm hover-elevate-up">
+                      <div 
+                        className="position-relative overflow-hidden cursor-pointer"
+                        style={{ paddingBottom: '75%' }} // 4:3 aspect ratio
+                        onClick={() => handlePhotoClick(photo)}
+                      >
+                        <img
+                          src={photo.file_url}
+                          alt={photo.description || `${getPhotoTypeLabel(photo.photo_type)} photo`}
+                          className="position-absolute top-0 start-0 w-100 h-100"
+                          style={{ objectFit: 'cover' }}
+                        />
+                        
+                        {/* Hover overlay */}
+                        <div className="position-absolute top-0 start-0 w-100 h-100 bg-dark bg-opacity-0 hover-bg-opacity-50 transition-all d-flex align-items-center justify-content-center">
+                          <i className="ki-duotone ki-eye fs-2x text-white opacity-0 hover-opacity-100 transition-all">
+                            <span className="path1"></span>
+                            <span className="path2"></span>
+                            <span className="path3"></span>
+                          </i>
+                        </div>
+                        
+                        {/* Photo badges */}
+                        <div className="position-absolute top-0 start-0 m-3">
+                          <span className={`badge badge-${getPhotoTypeColor(photoType)} shadow`}>
+                            {getPhotoTypeLabel(photoType)}
                           </span>
-                          
-                          {/* Location indicator */}
-                          {(photo.latitude && photo.longitude) && (
-                            <span className="badge badge-success position-absolute bottom-0 start-0 m-2 fs-8">
-                              <i className="ki-duotone ki-geolocation fs-7">
+                        </div>
+                        
+                        {/* Location indicator */}
+                        {(photo.latitude && photo.longitude) && (
+                          <div className="position-absolute bottom-0 end-0 m-3">
+                            <span className="badge badge-success shadow">
+                              <i className="ki-duotone ki-geolocation fs-6">
                                 <span className="path1"></span>
                                 <span className="path2"></span>
                               </i>
+                              GPS
                             </span>
-                          )}
-                        </div>
-                        
-                        <div className="card-body p-2">
-                          {photo.description && (
-                            <p className="card-text fs-8 mb-1 text-truncate" title={photo.description}>
-                              {photo.description}
-                            </p>
-                          )}
-                          <div className="text-muted fs-9">
-                            {formatDate(photo.taken_at)}
                           </div>
+                        )}
+                      </div>
+                      
+                      <div className="card-body">
+                        {photo.description ? (
+                          <p className="card-text mb-2" style={{ minHeight: '2.5rem' }}>
+                            {photo.description}
+                          </p>
+                        ) : (
+                          <p className="card-text text-muted mb-2" style={{ minHeight: '2.5rem' }}>
+                            No description
+                          </p>
+                        )}
+                        <div className="d-flex justify-content-between align-items-center">
+                          <small className="text-muted">
+                            <i className="ki-duotone ki-time fs-6 me-1">
+                              <span className="path1"></span>
+                              <span className="path2"></span>
+                            </i>
+                            {formatDate(photo.taken_at)}
+                          </small>
+                          {photo.taken_by_name && (
+                            <small className="text-muted">
+                              <i className="ki-duotone ki-user fs-6 me-1">
+                                <span className="path1"></span>
+                                <span className="path2"></span>
+                              </i>
+                              {photo.taken_by_name}
+                            </small>
+                          )}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}

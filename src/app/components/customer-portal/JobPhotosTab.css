@@ -1,0 +1,43 @@
+/* JobPhotosTab Styles */
+.job-photos-customer .hover-elevate-up {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.job-photos-customer .hover-elevate-up:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+.job-photos-customer .hover-bg-opacity-50:hover {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.job-photos-customer .hover-opacity-100:hover {
+  opacity: 1 !important;
+}
+
+.job-photos-customer .transition-all {
+  transition: all 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .job-photos-customer .col-sm-6 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+}
+
+/* Photo card styling */
+.job-photos-customer .card {
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.job-photos-customer .card:hover {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Badge styling */
+.job-photos-customer .badge.shadow {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
