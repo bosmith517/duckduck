@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { Contact, Account } from '../../../../supabaseClient'
 import { AddressInput } from '../../../components/shared/AddressInput'
 import { FormattedAddress } from '../../../utils/addressUtils'
+import { normalizePhoneNumber } from '../../../../lib/phoneUtils'
 
 interface ContactFormProps {
   contact?: Contact | null
@@ -32,8 +33,18 @@ const contactSchema = Yup.object().shape({
   }),
   title: Yup.string().max(100, 'Maximum 100 characters'),
   email: Yup.string().email('Invalid email format').max(100, 'Maximum 100 characters'),
-  phone: Yup.string().max(20, 'Maximum 20 characters'),
-  mobile: Yup.string().max(20, 'Maximum 20 characters'),
+  phone: Yup.string()
+    .max(20, 'Maximum 20 characters')
+    .test('phone-valid', 'Please enter a valid phone number', (value) => {
+      if (!value) return true // Optional field
+      return normalizePhoneNumber(value) !== null
+    }),
+  mobile: Yup.string()
+    .max(20, 'Maximum 20 characters')
+    .test('mobile-valid', 'Please enter a valid mobile number', (value) => {
+      if (!value) return true // Optional field
+      return normalizePhoneNumber(value) !== null
+    }),
   address: Yup.string().max(200, 'Maximum 200 characters'),
   city: Yup.string().max(100, 'Maximum 100 characters'),
   state: Yup.string().max(50, 'Maximum 50 characters'),
@@ -66,7 +77,13 @@ export const ContactForm: React.FC<ContactFormProps> = ({ contact, accounts, onS
     onSubmit: async (values) => {
       setLoading(true)
       try {
-        await onSave(values)
+        // Normalize phone numbers before saving
+        const normalizedValues = {
+          ...values,
+          phone: normalizePhoneNumber(values.phone) || values.phone,
+          mobile: normalizePhoneNumber(values.mobile) || values.mobile
+        }
+        await onSave(normalizedValues)
       } catch (error) {
         console.error('Error saving contact:', error)
       } finally {

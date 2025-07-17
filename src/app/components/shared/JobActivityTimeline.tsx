@@ -4,33 +4,50 @@ import { jobActivityService, JobActivity } from '../../services/jobActivityServi
 import { showToast } from '../../utils/toast'
 
 interface JobActivityTimelineProps {
-  jobId: string
+  jobId?: string
+  leadId?: string
   showCustomerView?: boolean
   showAddNoteButton?: boolean
   onAddNote?: () => void
+  showCompleteJourney?: boolean // Show both lead and job activities
 }
 
 export const JobActivityTimeline: React.FC<JobActivityTimelineProps> = ({
   jobId,
+  leadId,
   showCustomerView = false,
   showAddNoteButton = true,
-  onAddNote
+  onAddNote,
+  showCompleteJourney = false
 }) => {
   const [activities, setActivities] = useState<JobActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [showInternalActivities, setShowInternalActivities] = useState(!showCustomerView)
 
   useEffect(() => {
-    if (jobId) {
+    if (jobId || leadId) {
       loadActivities()
     }
-  }, [jobId, showInternalActivities])
+  }, [jobId, leadId, showInternalActivities])
 
   const loadActivities = async () => {
     try {
       setLoading(true)
-      console.log('🔍 Loading activities for job:', jobId, 'showInternal:', showInternalActivities)
-      const data = await jobActivityService.getJobActivities(jobId, showInternalActivities)
+      console.log('🔍 Loading activities for:', { jobId, leadId, showCompleteJourney, showInternalActivities })
+      
+      let data: JobActivity[] = []
+      
+      if (showCompleteJourney && leadId) {
+        // Load complete customer journey (lead + job activities)
+        data = await jobActivityService.getCustomerJourneyActivities(leadId, jobId, showInternalActivities)
+      } else if (jobId) {
+        // Load only job activities
+        data = await jobActivityService.getJobActivities(jobId, showInternalActivities)
+      } else if (leadId) {
+        // Load only lead activities
+        data = await jobActivityService.getLeadActivities(leadId, showInternalActivities)
+      }
+      
       console.log('📊 Activities loaded:', data.length, 'activities', data)
       setActivities(data)
     } catch (error) {
@@ -43,6 +60,21 @@ export const JobActivityTimeline: React.FC<JobActivityTimelineProps> = ({
 
   const getActivityIcon = (activityType: string) => {
     switch (activityType) {
+      // Lead activities
+      case 'lead_created': return 'star'
+      case 'lead_called': return 'phone'
+      case 'lead_contacted': return 'message-text'
+      case 'lead_qualified': return 'check-circle'
+      case 'lead_unqualified': return 'cross-circle'
+      case 'lead_status_changed': return 'switch'
+      case 'lead_assigned': return 'user'
+      case 'lead_follow_up_scheduled': return 'calendar'
+      case 'lead_follow_up_completed': return 'check'
+      case 'lead_converted': return 'arrow-right'
+      case 'site_visit_scheduled': return 'calendar-add'
+      case 'site_visit_completed': return 'home'
+      case 'site_visit_cancelled': return 'cross'
+      // Job activities
       case 'job_created': return 'plus'
       case 'estimate_created': return 'document'
       case 'estimate_sent': return 'send'
@@ -62,12 +94,33 @@ export const JobActivityTimeline: React.FC<JobActivityTimelineProps> = ({
       case 'location_update': return 'geolocation'
       case 'call_made': return 'phone'
       case 'sms_sent': return 'sms'
+      case 'email_sent': return 'send'
       default: return 'information'
     }
   }
 
   const getActivityColor = (activityType: string) => {
     switch (activityType) {
+      // Lead activities
+      case 'lead_created':
+      case 'lead_assigned':
+        return 'primary'
+      case 'lead_qualified':
+      case 'lead_converted':
+      case 'site_visit_completed':
+        return 'success'
+      case 'lead_unqualified':
+      case 'site_visit_cancelled':
+        return 'danger'
+      case 'lead_status_changed':
+      case 'site_visit_scheduled':
+        return 'warning'
+      case 'lead_called':
+      case 'lead_contacted':
+      case 'lead_follow_up_scheduled':
+      case 'lead_follow_up_completed':
+        return 'info'
+      // Job activities
       case 'estimate_created':
       case 'estimate_sent':
       case 'invoice_created':
@@ -133,7 +186,14 @@ export const JobActivityTimeline: React.FC<JobActivityTimelineProps> = ({
       <div className="card-header">
         <div className="d-flex justify-content-between align-items-center w-100">
           <h3 className="card-title">
-            {showCustomerView ? 'Project Updates' : 'Activity Timeline'}
+            {showCustomerView 
+              ? 'Project Updates' 
+              : showCompleteJourney 
+                ? 'Complete Customer Journey' 
+                : leadId && !jobId 
+                  ? 'Lead Activity Timeline' 
+                  : 'Activity Timeline'
+            }
           </h3>
           <div className="d-flex gap-3">
             {!showCustomerView && (

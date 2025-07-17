@@ -46,6 +46,7 @@ import MobileRedirectTest from '../pages/test/MobileRedirectTest'
 import PwaStartPage from '../pages/PwaStartPage'
 import PublicBookingPage from '../pages/bookings/PublicBookingPageV3'
 import TestAvailabilityPage from '../pages/bookings/TestAvailabilityPage'
+import PortalTestPage from '../pages/test/PortalTestPage'
 
 
 /**
@@ -147,6 +148,7 @@ const AppRoutes: FC = () => {
         {/* Test routes - accessible without login */}
         <Route path='test-ui' element={<UITestPage />} />
         <Route path='test-video' element={<VideoTestPage />} />
+        <Route path='test-portal' element={<PortalTestPage />} />
         <Route path='test-signalwire' element={<SignalWireTestPage />} />
         <Route path='test/video-estimate' element={<VideoEstimateTestPage />} />
         <Route path='test-signalwire-sync' element={<SignalWireSyncTestPage />} />

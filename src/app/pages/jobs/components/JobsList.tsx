@@ -174,17 +174,22 @@ export const JobsList: React.FC<JobsListProps> = ({ jobs, onEdit, onDelete, onSt
               </td>
               <td>
                 <div className='d-flex flex-column'>
-                  {job.estimated_cost && (
+                  {(job.contract_price || job.estimated_cost) && (
                     <span className='text-gray-800 mb-1'>
-                      Est: {formatCurrency(job.estimated_cost)}
+                      Contract: {formatCurrency(job.contract_price || job.estimated_cost || 0)}
                     </span>
                   )}
-                  {job.actual_cost && (
+                  {job.actual_cost !== undefined && (
                     <span className='text-muted fs-7'>
-                      Actual: {formatCurrency(job.actual_cost)}
+                      Cost: {formatCurrency(job.actual_cost)}
                     </span>
                   )}
-                  {!job.estimated_cost && !job.actual_cost && (
+                  {((job.contract_price || job.estimated_cost || 0) - (job.actual_cost || 0)) !== 0 && (
+                    <span className={`fs-7 fw-bold ${((job.contract_price || job.estimated_cost || 0) - (job.actual_cost || 0)) >= 0 ? 'text-success' : 'text-danger'}`}>
+                      Profit: {formatCurrency((job.contract_price || job.estimated_cost || 0) - (job.actual_cost || 0))}
+                    </span>
+                  )}
+                  {!job.contract_price && !job.estimated_cost && !job.actual_cost && (
                     <span className='text-muted'>-</span>
                   )}
                 </div>

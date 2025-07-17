@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../../supabaseClient'
 import { VideoSession } from '../video-estimating/VideoEstimatingHub'
-import { SignalWireVideoRoom } from '../../components/video/SignalWireVideoRoom'
-import { SimpleSignalWireRoom } from '../../components/video/SimpleSignalWireRoom'
+import SignalWireVideoRoom from '../../components/video/SignalWireVideoRoom'
+import { ErrorBoundary } from '../../components/common/ErrorBoundary'
 
 const VideoEstimatePage: React.FC = () => {
   const [searchParams] = useSearchParams()
@@ -265,18 +265,20 @@ const VideoEstimatePage: React.FC = () => {
       
       {/* Video Room - Using SignalWireVideoRoom */}
       <div className='flex-grow-1 position-relative'>
-        <SignalWireVideoRoom
-          token={swToken}
-          roomName={session?.room_id}
-          userName="Customer"
-          onRoomJoined={handleRoomJoined}
-          onMemberJoined={handleMemberJoined}
-          onMemberLeft={handleMemberLeft}
-          onError={handleError}
-          enableAudio={true}
-          enableVideo={true}
-          layout="grid-responsive"
-        />
+        <ErrorBoundary>
+          <SignalWireVideoRoom
+            token={swToken}
+            roomName={session?.room_id}
+            userName="Customer"
+            onRoomJoined={handleRoomJoined}
+            onMemberJoined={handleMemberJoined}
+            onMemberLeft={handleMemberLeft}
+            onError={handleError}
+            enableAudio={true}
+            enableVideo={true}
+            layout="grid-responsive"
+          />
+        </ErrorBoundary>
         
         {/* AI Status Overlay */}
         {aiStatus && (

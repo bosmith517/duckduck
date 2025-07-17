@@ -3,30 +3,37 @@ import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { supabase } from '../../../supabaseClient'
 import { showToast } from '../../utils/toast'
 import PhotoCapture from '../shared/PhotoCapture'
+import JobContractPriceEditor from './JobContractPriceEditor'
 
 interface JobCostData {
   id: string
-  job_number: string
   title: string
   status: string
   start_date: string
   contact_name: string
   
-  // Financial data
+  // Financial data (from actual schema)
   estimated_cost: number
   actual_cost: number
-  total_invoiced: number
+  estimated_hours: number
+  actual_hours: number
   
-  // Labor
-  labor_hours_estimated: number
-  labor_hours_actual: number
-  labor_rate: number
+  // Enhanced financial fields
+  contract_price: number // Total amount charging client
+  estimated_material_cost: number
+  estimated_labor_cost: number
+  estimated_equipment_cost: number
+  estimated_overhead_cost: number
   
-  // Materials & other costs
-  material_cost_estimated: number
-  material_cost_actual: number
-  overhead_percentage: number
-  profit_margin_percentage: number
+  // Actual cost breakdowns
+  actual_material_cost?: number
+  actual_labor_cost?: number
+  actual_equipment_cost?: number
+  actual_overhead_cost?: number
+  
+  // Reference IDs
+  estimate_id?: string | null
+  lead_id?: string | null
   
   // Calculated fields
   gross_profit: number
@@ -34,12 +41,22 @@ interface JobCostData {
   cost_variance: number
   labor_variance: number
   is_profitable: boolean
+  total_invoiced: number // Will be calculated from invoices
+  
+  // Enhanced profitability metrics
+  expected_profit: number // contract_price - estimated_total_cost
+  actual_profit: number // contract_price - actual_total_cost
+  profit_variance: number // actual_profit - expected_profit
+  profitability_score: 'A' | 'B' | 'C' | 'D' | 'F'
+  burn_rate: number // actual_cost / days_elapsed
+  completion_percentage: number
 }
 
 interface CostEntry {
   id: string
   job_id: string
   cost_type: 'labor' | 'material' | 'equipment' | 'subcontractor' | 'overhead' | 'other'
+  cost_subtype?: string // e.g., 'paint', 'drywall', 'lumber' for materials
   description: string
   quantity: number
   unit_cost: number
@@ -48,11 +65,121 @@ interface CostEntry {
   vendor?: string
   receipt_url?: string
   created_by_name?: string
+  
+  // Enhanced cost tracking
+  markup_percentage?: number // e.g., 20%
+  markup_type?: 'flat' | 'margin'
+  is_approved?: boolean
+  approved_by?: string
+  approval_notes?: string
+  budget_category?: string // Links to budget line item
 }
 
 interface JobCostingDashboardProps {
   jobId?: string
   showSummaryOnly?: boolean
+}
+
+// Helper function to calculate profitability score
+const calculateProfitabilityScore = (
+  profitMargin: number,
+  costVariance: number,
+  laborVariance: number,
+  estimatedCost: number
+): 'A' | 'B' | 'C' | 'D' | 'F' => {
+  let score = 100
+  
+  // Profit margin scoring (40% weight)
+  if (profitMargin >= 20) score += 0
+  else if (profitMargin >= 15) score -= 10
+  else if (profitMargin >= 10) score -= 20
+  else if (profitMargin >= 5) score -= 30
+  else if (profitMargin >= 0) score -= 40
+  else score -= 60
+  
+  // Cost variance scoring (35% weight)
+  const costVariancePercent = estimatedCost > 0 ? (costVariance / estimatedCost) * 100 : 0
+  if (costVariancePercent <= 0) score += 0 // On or under budget
+  else if (costVariancePercent <= 5) score -= 10
+  else if (costVariancePercent <= 10) score -= 20
+  else if (costVariancePercent <= 15) score -= 30
+  else score -= 40
+  
+  // Labor variance scoring (25% weight)
+  if (laborVariance <= 0) score += 0 // On or under time
+  else if (laborVariance <= 2) score -= 5
+  else if (laborVariance <= 5) score -= 10
+  else if (laborVariance <= 10) score -= 15
+  else score -= 25
+  
+  // Convert to letter grade
+  if (score >= 90) return 'A'
+  if (score >= 80) return 'B'
+  if (score >= 70) return 'C'
+  if (score >= 60) return 'D'
+  return 'F'
+}
+
+// Helper function to get alert thresholds
+const getAlertThresholds = (job: JobCostData) => {
+  const alerts = []
+  
+  // Cost overrun alert (>10% over budget)
+  if (job.estimated_cost > 0) {
+    const overrunPercent = (job.cost_variance / job.estimated_cost) * 100
+    if (overrunPercent > 10) {
+      alerts.push({
+        type: 'danger',
+        message: `Cost overrun: ${overrunPercent.toFixed(1)}% over budget`,
+        icon: 'warning'
+      })
+    }
+  }
+  
+  // Low profit margin alert (<5%)
+  if (job.profit_margin < 5 && job.profit_margin >= 0) {
+    alerts.push({
+      type: 'warning',
+      message: `Low profit margin: ${job.profit_margin.toFixed(1)}%`,
+      icon: 'information'
+    })
+  }
+  
+  // Unprofitable alert
+  if (job.profit_margin < 0) {
+    alerts.push({
+      type: 'danger',
+      message: `Job is unprofitable: ${job.profit_margin.toFixed(1)}% margin`,
+      icon: 'cross-circle'
+    })
+  }
+  
+  // Contract price missing alert
+  if (job.contract_price === 0) {
+    alerts.push({
+      type: 'warning',
+      message: `Contract price not set - profitability calculations may be incorrect`,
+      icon: 'dollar'
+    })
+  }
+  
+  // High burn rate alert
+  if (job.burn_rate > 0 && job.completion_percentage < 100) {
+    const projectedTotalCost = job.burn_rate * (job.completion_percentage > 0 ? 
+      (100 / job.completion_percentage) * 
+      Math.floor((new Date().getTime() - new Date(job.start_date).getTime()) / (1000 * 60 * 60 * 24)) 
+      : 30)
+    
+    if (projectedTotalCost > job.estimated_cost * 1.15) {
+      alerts.push({
+        type: 'warning',
+        message: `High burn rate detected - projected to exceed budget`,
+        icon: 'chart-line-up'
+      })
+    }
+  }
+  
+  return alerts
 }
 
 const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
@@ -67,6 +194,8 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
   const [costEntries, setCostEntries] = useState<CostEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'costs' | 'analysis'>('overview')
+  const [editingContractPrice, setEditingContractPrice] = useState(false)
+  const [contractPriceForm, setContractPriceForm] = useState(0)
   
   // Form states
   const [showCostModal, setShowCostModal] = useState(false)
@@ -75,20 +204,26 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
   const [currentCostEntryId, setCurrentCostEntryId] = useState<string | null>(null)
   const [costForm, setCostForm] = useState<{
     cost_type: 'labor' | 'material' | 'equipment' | 'subcontractor' | 'overhead' | 'other'
+    cost_subtype: string
     description: string
     quantity: number
     unit_cost: number
     cost_date: string
     vendor: string
     receipt_url: string
+    markup_percentage: number
+    markup_type: 'flat' | 'margin'
   }>({
     cost_type: 'labor',
+    cost_subtype: '',
     description: '',
     quantity: 1,
     unit_cost: 0,
     cost_date: new Date().toISOString().split('T')[0],
     vendor: '',
-    receipt_url: ''
+    receipt_url: '',
+    markup_percentage: 0,
+    markup_type: 'flat'
   })
 
   useEffect(() => {
@@ -116,59 +251,133 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
         }, 
         (payload) => {
           console.log('🔄 Cost change detected, refreshing data...', payload)
-          loadCostEntries(jobId)
-          loadSingleJob(jobId) // Refresh job totals
+          try {
+            loadCostEntries(jobId)
+            loadSingleJob(jobId) // Refresh job totals
+          } catch (error) {
+            console.error('Error refreshing data after cost change:', error)
+          }
         }
       )
       .subscribe()
 
     return () => {
-      subscription.unsubscribe()
+      try {
+        subscription.unsubscribe()
+      } catch (error) {
+        console.error('Error unsubscribing from real-time updates:', error)
+      }
     }
   }, [jobId, userProfile?.tenant_id])
 
   const loadJobsWithCosts = async () => {
     setLoading(true)
     try {
+      if (!userProfile?.tenant_id) {
+        throw new Error('User profile or tenant ID not available')
+      }
+
       const { data: jobsData, error } = await supabase
         .from('jobs')
         .select(`
           id,
-          job_number,
           title,
           status,
           start_date,
           estimated_cost,
           actual_cost,
-          total_invoiced,
-          labor_hours_estimated,
-          labor_hours_actual,
-          labor_rate,
-          material_cost_estimated,
-          material_cost_actual,
-          overhead_percentage,
-          profit_margin_percentage,
+          estimated_hours,
+          actual_hours,
+          contract_price,
+          estimate_id,
+          lead_id,
           contacts(first_name, last_name)
         `)
-        .eq('tenant_id', userProfile?.tenant_id)
-        .in('status', ['In Progress', 'Completed', 'On Hold'])
+        .eq('tenant_id', userProfile.tenant_id)
+        .not('status', 'eq', 'Draft')
         .order('start_date', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Database error loading jobs:', error)
+        throw new Error(`Failed to load jobs: ${error.message}`)
+      }
+
+      if (!jobsData || jobsData.length === 0) {
+        console.log('No jobs found for tenant')
+        setJobs([])
+        setSelectedJob(null)
+        return
+      }
 
       // Process and calculate profitability metrics
-      const processedJobs = (jobsData || []).map(job => calculateJobMetrics(job))
+      const processedJobs = await Promise.all(
+        jobsData.map(async (job) => {
+          try {
+            return await calculateJobMetrics(job)
+          } catch (error) {
+            console.error(`Error calculating metrics for job ${job.id}:`, error)
+            // Return job with default values if calculation fails
+            const contact = job.contacts as any
+            const contactName = contact && typeof contact === 'object' && !Array.isArray(contact) && 'first_name' in contact 
+              ? `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown' 
+              : 'Unknown'
+            
+            const fallbackMetrics: JobCostData = {
+              id: job.id,
+              title: job.title,
+              status: job.status,
+              start_date: job.start_date,
+              contact_name: contactName,
+              estimated_cost: job.estimated_cost || 0,
+              actual_cost: job.actual_cost || 0,
+              estimated_hours: job.estimated_hours || 0,
+              actual_hours: job.actual_hours || 0,
+              contract_price: job.contract_price || 0,
+              estimated_material_cost: 0,
+              estimated_labor_cost: 0,
+              estimated_equipment_cost: 0,
+              estimated_overhead_cost: 0,
+              actual_material_cost: 0,
+              actual_labor_cost: 0,
+              actual_equipment_cost: 0,
+              actual_overhead_cost: 0,
+              total_invoiced: 0,
+              gross_profit: 0,
+              profit_margin: 0,
+              cost_variance: 0,
+              labor_variance: 0,
+              is_profitable: false,
+              expected_profit: 0,
+              actual_profit: 0,
+              profit_variance: 0,
+              profitability_score: 'F' as const,
+              burn_rate: 0,
+              completion_percentage: 0,
+              estimate_id: job.estimate_id || null,
+              lead_id: job.lead_id || null
+            }
+            
+            return fallbackMetrics
+          }
+        })
+      )
       setJobs(processedJobs)
 
       // Auto-select first job if none selected
       if (processedJobs.length > 0 && !selectedJob) {
         setSelectedJob(processedJobs[0])
-        loadCostEntries(processedJobs[0].id)
+        try {
+          await loadCostEntries(processedJobs[0].id)
+        } catch (error) {
+          console.error('Error loading cost entries for first job:', error)
+        }
       }
 
     } catch (error) {
       console.error('Error loading jobs:', error)
-      showToast.error('Failed to load job costing data')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      showToast.error(`Failed to load job costing data: ${errorMessage}`)
+      setJobs([])
     } finally {
       setLoading(false)
     }
@@ -181,20 +390,16 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
         .from('jobs')
         .select(`
           id,
-          job_number,
           title,
           status,
           start_date,
           estimated_cost,
           actual_cost,
-          total_invoiced,
-          labor_hours_estimated,
-          labor_hours_actual,
-          labor_rate,
-          material_cost_estimated,
-          material_cost_actual,
-          overhead_percentage,
-          profit_margin_percentage,
+          estimated_hours,
+          actual_hours,
+          contract_price,
+          estimate_id,
+          lead_id,
           contacts(first_name, last_name)
         `)
         .eq('id', id)
@@ -202,7 +407,7 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
 
       if (error) throw error
 
-      const processedJob = calculateJobMetrics(data)
+      const processedJob = await calculateJobMetrics(data)
       setSelectedJob(processedJob)
       setJobs([processedJob])
       loadCostEntries(id)
@@ -238,40 +443,200 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
       setCostEntries(processedEntries)
     } catch (error) {
       console.error('Error loading cost entries:', error)
+      showToast.error('Failed to load cost entries')
+      setCostEntries([])
     }
   }
 
-  const calculateJobMetrics = (job: any): JobCostData => {
-    const totalInvoiced = job.total_invoiced || 0
-    const actualCost = job.actual_cost || 0
-    const estimatedCost = job.estimated_cost || 0
-    
-    const grossProfit = totalInvoiced - actualCost
-    const profitMargin = totalInvoiced > 0 ? (grossProfit / totalInvoiced) * 100 : 0
-    const costVariance = actualCost - estimatedCost
-    const laborVariance = (job.labor_hours_actual || 0) - (job.labor_hours_estimated || 0)
-    
-    return {
-      ...job,
-      contact_name: job.contacts ? `${job.contacts.first_name} ${job.contacts.last_name}` : 'Unknown',
-      gross_profit: grossProfit,
-      profit_margin: profitMargin,
-      cost_variance: costVariance,
-      labor_variance: laborVariance,
-      is_profitable: grossProfit > 0
+  const calculateJobMetrics = async (job: any): Promise<JobCostData> => {
+    try {
+      const actualCost = Math.max(0, job.actual_cost || 0)
+      const estimatedCost = Math.max(0, job.estimated_cost || 0)
+      
+      // Get the accepted estimate to find the contract price
+      let contractPrice = job.contract_price || 0
+      if (job.estimate_id || job.lead_id) {
+        try {
+          let query = supabase
+            .from('estimates')
+            .select('total_amount, status')
+            .eq('status', 'approved')
+            
+          // Build the OR condition based on what IDs we have
+          const orConditions = []
+          if (job.estimate_id) orConditions.push(`id.eq.${job.estimate_id}`)
+          if (job.lead_id) orConditions.push(`lead_id.eq.${job.lead_id}`)
+          
+          if (orConditions.length > 0) {
+            query = query.or(orConditions.join(','))
+            
+            const { data: estimate } = await query
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            
+            if (estimate && estimate.total_amount) {
+              contractPrice = estimate.total_amount
+            }
+          }
+        } catch (error) {
+          console.log('No approved estimate found for job')
+        }
+      }
+      
+      // Calculate total invoiced amount from invoices table
+      let totalInvoiced = 0
+      try {
+        const { data: invoices, error } = await supabase
+          .from('invoices')
+          .select('total_amount')
+          .eq('job_id', job.id)
+          .eq('payment_status', 'paid')
+        
+        if (error) {
+          console.error(`Error fetching invoices for job ${job.id}:`, error)
+        } else {
+          totalInvoiced = (invoices || []).reduce((sum, invoice) => {
+            const amount = parseFloat(invoice.total_amount) || 0
+            return sum + (isNaN(amount) ? 0 : amount)
+          }, 0)
+        }
+      } catch (error) {
+        console.error('Error calculating invoiced amount:', error)
+        totalInvoiced = 0
+      }
+      
+      // PROPER FINANCIAL CALCULATIONS
+      // Using the accepted estimate total as the contract price
+      
+      const expectedProfit = contractPrice - estimatedCost  // What we expected to make
+      const actualProfit = contractPrice - actualCost      // What we actually made
+      const profitVariance = actualProfit - expectedProfit
+      
+      const grossProfit = totalInvoiced - actualCost
+      const profitMargin = contractPrice > 0 ? (expectedProfit / contractPrice) * 100 : 0
+      const costVariance = actualCost - estimatedCost  // How much over/under budget we are
+      const laborVariance = (job.actual_hours || 0) - (job.estimated_hours || 0)
+      
+      // Calculate burn rate and completion metrics
+      const startDate = new Date(job.start_date)
+      const now = new Date()
+      const daysElapsed = Math.max(1, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+      const burnRate = actualCost / daysElapsed
+      const completionPercentage = job.completion_percentage || 0
+      
+      // Calculate profitability score
+      const profitabilityScore = calculateProfitabilityScore(profitMargin, costVariance, laborVariance, estimatedCost)
+      
+      // Validate calculated values
+      const safeMetrics = {
+        total_invoiced: isNaN(totalInvoiced) ? 0 : totalInvoiced,
+        gross_profit: isNaN(grossProfit) ? 0 : grossProfit,
+        profit_margin: isNaN(profitMargin) ? 0 : profitMargin,
+        cost_variance: isNaN(costVariance) ? 0 : costVariance,
+        labor_variance: isNaN(laborVariance) ? 0 : laborVariance,
+        is_profitable: !isNaN(actualProfit) && actualProfit > 0,
+        expected_profit: isNaN(expectedProfit) ? 0 : expectedProfit,
+        actual_profit: isNaN(actualProfit) ? 0 : actualProfit,
+        profit_variance: isNaN(profitVariance) ? 0 : profitVariance,
+        profitability_score: profitabilityScore,
+        burn_rate: isNaN(burnRate) ? 0 : burnRate,
+        completion_percentage: isNaN(completionPercentage) ? 0 : completionPercentage,
+        contract_price: isNaN(contractPrice) ? 0 : contractPrice,
+        estimated_material_cost: job.estimated_material_cost || 0,
+        estimated_labor_cost: job.estimated_labor_cost || 0,
+        estimated_equipment_cost: job.estimated_equipment_cost || 0,
+        estimated_overhead_cost: job.estimated_overhead_cost || 0
+      }
+      
+      return {
+        ...job,
+        contact_name: job.contacts && typeof job.contacts === 'object' && 'first_name' in job.contacts 
+          ? `${job.contacts.first_name} ${job.contacts.last_name}` 
+          : 'Unknown',
+        ...safeMetrics,
+        // Add missing fields
+        actual_material_cost: 0,
+        actual_labor_cost: 0,
+        actual_equipment_cost: 0,
+        actual_overhead_cost: 0,
+        estimate_id: job.estimate_id || null,
+        lead_id: job.lead_id || null
+      } as JobCostData
+    } catch (error) {
+      console.error(`Error calculating job metrics for job ${job.id}:`, error)
+      // Return safe default values if calculation fails
+      return {
+        ...job,
+        contact_name: job.contacts && typeof job.contacts === 'object' && 'first_name' in job.contacts 
+          ? `${job.contacts.first_name} ${job.contacts.last_name}` 
+          : 'Unknown',
+        total_invoiced: 0,
+        gross_profit: 0,
+        profit_margin: 0,
+        cost_variance: 0,
+        labor_variance: 0,
+        is_profitable: false,
+        expected_profit: 0,
+        actual_profit: 0,
+        profit_variance: 0,
+        profitability_score: 'F' as const,
+        burn_rate: 0,
+        completion_percentage: 0,
+        contract_price: 0,
+        estimated_material_cost: 0,
+        estimated_labor_cost: 0,
+        estimated_equipment_cost: 0,
+        estimated_overhead_cost: 0,
+        actual_material_cost: 0,
+        actual_labor_cost: 0,
+        actual_equipment_cost: 0,
+        actual_overhead_cost: 0,
+        estimate_id: job.estimate_id || null,
+        lead_id: job.lead_id || null
+      } as JobCostData
     }
   }
 
   const handleSaveCost = async () => {
-    if (!selectedJob) return
+    if (!selectedJob) {
+      showToast.error('No job selected')
+      return
+    }
+
+    if (!userProfile?.tenant_id || !userProfile?.id) {
+      showToast.error('User authentication required')
+      return
+    }
+
+    // Validate form data
+    if (!costForm.description.trim()) {
+      showToast.error('Description is required')
+      return
+    }
+
+    if (costForm.quantity <= 0) {
+      showToast.error('Quantity must be greater than 0')
+      return
+    }
+
+    if (costForm.unit_cost <= 0) {
+      showToast.error('Unit cost must be greater than 0')
+      return
+    }
 
     try {
+      const totalCost = costForm.quantity * costForm.unit_cost
+      if (isNaN(totalCost) || totalCost <= 0) {
+        throw new Error('Invalid cost calculation')
+      }
+
       const costData = {
         job_id: selectedJob.id,
-        tenant_id: userProfile?.tenant_id,
+        tenant_id: userProfile.tenant_id,
         ...costForm,
-        total_cost: costForm.quantity * costForm.unit_cost,
-        created_by: userProfile?.id
+        total_cost: totalCost,
+        created_by: userProfile.id
       }
 
       if (editingCost) {
@@ -280,14 +645,20 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
           .update(costData)
           .eq('id', editingCost.id)
 
-        if (error) throw error
+        if (error) {
+          console.error('Error updating cost entry:', error)
+          throw new Error(`Failed to update cost entry: ${error.message}`)
+        }
         showToast.success('Cost entry updated successfully')
       } else {
         const { error } = await supabase
           .from('job_costs')
           .insert(costData)
 
-        if (error) throw error
+        if (error) {
+          console.error('Error adding cost entry:', error)
+          throw new Error(`Failed to add cost entry: ${error.message}`)
+        }
         showToast.success('Cost entry added successfully')
       }
 
@@ -296,58 +667,76 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
       
       setShowCostModal(false)
       resetCostForm()
-      loadCostEntries(selectedJob.id)
-      loadJobsWithCosts()
+      
+      // Refresh data
+      try {
+        await loadCostEntries(selectedJob.id)
+        await loadJobsWithCosts()
+      } catch (refreshError) {
+        console.error('Error refreshing data:', refreshError)
+        showToast.error('Cost saved but failed to refresh display')
+      }
 
     } catch (error) {
       console.error('Error saving cost:', error)
-      showToast.error('Failed to save cost entry')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      showToast.error(`Failed to save cost entry: ${errorMessage}`)
     }
   }
 
   const updateJobActualCosts = async (jobId: string) => {
     try {
+      if (!jobId) {
+        throw new Error('Job ID is required')
+      }
+
       // Calculate total actual costs from cost entries
-      const { data: costs } = await supabase
+      const { data: costs, error: costsError } = await supabase
         .from('job_costs')
         .select('cost_type, total_cost')
         .eq('job_id', jobId)
 
-      if (!costs) return
+      if (costsError) {
+        console.error('Error fetching job costs:', costsError)
+        throw new Error(`Failed to fetch costs: ${costsError.message}`)
+      }
 
-      const laborCost = costs
-        .filter(c => c.cost_type === 'labor')
-        .reduce((sum, c) => sum + c.total_cost, 0)
-      
-      const materialCost = costs
-        .filter(c => c.cost_type === 'material')
-        .reduce((sum, c) => sum + c.total_cost, 0)
-      
-      const totalActualCost = costs.reduce((sum, c) => sum + c.total_cost, 0)
+      const totalActualCost = (costs || []).reduce((sum, c) => {
+        const cost = parseFloat(c.total_cost) || 0
+        return sum + (isNaN(cost) ? 0 : cost)
+      }, 0)
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('jobs')
         .update({
           actual_cost: totalActualCost,
-          material_cost_actual: materialCost,
           updated_at: new Date().toISOString()
         })
         .eq('id', jobId)
 
+      if (updateError) {
+        console.error('Error updating job actual costs:', updateError)
+        throw new Error(`Failed to update job costs: ${updateError.message}`)
+      }
+
     } catch (error) {
       console.error('Error updating job costs:', error)
+      showToast.error('Failed to update job cost totals')
     }
   }
 
   const resetCostForm = () => {
     setCostForm({
       cost_type: 'labor',
+      cost_subtype: '',
       description: '',
       quantity: 1,
       unit_cost: 0,
       cost_date: new Date().toISOString().split('T')[0],
       vendor: '',
-      receipt_url: ''
+      receipt_url: '',
+      markup_percentage: 0,
+      markup_type: 'flat'
     })
     setEditingCost(null)
   }
@@ -387,6 +776,10 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
     }).format(amount)
   }
 
+  const formatPercentage = (value: number) => {
+    return `${value.toFixed(1)}%`
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'In Progress': 'primary',
@@ -395,6 +788,17 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
       'Cancelled': 'danger'
     }
     return colors[status] || 'secondary'
+  }
+
+  const getProfitabilityScoreColor = (score: 'A' | 'B' | 'C' | 'D' | 'F') => {
+    const colors: Record<string, string> = {
+      'A': 'success',
+      'B': 'primary',
+      'C': 'warning',
+      'D': 'danger',
+      'F': 'dark'
+    }
+    return colors[score] || 'secondary'
   }
 
   const getCostTypeColor = (type: string) => {
@@ -445,6 +849,22 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
 
   return (
     <div className="row g-6">
+      {/* Contract Price Notice */}
+      {selectedJob && selectedJob.contract_price === 0 && (
+        <div className="col-12">
+          <div className="alert alert-warning d-flex align-items-center p-5">
+            <i className="ki-duotone ki-dollar fs-2hx text-warning me-4">
+              <span className="path1"></span>
+              <span className="path2"></span>
+            </i>
+            <div className="d-flex flex-column">
+              <h5 className="mb-1">Contract Price Not Set</h5>
+              <span>The contract price should be pulled from your accepted estimate. Click the edit button to set it manually or ensure the estimate is marked as approved.</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Jobs List */}
       {!jobId && (
         <div className="col-lg-4">
@@ -467,16 +887,21 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                   >
                     <div className="d-flex justify-content-between align-items-start">
                       <div className="flex-grow-1">
-                        <h6 className="mb-1">{job.job_number}</h6>
-                        <p className="mb-1 fs-7">{job.title}</p>
+                        <h6 className="mb-1">{job.title}</h6>
+                        <p className="mb-1 fs-7">Job ID: {job.id.slice(0, 8)}</p>
                         <small className="text-muted">{job.contact_name}</small>
                       </div>
                       <div className="text-end">
-                        <span className={`badge badge-light-${getStatusColor(job.status)} mb-1`}>
-                          {job.status}
-                        </span>
+                        <div className="d-flex gap-1 mb-1">
+                          <span className={`badge badge-light-${getStatusColor(job.status)}`}>
+                            {job.status}
+                          </span>
+                          <span className={`badge badge-light-${getProfitabilityScoreColor(job.profitability_score)}`}>
+                            {job.profitability_score}
+                          </span>
+                        </div>
                         <div className={`fs-7 fw-bold ${job.is_profitable ? 'text-success' : 'text-danger'}`}>
-                          {formatCurrency(job.gross_profit)}
+                          {formatCurrency(job.actual_profit)}
                         </div>
                       </div>
                     </div>
@@ -495,7 +920,7 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
             <div className="card-header">
               <div className="d-flex justify-content-between align-items-center">
                 <h3 className="card-title mb-0">
-                  {selectedJob.job_number} - {selectedJob.title}
+                  {selectedJob.title}
                 </h3>
                 <button
                   className="btn btn-primary"
@@ -556,6 +981,27 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
             <div className="card-body">
               {activeTab === 'overview' && (
                 <div>
+                  {/* Alert System */}
+                  {(() => {
+                    const alerts = getAlertThresholds(selectedJob)
+                    return alerts.length > 0 ? (
+                      <div className="mb-6">
+                        {alerts.map((alert, index) => (
+                          <div key={index} className={`alert alert-${alert.type} d-flex align-items-center p-5 mb-3`}>
+                            <i className={`ki-duotone ki-${alert.icon} fs-2hx text-${alert.type} me-4`}>
+                              <span className="path1"></span>
+                              <span className="path2"></span>
+                            </i>
+                            <div className="d-flex flex-column">
+                              <h5 className="mb-1">Alert</h5>
+                              <span>{alert.message}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
+
                   {/* Key Metrics */}
                   <div className="row g-4 mb-6">
                     <div className="col-md-3">
@@ -567,9 +1013,9 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                             <span className="path3"></span>
                           </i>
                           <div className="fs-2x fw-bold text-dark">
-                            {formatCurrency(selectedJob.gross_profit)}
+                            {formatCurrency(selectedJob.actual_profit)}
                           </div>
-                          <div className="text-muted fs-7">Gross Profit</div>
+                          <div className="text-muted fs-7">Actual Profit</div>
                         </div>
                       </div>
                     </div>
@@ -582,7 +1028,7 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                             <span className="path2"></span>
                           </i>
                           <div className="fs-2x fw-bold text-dark">
-                            {selectedJob.profit_margin.toFixed(1)}%
+                            {formatPercentage(selectedJob.profit_margin)}
                           </div>
                           <div className="text-muted fs-7">Profit Margin</div>
                         </div>
@@ -607,14 +1053,14 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                     <div className="col-md-3">
                       <div className="card border border-light h-100">
                         <div className="card-body text-center">
-                          <i className="ki-duotone ki-time fs-2x text-warning mb-3">
-                            <span className="path1"></span>
-                            <span className="path2"></span>
-                          </i>
-                          <div className={`fs-2x fw-bold ${selectedJob.labor_variance >= 0 ? 'text-danger' : 'text-success'}`}>
-                            {selectedJob.labor_variance >= 0 ? '+' : ''}{selectedJob.labor_variance.toFixed(1)}h
+                          <div className={`symbol symbol-50px symbol-circle bg-light-${getProfitabilityScoreColor(selectedJob.profitability_score)} mb-3`}>
+                            <div className="symbol-label">
+                              <span className={`fs-2x fw-bold text-${getProfitabilityScoreColor(selectedJob.profitability_score)}`}>
+                                {selectedJob.profitability_score}
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-muted fs-7">Labor Variance</div>
+                          <div className="text-muted fs-7">Profitability Score</div>
                         </div>
                       </div>
                     </div>
@@ -627,6 +1073,91 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                       <div className="table-responsive">
                         <table className="table table-row-bordered">
                           <tbody>
+                            <tr>
+                              <td className="fw-bold text-muted">Contract Price</td>
+                              <td className="text-end">
+                                {editingContractPrice ? (
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className="text-muted">$</span>
+                                    <input
+                                      type="number"
+                                      className="form-control form-control-sm"
+                                      style={{ width: '120px' }}
+                                      value={contractPriceForm}
+                                      onChange={(e) => setContractPriceForm(parseFloat(e.target.value) || 0)}
+                                      min="0"
+                                      step="0.01"
+                                      autoFocus
+                                    />
+                                    <button
+                                      className="btn btn-sm btn-success"
+                                      onClick={async () => {
+                                        if (contractPriceForm <= 0) {
+                                          showToast.error('Contract price must be greater than 0')
+                                          return
+                                        }
+                                        try {
+                                          const { error } = await supabase
+                                            .from('jobs')
+                                            .update({ 
+                                              contract_price: contractPriceForm,
+                                              updated_at: new Date().toISOString()
+                                            })
+                                            .eq('id', selectedJob.id)
+                                          if (error) throw error
+                                          showToast.success('Contract price updated')
+                                          setEditingContractPrice(false)
+                                          // Refresh the job data
+                                          if (jobId) {
+                                            await loadSingleJob(selectedJob.id)
+                                          } else {
+                                            await loadJobsWithCosts()
+                                          }
+                                        } catch (error) {
+                                          console.error('Error updating contract price:', error)
+                                          showToast.error('Failed to update contract price')
+                                        }
+                                      }}
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      className="btn btn-sm btn-secondary"
+                                      onClick={() => {
+                                        setContractPriceForm(selectedJob.contract_price)
+                                        setEditingContractPrice(false)
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className={selectedJob.contract_price === 0 ? 'text-danger' : ''}>
+                                      {formatCurrency(selectedJob.contract_price)}
+                                    </span>
+                                    <button
+                                      className="btn btn-sm btn-icon btn-light-primary"
+                                      onClick={() => {
+                                        setContractPriceForm(selectedJob.contract_price)
+                                        setEditingContractPrice(true)
+                                      }}
+                                      title="Edit contract price"
+                                    >
+                                      <i className="ki-duotone ki-pencil fs-6">
+                                        <span className="path1"></span>
+                                        <span className="path2"></span>
+                                      </i>
+                                    </button>
+                                    {selectedJob.contract_price === 0 && (
+                                      <span className="badge badge-light-danger">
+                                        From accepted estimate
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
                             <tr>
                               <td className="fw-bold text-muted">Estimated Cost</td>
                               <td className="text-end">{formatCurrency(selectedJob.estimated_cost)}</td>
@@ -641,29 +1172,43 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                                 {selectedJob.cost_variance >= 0 ? '+' : ''}{formatCurrency(selectedJob.cost_variance)}
                               </td>
                             </tr>
+                            <tr>
+                              <td className="fw-bold text-muted">Burn Rate/Day</td>
+                              <td className="text-end">{formatCurrency(selectedJob.burn_rate)}</td>
+                            </tr>
                           </tbody>
                         </table>
                       </div>
                     </div>
                     
                     <div className="col-md-6">
-                      <h6 className="mb-4">Revenue & Profit</h6>
+                      <h6 className="mb-4">Profit Analysis</h6>
                       <div className="table-responsive">
                         <table className="table table-row-bordered">
                           <tbody>
+                            <tr>
+                              <td className="fw-bold text-muted">Expected Profit</td>
+                              <td className="text-end">{formatCurrency(selectedJob.expected_profit)}</td>
+                            </tr>
+                            <tr>
+                              <td className="fw-bold text-muted">Actual Profit</td>
+                              <td className={`text-end fw-bold ${selectedJob.is_profitable ? 'text-success' : 'text-danger'}`}>
+                                {formatCurrency(selectedJob.actual_profit)}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td className="fw-bold text-muted">Profit Variance</td>
+                              <td className={`text-end fw-bold ${selectedJob.profit_variance >= 0 ? 'text-success' : 'text-danger'}`}>
+                                {selectedJob.profit_variance >= 0 ? '+' : ''}{formatCurrency(selectedJob.profit_variance)}
+                              </td>
+                            </tr>
                             <tr>
                               <td className="fw-bold text-muted">Total Invoiced</td>
                               <td className="text-end">{formatCurrency(selectedJob.total_invoiced)}</td>
                             </tr>
                             <tr>
-                              <td className="fw-bold text-muted">Total Costs</td>
-                              <td className="text-end">{formatCurrency(selectedJob.actual_cost)}</td>
-                            </tr>
-                            <tr>
-                              <td className="fw-bold text-muted">Gross Profit</td>
-                              <td className={`text-end fw-bold ${selectedJob.is_profitable ? 'text-success' : 'text-danger'}`}>
-                                {formatCurrency(selectedJob.gross_profit)}
-                              </td>
+                              <td className="fw-bold text-muted">Completion</td>
+                              <td className="text-end">{formatPercentage(selectedJob.completion_percentage)}</td>
                             </tr>
                           </tbody>
                         </table>
@@ -731,12 +1276,15 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                                       setEditingCost(cost)
                                       setCostForm({
                                         cost_type: cost.cost_type,
+                                        cost_subtype: cost.cost_subtype || '',
                                         description: cost.description,
                                         quantity: cost.quantity,
                                         unit_cost: cost.unit_cost,
                                         cost_date: cost.cost_date,
                                         vendor: cost.vendor || '',
-                                        receipt_url: cost.receipt_url || ''
+                                        receipt_url: cost.receipt_url || '',
+                                        markup_percentage: cost.markup_percentage || 0,
+                                        markup_type: cost.markup_type || 'flat'
                                       })
                                       setShowCostModal(true)
                                     }}
@@ -831,23 +1379,43 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                       <h6 className="mb-4">Cost Distribution</h6>
                       <div className="d-flex flex-column gap-3">
                         {['labor', 'material', 'equipment', 'subcontractor', 'overhead', 'other'].map(type => {
-                          const typeCosts = costEntries.filter(c => c.cost_type === type)
-                          const totalTypeCost = typeCosts.reduce((sum, c) => sum + c.total_cost, 0)
-                          const percentage = selectedJob.actual_cost > 0 ? (totalTypeCost / selectedJob.actual_cost) * 100 : 0
-                          
-                          return (
-                            <div key={type} className="d-flex justify-content-between align-items-center">
-                              <div className="d-flex align-items-center">
-                                <span className={`badge badge-circle badge-${getCostTypeColor(type)} me-3`}></span>
-                                <span className="fw-semibold text-capitalize">{type}</span>
+                          try {
+                            const typeCosts = costEntries.filter(c => c.cost_type === type)
+                            const totalTypeCost = typeCosts.reduce((sum, c) => {
+                              const cost = Number(c.total_cost) || 0
+                              return sum + (isNaN(cost) ? 0 : cost)
+                            }, 0)
+                            const percentage = selectedJob.actual_cost > 0 ? (totalTypeCost / selectedJob.actual_cost) * 100 : 0
+                            const safePercentage = isNaN(percentage) ? 0 : percentage
+                            
+                            return (
+                              <div key={type} className="d-flex justify-content-between align-items-center">
+                                <div className="d-flex align-items-center">
+                                  <span className={`badge badge-circle badge-${getCostTypeColor(type)} me-3`}></span>
+                                  <span className="fw-semibold text-capitalize">{type}</span>
+                                </div>
+                                <div className="text-end">
+                                  <div className="fw-bold">{formatCurrency(totalTypeCost)}</div>
+                                  <div className="text-muted fs-8">{safePercentage.toFixed(1)}%</div>
+                                </div>
                               </div>
-                              <div className="text-end">
-                                <div className="fw-bold">{formatCurrency(totalTypeCost)}</div>
-                                <div className="text-muted fs-8">{percentage.toFixed(1)}%</div>
+                            )
+                          } catch (error) {
+                            console.error(`Error calculating costs for type ${type}:`, error)
+                            return (
+                              <div key={type} className="d-flex justify-content-between align-items-center">
+                                <div className="d-flex align-items-center">
+                                  <span className={`badge badge-circle badge-${getCostTypeColor(type)} me-3`}></span>
+                                  <span className="fw-semibold text-capitalize">{type}</span>
+                                </div>
+                                <div className="text-end">
+                                  <div className="fw-bold">$0.00</div>
+                                  <div className="text-muted fs-8">0.0%</div>
+                                </div>
                               </div>
-                            </div>
-                          )
-                        })}
+                            )
+                          }
+                        })}  
                       </div>
                     </div>
                     
@@ -861,7 +1429,10 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                               {selectedJob.cost_variance <= 0 ? 'On Budget' : 'Over Budget'}
                             </div>
                             <div className="text-muted fs-8">
-                              {Math.abs(selectedJob.cost_variance / selectedJob.estimated_cost * 100).toFixed(1)}% variance
+                              {selectedJob.estimated_cost > 0 
+                                ? `${Math.abs(selectedJob.cost_variance / selectedJob.estimated_cost * 100).toFixed(1)}% variance`
+                                : 'No estimate available'
+                              }
                             </div>
                           </div>
                         </div>
@@ -873,7 +1444,7 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                               {selectedJob.labor_variance <= 0 ? 'Efficient' : 'Over Time'}
                             </div>
                             <div className="text-muted fs-8">
-                              {selectedJob.labor_hours_actual}h / {selectedJob.labor_hours_estimated}h
+                              {selectedJob.actual_hours || 0}h / {selectedJob.estimated_hours || 0}h
                             </div>
                           </div>
                         </div>
@@ -882,7 +1453,9 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                           <span className="fw-semibold">Revenue Recognition</span>
                           <div className="text-end">
                             <div className="fw-bold text-primary">
-                              {((selectedJob.total_invoiced / (selectedJob.estimated_cost * 1.2)) * 100).toFixed(1)}%
+                              {selectedJob.estimated_cost > 0 
+                                ? ((selectedJob.total_invoiced / (selectedJob.estimated_cost * 1.2)) * 100).toFixed(1) 
+                                : '0'}%
                             </div>
                             <div className="text-muted fs-8">of expected revenue</div>
                           </div>
@@ -925,7 +1498,7 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
               </div>
               <div className="modal-body">
                 <div className="row g-4">
-                  <div className="col-md-6">
+                  <div className="col-md-4">
                     <label className="form-label required">Cost Type</label>
                     <select
                       className="form-select"
@@ -940,7 +1513,17 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                       <option value="other">Other</option>
                     </select>
                   </div>
-                  <div className="col-md-6">
+                  <div className="col-md-4">
+                    <label className="form-label">Subcategory</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={costForm.cost_subtype}
+                      onChange={(e) => setCostForm(prev => ({ ...prev, cost_subtype: e.target.value }))}
+                      placeholder={costForm.cost_type === 'material' ? 'e.g., paint, drywall' : costForm.cost_type === 'labor' ? 'e.g., plumbing, electrical' : 'Optional subcategory'}
+                    />
+                  </div>
+                  <div className="col-md-4">
                     <label className="form-label required">Date</label>
                     <input
                       type="date"
@@ -996,7 +1579,7 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="col-12">
+                  <div className="col-md-6">
                     <label className="form-label">Vendor/Supplier</label>
                     <input
                       type="text"
@@ -1005,6 +1588,29 @@ const JobCostingDashboard: React.FC<JobCostingDashboardProps> = ({
                       onChange={(e) => setCostForm(prev => ({ ...prev, vendor: e.target.value }))}
                       placeholder="Optional vendor name"
                     />
+                  </div>
+                  <div className="col-md-3">
+                    <label className="form-label">Markup %</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={costForm.markup_percentage}
+                      onChange={(e) => setCostForm(prev => ({ ...prev, markup_percentage: parseFloat(e.target.value) || 0 }))}
+                      min="0"
+                      step="0.1"
+                      placeholder="20"
+                    />
+                  </div>
+                  <div className="col-md-3">
+                    <label className="form-label">Markup Type</label>
+                    <select
+                      className="form-select"
+                      value={costForm.markup_type}
+                      onChange={(e) => setCostForm(prev => ({ ...prev, markup_type: e.target.value as any }))}
+                    >
+                      <option value="flat">Flat Rate</option>
+                      <option value="margin">Margin</option>
+                    </select>
                   </div>
                   <div className="col-12">
                     <label className="form-label">Receipt Photo</label>

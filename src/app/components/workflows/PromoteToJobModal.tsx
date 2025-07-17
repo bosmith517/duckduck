@@ -4,13 +4,17 @@ import * as Yup from 'yup'
 import clsx from 'clsx'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { useCustomerJourneyStore, journeyEventBus, JOURNEY_EVENTS } from '../../stores/customerJourneyStore'
+import { useSmartAssistant } from '../../hooks/useSmartAssistant'
+import { StepTrackerMini } from '../journey/StepTracker'
+import type { JobSchema } from '../../contexts/CustomerJourneyContext'
 import { jobActivityService } from '../../services/jobActivityService'
 
 interface PromoteToJobModalProps {
   isOpen: boolean
   onClose: () => void
-  leadId: string
-  leadData: any
+  leadId?: string
+  leadData?: any
   onSuccess: (jobId: string) => void
 }
 
@@ -60,8 +64,8 @@ const promoteSchema = Yup.object().shape({
 export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({ 
   isOpen, 
   onClose, 
-  leadId,
-  leadData,
+  leadId: propLeadId,
+  leadData: propLeadData,
   onSuccess 
 }) => {
   const { userProfile } = useSupabaseAuth()
@@ -69,11 +73,28 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [currentStep, setCurrentStep] = useState(1)
 
+  // Customer Journey integration
+  const { lead, estimate, leadId: storeLeadId, setJob, updateStep, completeCurrentStep } = useCustomerJourneyStore()
+  const { trackAction } = useSmartAssistant()
+  
+  // Use store data or props as fallback
+  const effectiveLeadId = storeLeadId || propLeadId
+  const effectiveLeadData = lead || propLeadData
+  
+  // Check if we have an approved estimate
+  const hasApprovedEstimate = estimate?.status === 'approved' || estimate?.is_approved
+
   useEffect(() => {
     if (isOpen) {
       fetchTechnicians()
+      trackAction('opened_promote_to_job_modal')
+      
+      // If not on conversion step, navigate there
+      if (storeLeadId && useCustomerJourneyStore.getState().step !== 'conversion') {
+        updateStep('conversion')
+      }
     }
-  }, [isOpen])
+  }, [isOpen, trackAction, storeLeadId, updateStep])
 
   const fetchTechnicians = async () => {
     if (!userProfile?.tenant_id) return
@@ -99,18 +120,18 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
 
   const formik = useFormik({
     initialValues: {
-      property_address: '',
-      property_city: '',
-      property_state: '',
-      property_zip: '',
-      service_type: '',
-      job_description: leadData?.initial_request || '',
+      property_address: effectiveLeadData?.full_address || effectiveLeadData?.street_address || '',
+      property_city: effectiveLeadData?.city || '',
+      property_state: effectiveLeadData?.state || '',
+      property_zip: effectiveLeadData?.zip_code || '',
+      service_type: estimate?.project_title || effectiveLeadData?.service_type || '',
+      job_description: estimate?.description || effectiveLeadData?.initial_request || effectiveLeadData?.service_type || '',
       estimate_date: '',
       estimate_time: '09:00',
       assigned_technician: '',
-      estimated_duration: 2,
-      estimated_value: leadData?.estimated_value || 0,
-      special_instructions: ''
+      estimated_duration: estimate?.estimated_hours || 2,
+      estimated_value: estimate?.total_amount || effectiveLeadData?.estimated_value || 0,
+      special_instructions: effectiveLeadData?.notes || ''
     },
     validationSchema: promoteSchema,
     onSubmit: async (values) => {
@@ -124,201 +145,62 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
       return
     }
 
+    if (!effectiveLeadId) {
+      alert('No lead selected. Please refresh and try again.')
+      return
+    }
+
     setLoading(true)
     try {
-      // Step 1: Update Lead Status to "Qualified"
-      const { error: leadUpdateError } = await supabase
-        .from('leads')
-        .update({ 
-          status: 'qualified',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', leadId)
-
-      if (leadUpdateError) throw leadUpdateError
-
-      // Step 2: Find or create contact (accounts and contacts are now equivalent)
-      let contact = null
-      
-      // Search for existing contact by phone or email
-      const { data: existingByPhone, error: phoneError } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('tenant_id', userProfile.tenant_id)
-        .eq('phone', leadData.phone_number)
-        
-      if (phoneError && phoneError.code !== 'PGRST116') throw phoneError
-      
-      const { data: existingByEmail, error: emailError } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('tenant_id', userProfile.tenant_id)
-        .eq('email', leadData.email)
-        
-      if (emailError && emailError.code !== 'PGRST116') throw emailError
-      
-      // Combine results and remove duplicates
-      const existingContacts: any[] = []
-      if (existingByPhone && existingByPhone.length > 0) {
-        existingContacts.push(...existingByPhone)
-      }
-      if (existingByEmail && existingByEmail.length > 0) {
-        existingByEmail.forEach(emailContact => {
-          if (!existingContacts.find((c: any) => c.id === emailContact.id)) {
-            existingContacts.push(emailContact)
-          }
-        })
-      }
-
-      if (existingContacts && existingContacts.length > 0) {
-        // Use the first matching contact
-        const existingContact = existingContacts[0]
-        
-        // Update existing contact with latest information
-        const { data: updatedContact, error: updateError } = await supabase
-          .from('contacts')
-          .update({
-            address_line1: values.property_address,
-            city: values.property_city,
-            state: values.property_state,
-            zip_code: values.property_zip,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingContact.id)
-          .select()
-          .single()
-
-        if (updateError) throw updateError
-        contact = updatedContact
-      } else {
-        // Create new contact
-        const contactData = {
-          tenant_id: userProfile.tenant_id,
-          first_name: leadData.caller_name.split(' ')[0] || leadData.caller_name,
-          last_name: leadData.caller_name.split(' ').slice(1).join(' ') || '',
-          name: leadData.caller_name,
-          phone: leadData.phone_number,
-          email: leadData.email,
-          contact_type: 'individual',
-          address_line1: values.property_address,
-          city: values.property_city,
-          state: values.property_state,
-          zip_code: values.property_zip,
-          notes: `Created from lead: ${leadData.initial_request}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+      // Use the new transactional Edge Function for atomic lead conversion
+      const { data, error } = await supabase.functions.invoke('convert-lead-to-job', {
+        body: {
+          leadId: effectiveLeadId,
+          jobDetails: values
         }
+      })
 
-        const { data: newContact, error: contactError } = await supabase
-          .from('contacts')
-          .insert(contactData)
-          .select()
-          .single()
-
-        if (contactError) {
-          // Handle potential duplicates
-          if (contactError.code === '23505') {
-            console.log('Contact already exists, searching again...')
-            const { data: existingByName, error: nameError } = await supabase
-              .from('contacts')
-              .select('*')
-              .eq('tenant_id', userProfile.tenant_id)
-              .ilike('name', `%${leadData.caller_name}%`)
-              .limit(1)
-              
-            if (nameError) throw nameError
-            
-            if (existingByName && existingByName.length > 0) {
-              contact = existingByName[0]
-            } else {
-              throw new Error(`Contact creation failed: ${contactError.message}`)
-            }
-          } else {
-            throw contactError
-          }
-        } else {
-          contact = newContact
-        }
+      if (error) {
+        throw new Error(`Conversion failed: ${error.message}`)
       }
 
-      // Step 3: Create Job Record (linking to contact only - accounts and contacts are interchangeable)
-      const estimateDateTime = new Date(`${values.estimate_date}T${values.estimate_time}:00`)
-      const jobData = {
-        tenant_id: userProfile.tenant_id,
-        contact_id: contact.id,
-        lead_id: leadId,
-        job_number: `JOB-${Date.now()}`,
-        title: `${values.service_type} - ${leadData.caller_name}`,
+      if (!data.success) {
+        throw new Error(data.error || 'Conversion failed')
+      }
+
+      // Update Customer Journey Store with the created job
+      const jobData: JobSchema = {
+        id: data.job.id,
+        title: data.job.title,
         description: values.job_description,
-        status: 'needs_estimate',
-        priority: leadData.urgency === 'emergency' ? 'high' : leadData.urgency === 'high' ? 'medium' : 'low',
-        start_date: estimateDateTime.toISOString(),
-        estimated_hours: values.estimated_duration,
-        estimated_cost: values.estimated_value,
-        location_address: values.property_address,
-        location_city: values.property_city,
-        location_state: values.property_state,
-        location_zip: values.property_zip,
-        assigned_technician_id: values.assigned_technician,
-        notes: values.special_instructions || null,
+        status: 'scheduled',
+        priority: effectiveLeadData?.urgency === 'emergency' ? 'high' : effectiveLeadData?.urgency === 'high' ? 'medium' : 'low',
+        scheduled_start: data.job.start_date,
+        scheduled_end: new Date(new Date(data.job.start_date).getTime() + (values.estimated_duration * 60 * 60 * 1000)).toISOString(),
+        lead_id: effectiveLeadId,
+        contact_id: data.contact.id,
+        estimate_id: estimate?.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
+      
+      setJob(jobData)
+      
+      // Emit events for journey tracking
+      journeyEventBus.emit(JOURNEY_EVENTS.JOB_CREATED, {
+        job: jobData,
+        estimateDateTime: `${values.estimate_date}T${values.estimate_time}:00`,
+        assignedTechnician: values.assigned_technician,
+        contact: data.contact,
+        leadConverted: data.lead
+      })
 
-      const { data: job, error: jobError } = await supabase
-        .from('jobs')
-        .insert(jobData)
-        .select()
-        .single()
+      trackAction('job_created_successfully')
+      
+      // Auto-advance step
+      completeCurrentStep()
 
-      if (jobError) throw jobError
-
-      // Log job creation activity
-      try {
-        await jobActivityService.logActivity({
-          jobId: job.id,
-          tenantId: userProfile.tenant_id,
-          userId: userProfile.id,
-          activityType: 'job_created',
-          activityCategory: 'user',
-          title: 'Job Created from Lead',
-          description: `Job created from lead promotion for ${leadData.caller_name}`,
-          referenceId: leadId,
-          referenceType: 'lead',
-          isVisibleToCustomer: true,
-          isMilestone: true
-        })
-      } catch (logError) {
-        console.error('Failed to log job creation activity:', logError)
-      }
-
-      // Step 5: Update Lead with converted status and job reference
-      await supabase
-        .from('leads')
-        .update({ 
-          status: 'converted',
-          converted_to_job_id: job.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', leadId)
-
-      // Step 6: Send Automated SMS/Email Notification (placeholder for now)
-      try {
-        await sendEstimateNotification(leadData, estimateDateTime, values)
-      } catch (notificationError) {
-        console.error('Error sending notification:', notificationError)
-        // Don't fail the whole process for notification errors
-      }
-
-      // Step 7: Create Calendar Event for Technician
-      try {
-        await createTechnicianCalendarEvent(job, estimateDateTime, values.assigned_technician)
-      } catch (calendarError) {
-        console.error('Error creating calendar event:', calendarError)
-        // Don't fail the whole process for calendar errors
-      }
-
-      onSuccess(job.id)
+      onSuccess(data.job.id)
       formik.resetForm()
       
     } catch (error) {
@@ -400,7 +282,7 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
               />
               {formik.touched.property_address && formik.errors.property_address && (
                 <div className="fv-plugins-message-container">
-                  <span role="alert">{formik.errors.property_address}</span>
+                  <span role="alert">{String(formik.errors.property_address)}</span>
                 </div>
               )}
             </div>
@@ -603,7 +485,7 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
                 <span className="path1"></span>
                 <span className="path2"></span>
               </i>
-              Promote Lead to Job - {leadData?.caller_name}
+              Promote Lead to Job - {effectiveLeadData?.caller_name || effectiveLeadData?.name || 'Customer'}
             </h5>
             <button
               type="button"
@@ -613,6 +495,31 @@ export const PromoteToJobModal: React.FC<PromoteToJobModalProps> = ({
           </div>
 
           <div className="modal-body">
+            {/* Journey Progress */}
+            <StepTrackerMini className="mb-5" />
+            
+            {/* Show approved estimate info if available */}
+            {hasApprovedEstimate && estimate && (
+              <div className="notice d-flex bg-light-success rounded border-success border border-dashed p-6 mb-5">
+                <i className="ki-duotone ki-check-circle fs-2x text-success me-4">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                <div className="d-flex flex-stack flex-grow-1">
+                  <div className="fw-semibold">
+                    <h4 className="text-gray-900 fw-bold">Approved Estimate Ready</h4>
+                    <div className="fs-6 text-gray-700">
+                      Estimate #{estimate.estimate_number} has been approved. Job details have been pre-filled from the estimate.
+                      <div className="mt-2">
+                        <strong>Total Amount:</strong> ${estimate.total_amount?.toFixed(2) || '0.00'}
+                        {estimate.approved_by && <span className="ms-3"><strong>Approved by:</strong> {estimate.approved_by}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Progress Indicator */}
             <div className="d-flex justify-content-center mb-7">
               <div className="stepper stepper-pills stepper-column d-flex flex-row">

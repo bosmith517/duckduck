@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Unregister Service Worker</title>
+</head>
+<body>
+    <h1>Service Worker Unregistration</h1>
+    <button id="unregister">Unregister All Service Workers</button>
+    <div id="status"></div>
+    
+    <script>
+        document.getElementById('unregister').addEventListener('click', async () => {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<p>Unregistering service workers...</p>';
+            
+            try {
+                // Get all service worker registrations
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                
+                // Unregister each one
+                for (let registration of registrations) {
+                    await registration.unregister();
+                    statusDiv.innerHTML += `<p>✓ Unregistered: ${registration.scope}</p>`;
+                }
+                
+                // Clear all caches
+                const cacheNames = await caches.keys();
+                for (let cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                    statusDiv.innerHTML += `<p>✓ Deleted cache: ${cacheName}</p>`;
+                }
+                
+                statusDiv.innerHTML += '<p style="color: green; font-weight: bold;">All service workers unregistered and caches cleared! You can close this page.</p>';
+            } catch (error) {
+                statusDiv.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        });
+        
+        // Auto-check status on load
+        window.addEventListener('load', async () => {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            document.getElementById('status').innerHTML = `<p>Currently ${registrations.length} service worker(s) registered.</p>`;
+        });
+    </script>
+</body>
+</html>

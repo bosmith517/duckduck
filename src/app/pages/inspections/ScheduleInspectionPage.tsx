@@ -5,6 +5,8 @@ import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { InspectionService, JobInspection } from '../../services/inspectionService'
 import { supabase } from '../../../supabaseClient'
 import { showToast } from '../../utils/toast'
+import { useFormValidation } from '../../hooks/useFormValidation'
+import { inspectionScheduleSchema, formatPhoneNumber } from '../../utils/appointmentValidation'
 
 interface Job {
   id: string
@@ -22,11 +24,29 @@ const ScheduleInspectionPage: React.FC = () => {
   const [pendingInspections, setPendingInspections] = useState<JobInspection[]>([])
   const [selectedInspection, setSelectedInspection] = useState<JobInspection | null>(null)
   const [loading, setLoading] = useState(false)
-  const [schedulingData, setSchedulingData] = useState({
-    scheduled_date: '',
-    inspector_name: '',
-    inspector_contact: '',
-    notes: ''
+  
+  const {
+    values,
+    errors,
+    touched,
+    getFieldProps,
+    getFieldMeta,
+    handleSubmit: handleFormSubmit,
+    isValid,
+    isSubmitting,
+    resetForm,
+    setFieldValue
+  } = useFormValidation({
+    initialValues: {
+      scheduled_date: '',
+      inspector_name: '',
+      inspector_contact: '',
+      notes: ''
+    },
+    validationSchema: inspectionScheduleSchema,
+    onSubmit: async (formValues) => {
+      await handleScheduleInspection(formValues)
+    }
   })
 
   useEffect(() => {
@@ -87,9 +107,7 @@ const ScheduleInspectionPage: React.FC = () => {
     }
   }
 
-  const handleScheduleInspection = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+  const handleScheduleInspection = async (formValues: any) => {
     if (!selectedInspection) {
       showToast.error('Please select an inspection to schedule')
       return
@@ -97,16 +115,11 @@ const ScheduleInspectionPage: React.FC = () => {
 
     try {
       setLoading(true)
-      await InspectionService.scheduleInspection(selectedInspection.id, schedulingData)
+      await InspectionService.scheduleInspection(selectedInspection.id, formValues)
       showToast.success('Inspection scheduled successfully')
       
       // Reset form
-      setSchedulingData({
-        scheduled_date: '',
-        inspector_name: '',
-        inspector_contact: '',
-        notes: ''
-      })
+      resetForm()
       setSelectedInspection(null)
       
       // Reload inspections
@@ -239,7 +252,7 @@ const ScheduleInspectionPage: React.FC = () => {
             </div>
             <KTCardBody>
               {selectedInspection ? (
-                <form onSubmit={handleScheduleInspection}>
+                <form onSubmit={handleFormSubmit}>
                   <div className='mb-5'>
                     <div className='bg-light-primary rounded p-4 mb-5'>
                       <h5 className='mb-2'>Selected Inspection</h5>
@@ -254,46 +267,70 @@ const ScheduleInspectionPage: React.FC = () => {
                       <label className='form-label required'>Inspection Date & Time</label>
                       <input
                         type='datetime-local'
-                        className='form-control form-control-solid'
-                        value={schedulingData.scheduled_date}
-                        onChange={(e) => setSchedulingData({...schedulingData, scheduled_date: e.target.value})}
+                        className={`form-control form-control-solid ${getFieldMeta('scheduled_date').isInvalid ? 'is-invalid' : ''}`}
+                        {...getFieldProps('scheduled_date')}
                         min={new Date().toISOString().slice(0, 16)}
-                        required
                       />
+                      {getFieldMeta('scheduled_date').isInvalid && (
+                        <div className='invalid-feedback'>
+                          {errors.scheduled_date}
+                        </div>
+                      )}
                     </div>
 
                     <div className='mb-5'>
                       <label className='form-label required'>Inspector Name</label>
                       <input
                         type='text'
-                        className='form-control form-control-solid'
+                        className={`form-control form-control-solid ${getFieldMeta('inspector_name').isInvalid ? 'is-invalid' : ''}`}
                         placeholder='Enter inspector name'
-                        value={schedulingData.inspector_name}
-                        onChange={(e) => setSchedulingData({...schedulingData, inspector_name: e.target.value})}
-                        required
+                        {...getFieldProps('inspector_name')}
                       />
+                      {getFieldMeta('inspector_name').isInvalid && (
+                        <div className='invalid-feedback'>
+                          {errors.inspector_name}
+                        </div>
+                      )}
                     </div>
 
                     <div className='mb-5'>
-                      <label className='form-label'>Inspector Contact</label>
+                      <label className='form-label required'>Inspector Contact</label>
                       <input
                         type='text'
-                        className='form-control form-control-solid'
-                        placeholder='Phone or email'
-                        value={schedulingData.inspector_contact}
-                        onChange={(e) => setSchedulingData({...schedulingData, inspector_contact: e.target.value})}
+                        className={`form-control form-control-solid ${getFieldMeta('inspector_contact').isInvalid ? 'is-invalid' : ''}`}
+                        placeholder='Email or Phone (xxx) xxx-xxxx'
+                        value={values.inspector_contact}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          // Auto-format phone numbers if they start with digits or parenthesis
+                          if (value && (value[0] === '(' || /^\d/.test(value))) {
+                            setFieldValue('inspector_contact', formatPhoneNumber(value))
+                          } else {
+                            setFieldValue('inspector_contact', value)
+                          }
+                        }}
+                        onBlur={getFieldProps('inspector_contact').onBlur}
                       />
+                      {getFieldMeta('inspector_contact').isInvalid && (
+                        <div className='invalid-feedback'>
+                          {errors.inspector_contact}
+                        </div>
+                      )}
                     </div>
 
                     <div className='mb-5'>
                       <label className='form-label'>Notes</label>
                       <textarea
-                        className='form-control form-control-solid'
+                        className={`form-control form-control-solid ${getFieldMeta('notes').isInvalid ? 'is-invalid' : ''}`}
                         rows={4}
                         placeholder='Any special instructions or requirements...'
-                        value={schedulingData.notes}
-                        onChange={(e) => setSchedulingData({...schedulingData, notes: e.target.value})}
+                        {...getFieldProps('notes')}
                       />
+                      {getFieldMeta('notes').isInvalid && (
+                        <div className='invalid-feedback'>
+                          {errors.notes}
+                        </div>
+                      )}
                     </div>
 
                     {selectedInspection.prerequisites.length > 0 && (
@@ -314,12 +351,7 @@ const ScheduleInspectionPage: React.FC = () => {
                       className='btn btn-light'
                       onClick={() => {
                         setSelectedInspection(null)
-                        setSchedulingData({
-                          scheduled_date: '',
-                          inspector_name: '',
-                          inspector_contact: '',
-                          notes: ''
-                        })
+                        resetForm()
                       }}
                     >
                       Cancel
@@ -327,7 +359,7 @@ const ScheduleInspectionPage: React.FC = () => {
                     <button
                       type='submit'
                       className='btn btn-primary'
-                      disabled={loading}
+                      disabled={loading || isSubmitting || !isValid}
                     >
                       {loading ? (
                         <>

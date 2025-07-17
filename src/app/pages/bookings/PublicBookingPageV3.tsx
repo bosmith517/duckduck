@@ -4,6 +4,9 @@ import { BookingService } from '../../services/bookingService'
 import { BookingLink, TimeSlot, BookingFormData } from '../../components/bookings/bookings.types'
 import { format, addDays, startOfDay, isSameDay, addMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isToday, isBefore } from 'date-fns'
 import { toast } from 'react-toastify'
+import { useFormValidation } from '../../hooks/useFormValidation'
+import { formatPhoneNumber } from '../../utils/appointmentValidation'
+import * as Yup from 'yup'
 import './booking-page.css'
 
 const PublicBookingPageV3: React.FC = () => {
@@ -371,77 +374,133 @@ const BookingFormV3: React.FC<BookingFormV3Props> = ({
   onSubmit,
   onCancel
 }) => {
-  const [formData, setFormData] = useState<BookingFormData>({
-    customer_name: '',
-    customer_email: '',
-    customer_phone: '',
-    notes: ''
-  })
   const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-    await onSubmit(formData)
-    setSubmitting(false)
+  // Phone validation regex for format (xxx) xxx-xxxx
+  const phoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/
+
+  // Custom booking form schema
+  const bookingFormSchema = Yup.object().shape({
+    customer_name: Yup.string()
+      .required('Name is required')
+      .min(2, 'Name must be at least 2 characters')
+      .max(100, 'Name must be no more than 100 characters')
+      .matches(/^[a-zA-Z\s'-]+$/, 'Name can only contain letters, spaces, hyphens, and apostrophes'),
+    customer_email: Yup.string()
+      .required('Email is required')
+      .email('Please enter a valid email address'),
+    customer_phone: Yup.string()
+      .required('Phone number is required')
+      .matches(phoneRegex, 'Phone number must be in format (xxx) xxx-xxxx'),
+    notes: Yup.string()
+      .max(500, 'Notes must be no more than 500 characters')
+  })
+
+  const {
+    values,
+    errors,
+    touched,
+    getFieldProps,
+    getFieldMeta,
+    handleSubmit: handleFormSubmit,
+    isValid,
+    isSubmitting,
+    setFieldValue
+  } = useFormValidation({
+    initialValues: {
+      customer_name: '',
+      customer_email: '',
+      customer_phone: '',
+      notes: ''
+    },
+    validationSchema: bookingFormSchema,
+    onSubmit: async (formValues) => {
+      setSubmitting(true)
+      try {
+        await onSubmit(formValues as BookingFormData)
+      } finally {
+        setSubmitting(false)
+      }
+    }
+  })
+
+  // Handle phone number formatting
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value)
+    setFieldValue('customer_phone', formatted)
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleFormSubmit}>
       <h5 className="mb-3">Your Information</h5>
 
       <div className="mb-3">
         <label className="form-label">Full Name *</label>
         <input
           type="text"
-          className="form-control"
+          className={`form-control ${getFieldMeta('customer_name').isInvalid ? 'is-invalid' : ''}`}
           placeholder="John Smith"
-          value={formData.customer_name}
-          onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-          required
+          {...getFieldProps('customer_name')}
         />
+        {getFieldMeta('customer_name').isInvalid && (
+          <div className="invalid-feedback">
+            {errors.customer_name}
+          </div>
+        )}
       </div>
 
       <div className="mb-3">
         <label className="form-label">Email Address *</label>
         <input
           type="email"
-          className="form-control"
+          className={`form-control ${getFieldMeta('customer_email').isInvalid ? 'is-invalid' : ''}`}
           placeholder="john@example.com"
-          value={formData.customer_email}
-          onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
-          required
+          {...getFieldProps('customer_email')}
         />
+        {getFieldMeta('customer_email').isInvalid && (
+          <div className="invalid-feedback">
+            {errors.customer_email}
+          </div>
+        )}
       </div>
 
       <div className="mb-3">
         <label className="form-label">Phone Number *</label>
         <input
           type="tel"
-          className="form-control"
+          className={`form-control ${getFieldMeta('customer_phone').isInvalid ? 'is-invalid' : ''}`}
           placeholder="(555) 123-4567"
-          value={formData.customer_phone}
-          onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-          required
+          value={values.customer_phone}
+          onChange={handlePhoneChange}
+          onBlur={getFieldProps('customer_phone').onBlur}
         />
+        {getFieldMeta('customer_phone').isInvalid && (
+          <div className="invalid-feedback">
+            {errors.customer_phone}
+          </div>
+        )}
       </div>
 
       <div className="mb-4">
         <label className="form-label">Additional Information</label>
         <textarea
-          className="form-control"
           rows={3}
           placeholder="Tell us about your project or any specific requirements..."
-          value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          className={`form-control ${getFieldMeta('notes').isInvalid ? 'is-invalid' : ''}`}
+          {...getFieldProps('notes')}
         />
+        {getFieldMeta('notes').isInvalid && (
+          <div className="invalid-feedback">
+            {errors.notes}
+          </div>
+        )}
       </div>
 
       <div className="d-grid">
         <button
           type="submit"
           className="btn btn-primary btn-lg"
-          disabled={submitting}
+          disabled={submitting || isSubmitting || !isValid}
         >
           {submitting ? (
             <>

@@ -97,6 +97,9 @@ const PrivateRoutes = () => {
   const VideoTestPage = lazy(() => import('../pages/test/VideoTestPage'))
   const SignalWireDebugPage = lazy(() => import('../pages/test/SignalWireDebugPage'))
   const PurchaseLogsPage = lazy(() => import('../pages/test/PurchaseLogsPage'))
+  const SignalWireVideoTestPage = lazy(() => import('../pages/test/SignalWireVideoTestPage'))
+  const MultiPhotoTestPage = lazy(() => import('../pages/test/MultiPhotoTestPage'))
+  const CustomerJourneyTestPage = lazy(() => import('../pages/test/CustomerJourneyTestPage'))
   const TrackingPage = lazy(() => import('../pages/tracking/TrackingPage'))
   const TrackingOverviewPage = lazy(() => import('../pages/tracking/TrackingOverviewPage'))
   const LandingPage = lazy(() => import('../pages/marketing/LandingPage'))
@@ -852,6 +855,30 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <VideoTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/signalwire-video'
+          element={
+            <SuspensedView>
+              <SignalWireVideoTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/multi-photo'
+          element={
+            <SuspensedView>
+              <MultiPhotoTestPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/customer-journey'
+          element={
+            <SuspensedView>
+              <CustomerJourneyTestPage />
             </SuspensedView>
           }
         />

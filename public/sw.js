@@ -1,11 +1,19 @@
 // TradeWorks Pro Service Worker
-const CACHE_NAME = 'tradeworks-pro-v1';
+const CACHE_VERSION = 2; // Increment this to force update
+const CACHE_NAME = `tradeworks-pro-v${CACHE_VERSION}`;
 const STATIC_CACHE_URLS = [
   '/',
   '/manifest.json',
   '/offline.html',
   // Add critical assets here
 ];
+
+// Skip waiting and claim clients immediately for faster updates
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // Install event
 self.addEventListener('install', (event) => {
@@ -46,13 +54,21 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
+  // For non-GET requests, pass through to network
   if (request.method !== 'GET') {
+    event.respondWith(fetch(request));
     return;
   }
 
-  // Skip external requests
+  // For external requests, pass through to network
   if (url.origin !== location.origin) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // Skip chrome-extension URLs and other non-http(s) protocols
+  if (!url.protocol.startsWith('http')) {
+    event.respondWith(fetch(request));
     return;
   }
 
@@ -62,7 +78,7 @@ self.addEventListener('fetch', (event) => {
       fetch(request)
         .then((response) => {
           // Cache successful responses
-          if (response.status === 200) {
+          if (response && response.status === 200) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(request, responseClone);
@@ -72,7 +88,12 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // Return cached version if available
-          return caches.match(request);
+          return caches.match(request).then((cachedResponse) => {
+            return cachedResponse || new Response('Network error happened', {
+              status: 408,
+              headers: { 'Content-Type': 'text/plain' },
+            });
+          });
         })
     );
     return;
@@ -89,7 +110,7 @@ self.addEventListener('fetch', (event) => {
         return fetch(request)
           .then((response) => {
             // Cache successful responses
-            if (response.status === 200) {
+            if (response && response.status === 200) {
               const responseClone = response.clone();
               caches.open(CACHE_NAME).then((cache) => {
                 cache.put(request, responseClone);
@@ -100,8 +121,18 @@ self.addEventListener('fetch', (event) => {
           .catch(() => {
             // Return offline page for navigation requests
             if (request.mode === 'navigate') {
-              return caches.match('/offline.html');
+              return caches.match('/offline.html').then((response) => {
+                return response || new Response('Offline', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/html' },
+                });
+              });
             }
+            // Return a proper error response for other requests
+            return new Response('Network error happened', {
+              status: 408,
+              headers: { 'Content-Type': 'text/plain' },
+            });
           });
       })
   );

@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react'
-import {useLocation} from 'react-router'
+import {useLocation} from 'react-router-dom'
 import clsx from 'clsx'
 import {checkIsActive, KTIcon, WithChildren} from '../../../helpers'
 

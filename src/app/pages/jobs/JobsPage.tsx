@@ -158,15 +158,19 @@ const JobsPage: React.FC = () => {
 
   const handleUpdateJob = async (id: string, jobData: Partial<Job>) => {
     try {
-      const { data, error } = await supabase
+      // First update the job
+      const { error: updateError } = await supabase
         .from('jobs')
         .update(jobData)
         .eq('id', id)
-        .select(`
-          *,
-          account:accounts(id, name),
-          contact:contacts(id, first_name, last_name)
-        `)
+      
+      if (updateError) throw updateError
+      
+      // Then fetch the updated job with relations
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('id', id)
         .single()
 
       if (error) {

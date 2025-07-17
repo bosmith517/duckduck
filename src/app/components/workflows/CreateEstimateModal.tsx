@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { useCustomerJourneyStore, journeyEventBus, JOURNEY_EVENTS } from '../../stores/customerJourneyStore'
+import { useSmartAssistant } from '../../hooks/useSmartAssistant'
+import { StepTrackerMini } from '../journey/StepTracker'
+import type { EstimateSchema } from '../../contexts/CustomerJourneyContext'
 import { showToast } from '../../utils/toast'
 import { KTIcon } from '../../../_metronic/helpers'
-import { marked } from 'marked'
+// Dynamic import for marked.js to reduce bundle size
 import { jobActivityService } from '../../services/jobActivityService'
+import { EstimateForm } from '../../pages/estimates/components/EstimateForm'
+import { estimatesService } from '../../services/estimatesService'
 
 interface EstimateTier {
   tier_name: 'Good' | 'Better' | 'Best'
@@ -38,23 +44,38 @@ interface BasicRepair {
 type AIStage = 'idle' | 's1' | 's2' | 's3'
 
 interface CreateEstimateModalProps {
-  jobId: string
+  leadId?: string
+  jobId?: string
   isOpen: boolean
   onClose: () => void
   onEstimateCreated: (estimateId: string) => void
+  mode?: 'create' | 'revise'
+  existingEstimateId?: string
 }
 
 export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
-  jobId,
+  leadId: propLeadId,
+  jobId: propJobId,
   isOpen,
   onClose,
-  onEstimateCreated
+  onEstimateCreated,
+  mode = 'create',
+  existingEstimateId
 }) => {
   const { userProfile } = useSupabaseAuth()
   const [loading, setLoading] = useState(false)
-  const [jobDetails, setJobDetails] = useState<any>(null)
+  
+  // Customer Journey integration
+  const { lead, siteVisit, leadId: storeLeadId, setEstimate, updateStep, completeCurrentStep } = useCustomerJourneyStore()
+  const { trackAction } = useSmartAssistant()
+  
+  // Use store data or props as fallback
+  const effectiveLeadId = propLeadId || storeLeadId
+  const [leadDetails, setLeadDetails] = useState<any>(null)
+  const [currentEstimateVersion, setCurrentEstimateVersion] = useState(1)
+  const [existingEstimate, setExistingEstimate] = useState<EstimateSchema | null>(null)
   const [estimateNotes, setEstimateNotes] = useState('')
-  const [currentStep, setCurrentStep] = useState(1)
+  const [currentStep, setCurrentStep] = useState(0) // Start at 0 for method selection
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiNarrative, setAiNarrative] = useState<string | null>(null)
   const [aiStage, setAiStage] = useState<AIStage>('idle')
@@ -62,6 +83,11 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
   const [customTotals, setCustomTotals] = useState<{Good?: number, Better?: number, Best?: number}>({})
   const [manuallySetTiers, setManuallySetTiers] = useState<{Good?: boolean, Better?: boolean, Best?: boolean}>({})
   const [showLineItemPricing, setShowLineItemPricing] = useState(false)
+  const [estimateMethod, setEstimateMethod] = useState<'ai' | 'template' | 'manual' | null>(null)
+  const [showManualForm, setShowManualForm] = useState(false)
+  
+  // Debug log
+  console.log('CreateEstimateModal state:', { showManualForm, estimateMethod, currentStep })
   
   // New pipeline state
   const [availablePhotos, setAvailablePhotos] = useState<JobPhoto[]>([])
@@ -72,6 +98,20 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
   const [betterRepairs, setBetterRepairs] = useState<BasicRepair[]>([])
   const [bestRepairs, setBestRepairs] = useState<BasicRepair[]>([])
   const [pipelineError, setPipelineError] = useState<string | null>(null)
+  const [marked, setMarked] = useState<any>(null)
+
+  // Lazy load marked.js
+  useEffect(() => {
+    const loadMarked = async () => {
+      try {
+        const { marked: markedLib } = await import('marked')
+        setMarked(() => markedLib)
+      } catch (error) {
+        console.warn('Failed to load marked.js:', error)
+      }
+    }
+    loadMarked()
+  }, [])
 
   
   const [estimateTiers, setEstimateTiers] = useState<EstimateTier[]>([
@@ -96,57 +136,232 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
   ])
 
   useEffect(() => {
-    if (isOpen && jobId) {
-      loadJobDetails()
+    if (isOpen && effectiveLeadId) {
+      loadLeadDetails()
       loadAvailablePhotos()
+      loadExistingEstimate()
       // Clear any existing stage notifications when modal opens
       cleanupStageNotifications()
+      trackAction(mode === 'revise' ? 'opened_revise_estimate_modal' : 'opened_create_estimate_modal')
+      
+      // Navigate to appropriate step based on mode
+      if (storeLeadId) {
+        const currentStep = useCustomerJourneyStore.getState().step
+        if (mode === 'revise' && currentStep !== 'estimate_revision') {
+          updateStep('estimate_revision')
+        } else if (mode === 'create' && currentStep !== 'estimate') {
+          updateStep('estimate')
+        }
+      }
     } else if (!isOpen) {
       // Clean up notifications when modal closes
       cleanupStageNotifications()
     }
-  }, [isOpen, jobId])
+  }, [isOpen, effectiveLeadId, trackAction, storeLeadId, updateStep, mode])
 
-  const loadJobDetails = async () => {
+  const loadLeadDetails = async () => {
+    if (!effectiveLeadId) {
+      console.warn('Cannot load lead details: effectiveLeadId is null')
+      return
+    }
+
+    // If we have lead data from store, use it
+    if (lead && lead.id === effectiveLeadId) {
+      // CRITICAL: Check if lead has customer relationships
+      // Check both direct relationships and converted relationships
+      const hasAccountRelationship = lead.account_id || lead.converted_account_id
+      const hasContactRelationship = lead.contact_id || lead.converted_contact_id
+      
+      if (!hasAccountRelationship && !hasContactRelationship) {
+        showToast.error('Cannot create estimate: Customer information is missing. Please ensure the lead has contact details.')
+        console.error('Lead from store missing relationships:', {
+          leadId: lead.id,
+          account_id: lead.account_id,
+          contact_id: lead.contact_id,
+          converted_account_id: lead.converted_account_id,
+          converted_contact_id: lead.converted_contact_id
+        })
+        handleClose()
+        return
+      }
+      
+      setLeadDetails({
+        id: lead.id,
+        title: `Estimate for ${lead.name || 'Customer'}`,
+        description: lead.service_type || 'Service request',
+        location_city: lead.full_address?.split(',')[1]?.trim(),
+        location_state: lead.full_address?.split(',')[2]?.trim(),
+        location_address: lead.full_address,
+        estimated_cost: null,
+        notes: lead.notes,
+        account_id: lead.account_id || lead.converted_account_id,
+        contact_id: lead.contact_id || lead.converted_contact_id,
+        contacts: {
+          name: lead.name || 'Unknown',
+          first_name: (lead.name || '').split(' ')[0] || 'Unknown',
+          last_name: (lead.name || '').split(' ').slice(1).join(' ') || '',
+          phone: lead.contact?.phone || '',
+          email: lead.contact?.email || ''
+        }
+      })
+      return
+    }
+
+    // Otherwise fetch from database
     try {
       const { data, error } = await supabase
-        .from('jobs')
-        .select(`
-          *,
-          accounts (name, address_line1, city, state, zip_code),
-          contacts (first_name, last_name, phone, email)
-        `)
-        .eq('id', jobId)
+        .from('leads')
+        .select('*')
+        .eq('id', effectiveLeadId)
         .single()
 
       if (error) throw error
-      setJobDetails(data)
+      
+      // CRITICAL: Check if lead has customer relationships
+      // Check both direct relationships and converted relationships
+      const hasAccountRelationship = data.account_id || data.converted_account_id
+      const hasContactRelationship = data.contact_id || data.converted_contact_id
+      
+      if (!hasAccountRelationship && !hasContactRelationship) {
+        showToast.error('Cannot create estimate: Customer information is missing. Please ensure the lead has contact details.')
+        console.error('Lead missing relationships:', {
+          leadId: data.id,
+          account_id: data.account_id,
+          contact_id: data.contact_id,
+          converted_account_id: data.converted_account_id,
+          converted_contact_id: data.converted_contact_id
+        })
+        handleClose()
+        return
+      }
+      
+      setLeadDetails({
+        ...data,
+        title: `Estimate for ${data.name || data.caller_name || 'Customer'}`,
+        account_id: data.account_id || data.converted_account_id,
+        contact_id: data.contact_id || data.converted_contact_id,
+        // Create a mock contacts object from lead data
+        contacts: {
+          name: data.name || data.caller_name || 'Unknown',
+          first_name: (data.name || data.caller_name || '').split(' ')[0] || 'Unknown',
+          last_name: (data.name || data.caller_name || '').split(' ').slice(1).join(' ') || '',
+          phone: data.phone_number || data.phone || '',
+          email: data.email || ''
+        }
+      })
     } catch (error) {
-      console.error('Error loading job details:', error)
-      showToast.error('Failed to load job details')
+      console.error('Error loading lead details:', error)
+      showToast.error('Failed to load lead details')
+    }
+  }
+
+  const loadExistingEstimate = async () => {
+    if (mode === 'create') return
+    
+    if (!effectiveLeadId) {
+      console.warn('Cannot load existing estimate: effectiveLeadId is null')
+      return
+    }
+
+    try {
+      let estimateQuery = supabase
+        .from('estimates')
+        .select('*')
+        .eq('lead_id', effectiveLeadId)
+        .order('version', { ascending: false })
+
+      if (existingEstimateId) {
+        estimateQuery = estimateQuery.eq('id', existingEstimateId)
+      } else {
+        estimateQuery = estimateQuery.limit(1)
+      }
+
+      const { data, error } = await estimateQuery
+
+      if (error) throw error
+      
+      if (data && data.length > 0) {
+        const estimate = data[0]
+        setExistingEstimate(estimate)
+        setCurrentEstimateVersion((estimate.version || 1) + 1)
+        
+        // Pre-populate form with existing data
+        if (estimate.line_items) {
+          // Convert estimate line items to tier format
+          const tiers = estimateTiers.map(tier => ({
+            ...tier,
+            line_items: estimate.line_items || [],
+            total_amount: estimate.total || 0
+          }))
+          setEstimateTiers(tiers)
+        }
+        
+        setEstimateNotes(estimate.notes || '')
+      }
+    } catch (error) {
+      console.error('Error loading existing estimate:', error)
+      showToast.error('Failed to load existing estimate')
     }
   }
 
   const loadAvailablePhotos = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('job_photos')
-        .select('id, file_url, description, photo_type')
-        .eq('job_id', jobId)
-        .order('taken_at', { ascending: false })
+    if (!effectiveLeadId) {
+      setAvailablePhotos([])
+      return
+    }
 
-      if (error) throw error
-      
-      const photos: JobPhoto[] = (data || []).map(photo => ({
-        ...photo,
-        selected: false,
-        userNote: ''
-      }))
-      
-      setAvailablePhotos(photos)
+    try {
+      // First try to load photos directly associated with the lead
+      const { data: leadPhotos, error: leadPhotosError } = await supabase
+        .from('job_photos')
+        .select('*')
+        .eq('lead_id', effectiveLeadId)
+        .order('created_at', { ascending: false })
+
+      if (!leadPhotosError && leadPhotos && leadPhotos.length > 0) {
+        setAvailablePhotos(leadPhotos.map(photo => ({
+          ...photo,
+          selected: false,
+          userNote: ''
+        })))
+        return
+      }
+
+
+      // Finally, check if the lead has been converted to a job
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select('converted_to_job_id')
+        .eq('id', effectiveLeadId)
+        .single()
+
+      if (!leadError && leadData?.converted_to_job_id) {
+        // Load photos associated with the job
+        const { data: jobPhotos, error: jobPhotosError } = await supabase
+          .from('job_photos')
+          .select('*')
+          .eq('job_id', leadData.converted_to_job_id)
+          .order('created_at', { ascending: false })
+
+        if (!jobPhotosError && jobPhotos && jobPhotos.length > 0) {
+          setAvailablePhotos(jobPhotos.map(photo => ({
+            ...photo,
+            selected: false,
+            userNote: ''
+          })))
+          return
+        }
+      }
+
+      // No photos found anywhere
+      setAvailablePhotos([])
     } catch (error) {
       console.error('Error loading photos:', error)
-      showToast.error('Failed to load photos')
+      // Don't show error toast if it's just a missing column error during migration
+      if (error && typeof error === 'object' && 'code' in error && error.code !== '42703') {
+        showToast.error('Failed to load photos')
+      }
+      setAvailablePhotos([])
     }
   }
 
@@ -165,20 +380,20 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
     onClose()
   }
 
-  // Helper function to extract service type from job data
+  // Helper function to extract service type from lead data
   const getServiceType = () => {
-    if (!jobDetails) return 'general'
+    if (!leadDetails) return 'general'
     
-    // Extract service type from job title or description
-    const jobText = `${jobDetails.title || ''} ${jobDetails.description || ''}`.toLowerCase()
+    // Extract service type from lead title, description, or service_type
+    const leadText = `${leadDetails.title || ''} ${leadDetails.description || ''} ${leadDetails.service_type || ''}`.toLowerCase()
     
-    if (jobText.includes('electrical') || jobText.includes('electric') || jobText.includes('wiring')) return 'electrical'
-    if (jobText.includes('hvac') || jobText.includes('heating') || jobText.includes('cooling') || jobText.includes('air conditioning')) return 'hvac'
-    if (jobText.includes('plumbing') || jobText.includes('pipe') || jobText.includes('water') || jobText.includes('sewer')) return 'plumbing'
-    if (jobText.includes('roof') || jobText.includes('shingle') || jobText.includes('gutter')) return 'roofing'
-    if (jobText.includes('flooring') || jobText.includes('carpet') || jobText.includes('tile')) return 'flooring'
-    if (jobText.includes('painting') || jobText.includes('paint')) return 'painting'
-    if (jobText.includes('concrete') || jobText.includes('driveway') || jobText.includes('foundation')) return 'concrete'
+    if (leadText.includes('electrical') || leadText.includes('electric') || leadText.includes('wiring')) return 'electrical'
+    if (leadText.includes('hvac') || leadText.includes('heating') || leadText.includes('cooling') || leadText.includes('air conditioning')) return 'hvac'
+    if (leadText.includes('plumbing') || leadText.includes('pipe') || leadText.includes('water') || leadText.includes('sewer')) return 'plumbing'
+    if (leadText.includes('roof') || leadText.includes('shingle') || leadText.includes('gutter')) return 'roofing'
+    if (leadText.includes('flooring') || leadText.includes('carpet') || leadText.includes('tile')) return 'flooring'
+    if (leadText.includes('painting') || leadText.includes('paint')) return 'painting'
+    if (leadText.includes('concrete') || leadText.includes('driveway') || leadText.includes('foundation')) return 'concrete'
     
     return 'general'
   }
@@ -210,10 +425,10 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
         body: {
           photoUrls,
           photoNotes,
-          jobDetails: {
-            title: jobDetails?.title || '',
-            description: jobDetails?.description || '',
-            location: `${jobDetails?.location_city || ''}, ${jobDetails?.location_state || ''}`,
+          leadDetails: {
+            title: leadDetails?.title || '',
+            description: leadDetails?.description || '',
+            location: `${leadDetails?.location_city || ''}, ${leadDetails?.location_state || ''}`,
             serviceType: serviceType
           }
         }
@@ -270,10 +485,10 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
           damage_bullets: damageBullets,
           jobMeta: {
             serviceType: serviceType,
-            propertyAge: 25, // Could be extracted from job details
-            location: `${jobDetails?.location_city || ''}, ${jobDetails?.location_state || ''}`,
-            jobTitle: jobDetails?.title || '',
-            jobDescription: jobDetails?.description || ''
+            propertyAge: 25, // Could be extracted from lead details
+            location: `${leadDetails?.location_city || ''}, ${leadDetails?.location_state || ''}`,
+            jobTitle: leadDetails?.title || '',
+            jobDescription: leadDetails?.description || ''
           }
         }
       })
@@ -333,17 +548,17 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
           targetPrices: customTotals, // Pass custom price targets
           jobMeta: {
             serviceType: serviceType,
-            location: `${jobDetails?.location_city || ''}, ${jobDetails?.location_state || ''}`,
+            location: `${leadDetails?.location_city || ''}, ${leadDetails?.location_state || ''}`,
             complexity: 'standard',
-            jobTitle: jobDetails?.title || '',
-            jobDescription: jobDetails?.description || '',
-            customerName: jobDetails?.accounts?.name || 
-                          (jobDetails?.contacts ? (
-                            jobDetails.contacts.name || 
-                            `${jobDetails.contacts.first_name || ''} ${jobDetails.contacts.last_name || ''}`.trim()
+            jobTitle: leadDetails?.title || '',
+            jobDescription: leadDetails?.description || '',
+            customerName: leadDetails?.accounts?.name || 
+                          (leadDetails?.contacts ? (
+                            leadDetails.contacts.name || 
+                            `${leadDetails.contacts.first_name || ''} ${leadDetails.contacts.last_name || ''}`.trim()
                           ) : '') || 
                           '',
-            propertyAddress: jobDetails?.location_address || ''
+            propertyAddress: leadDetails?.location_address || ''
           }
         }
       })
@@ -550,41 +765,41 @@ export const CreateEstimateModal: React.FC<CreateEstimateModalProps> = ({
   }
 
   const generateAIPricing = async (templateName: string) => {
-    if (!jobDetails) return
+    if (!leadDetails) return
 
     setAiGenerating(true)
     showToast.loading('AI is analyzing photos and job details...')
 
     try {
-      // First, get photos for this job
+      // First, get photos for this lead
       const { data: photos, error: photosError } = await supabase
         .from('job_photos')
         .select('file_url, description, photo_type')
-        .eq('job_id', jobId)
+        .eq('lead_id', effectiveLeadId)
         .order('created_at', { ascending: false })
 
       if (photosError) throw photosError
 
       console.log('🔍 Found photos for analysis:', photos?.length || 0)
       console.log('📷 Photo URLs:', photos?.map(p => p.file_url))
-      console.log('📋 Job details for AI:', {
-        title: jobDetails.title,
-        description: jobDetails.description,
+      console.log('📋 Lead details for AI:', {
+        title: leadDetails.title,
+        description: leadDetails.description,
         serviceType: templateName
       })
       
       // Use Supabase Edge Function for comprehensive AI analysis with photos
       const { data, error } = await supabase.functions.invoke('generate-estimate', {
         body: {
-          jobId,
+          leadId: effectiveLeadId,
           analysisType: 'comprehensive_pricing',
-          jobDetails: {
-            title: jobDetails.title,
-            description: jobDetails.description,
+          leadDetails: {
+            title: leadDetails.title,
+            description: leadDetails.description,
             serviceType: templateName,
-            location: `${jobDetails.location_city}, ${jobDetails.location_state}`,
-            estimatedCost: jobDetails.estimated_cost,
-            notes: jobDetails.notes
+            location: `${leadDetails.location_city}, ${leadDetails.location_state}`,
+            estimatedCost: leadDetails.estimated_cost,
+            notes: leadDetails.notes
           },
           photoUrls: photos?.map(p => p.file_url) || [],
           photoDescriptions: photos?.map(p => ({ 
@@ -721,9 +936,14 @@ if (data?.narrative) {
     setCurrentStep(2)
   }
 
-  const createEstimate = async () => {
-    if (!jobDetails) {
-      showToast.error('Job details not loaded')
+  const createEstimate = async (action: 'draft' | 'send' = 'draft') => {
+    if (!leadDetails) {
+      showToast.error('Lead details not loaded')
+      return
+    }
+
+    if (!effectiveLeadId) {
+      showToast.error('No lead ID available')
       return
     }
 
@@ -733,19 +953,23 @@ if (data?.narrative) {
       const selectedTierData = estimateTiers.find(t => t.tier_name === selectedTier)
       const selectedTierTotal = customTotals[selectedTier] || selectedTierData?.total_amount || 0
 
-      // Create main estimate record
+      // Determine estimate status based on action
+      const estimateStatus = action === 'send' ? 'sent' : 'draft'
+
+      // Create main estimate record with versioning
       const { data: estimate, error: estimateError } = await supabase
         .from('estimates')
         .insert({
-          account_id: jobDetails.account_id,
+          lead_id: effectiveLeadId,
           tenant_id: userProfile?.tenant_id,
           estimate_number: `EST-${Date.now().toString().slice(-6)}`,
-          project_title: `Estimate for ${jobDetails.title}`,
+          project_title: `Estimate for ${leadDetails.title}`,
           description: estimateNotes,
           total_amount: selectedTierTotal,
           selected_tier: selectedTier.toLowerCase(),
-          status: 'draft',
-          // show_line_item_pricing: showLineItemPricing, // TODO: Add this column to database first
+          status: estimateStatus,
+          version: currentEstimateVersion,
+          valid_until: new Date(Date.now() + (30 * 24 * 60 * 60 * 1000)).toISOString(),
           created_at: new Date().toISOString()
         })
         .select()
@@ -827,18 +1051,89 @@ if (data?.narrative) {
         }
       }
 
-      // Log the estimate creation activity
-      if (userProfile?.tenant_id && userProfile?.id) {
-        await jobActivityService.logEstimateCreated(
-          jobId,
-          userProfile.tenant_id,
-          userProfile.id,
-          estimate.id,
-          selectedTierTotal
-        )
+      // Update lead's active_estimate_id to point to the latest version
+      if (estimateStatus === 'draft' || estimateStatus === 'sent') {
+        await supabase
+          .from('leads')
+          .update({ active_estimate_id: estimate.id })
+          .eq('id', effectiveLeadId)
       }
 
-      showToast.success('Estimate created successfully!')
+      // Log the estimate creation activity
+      if (userProfile?.tenant_id && userProfile?.id) {
+        await jobActivityService.logActivity({
+          leadId: effectiveLeadId,
+          tenantId: userProfile.tenant_id,
+          userId: userProfile.id,
+          activityType: mode === 'revise' ? 'estimate_revised' : 'estimate_created',
+          title: mode === 'revise' ? 'Estimate Revised' : 'Estimate Created',
+          description: `${mode === 'revise' ? 'Revised' : 'Created'} estimate v${currentEstimateVersion} for ${selectedTierTotal}`,
+          metadata: {
+            estimate_id: estimate.id,
+            version: currentEstimateVersion,
+            selected_tier: selectedTier,
+            total_amount: selectedTierTotal,
+            action: action
+          }
+        })
+      }
+
+      // Update Customer Journey Store
+      const estimateData: EstimateSchema = {
+        id: estimate.id,
+        lead_id: effectiveLeadId,
+        number: estimate.estimate_number,
+        line_items: estimateTiers.find(t => t.tier_name === selectedTier)?.line_items?.map(item => ({
+          title: item.description,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total: item.total_price || (item.quantity * item.unit_price)
+        })) || [],
+        subtotal: selectedTierTotal,
+        tax_rate: 0,
+        tax_amount: 0,
+        total: selectedTierTotal,
+        valid_until: estimate.valid_until,
+        status: estimateStatus as 'draft' | 'sent' | 'viewed' | 'approved' | 'rejected',
+        created_at: estimate.created_at
+      }
+      
+      setEstimate(estimateData)
+      
+      // Emit appropriate events for journey tracking
+      if (mode === 'revise') {
+        journeyEventBus.emit(JOURNEY_EVENTS.ESTIMATE_CREATED, {
+          estimate: estimateData,
+          version: currentEstimateVersion,
+          action: 'revised'
+        })
+      } else {
+        journeyEventBus.emit(JOURNEY_EVENTS.ESTIMATE_CREATED, {
+          estimate: estimateData,
+          selectedTier: selectedTier,
+          totalAmount: selectedTierTotal
+        })
+      }
+
+      trackAction(mode === 'revise' ? 'estimate_revised_successfully' : 'estimate_created_successfully')
+      
+      // Handle journey step progression
+      if (estimateStatus === 'draft') {
+        // Stay on current step for drafts
+        const successMessage = mode === 'revise' 
+          ? `Estimate v${currentEstimateVersion} saved as draft!`
+          : 'Estimate saved as draft!'
+        showToast.success(successMessage)
+      } else {
+        // Auto-advance step when estimate is sent
+        completeCurrentStep()
+        const successMessage = mode === 'revise'
+          ? `Estimate v${currentEstimateVersion} sent to customer!`
+          : 'Estimate sent to customer!'
+        showToast.success(successMessage)
+      }
+      
       onEstimateCreated(estimate.id)
       setCurrentStep(3) // Show completion step
 
@@ -852,45 +1147,351 @@ if (data?.narrative) {
   if (!isOpen) return null
 
   return (
-    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
-      <div className="modal-dialog modal-fullscreen">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h3 className="modal-title">
-              <KTIcon iconName="document" className="fs-2 text-primary me-3" />
-              Create Estimate - {jobDetails?.title}
-            </h3>
-            <button type="button" className="btn-close" onClick={handleClose}></button>
+    <>
+      <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+        <div className="modal-dialog modal-fullscreen">
+          <div className="modal-content">
+          <div className="modal-header bg-success">
+            <h5 className="modal-title text-white">
+              <KTIcon iconName="document" className="fs-2 text-white me-2" />
+              {mode === 'revise' 
+                ? `Revise Estimate v${currentEstimateVersion} - ${leadDetails?.title || 'New Estimate'}`
+                : `Create Estimate - ${leadDetails?.title || 'New Estimate'}`
+              }
+            </h5>
+            <button type="button" className="btn-close btn-close-white" onClick={handleClose}></button>
           </div>
 
           <div className="modal-body">
+            {/* Lead Information Card */}
+            {(lead || leadDetails) && (
+              <div className="alert alert-light-primary d-flex align-items-center p-5 mb-5">
+                <KTIcon iconName="profile-user" className="fs-2hx text-primary me-4" />
+                <div className="d-flex flex-column">
+                  <h4 className="mb-1 text-primary">Creating Estimate For:</h4>
+                  <div className="fs-6 text-gray-800">
+                    <strong>{lead?.name || leadDetails?.name || leadDetails?.title || 'Customer'}</strong>
+                    {(lead?.service_type || leadDetails?.service_type) && (
+                      <span className="text-gray-600 ms-2">• {lead?.service_type || leadDetails?.service_type}</span>
+                    )}
+                    {(lead?.phone_number || leadDetails?.phone) && (
+                      <span className="text-gray-600 d-block mt-1">
+                        <KTIcon iconName="phone" className="fs-6 me-1" />
+                        {lead?.phone_number || leadDetails?.phone}
+                      </span>
+                    )}
+                    {(lead?.full_address || leadDetails?.location_address) && (
+                      <span className="text-gray-600 d-block mt-1">
+                        <KTIcon iconName="geolocation" className="fs-6 me-1" />
+                        {lead?.full_address || leadDetails?.location_address}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Journey Progress */}
+            <StepTrackerMini className="mb-5" />
             {/* Progress Indicator */}
             <div className="d-flex justify-content-center mb-6">
               <div className="d-flex align-items-center">
-                <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${currentStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
-                  {currentStep > 1 ? <KTIcon iconName="check" className="fs-6" /> : '1'}
+                <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${currentStep >= 0 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
+                  {currentStep > 0 ? <KTIcon iconName="check" className="fs-6" /> : '1'}
                 </div>
-                <span className={`me-3 ${currentStep >= 1 ? 'text-primary' : 'text-muted'}`}>Choose Template</span>
+                <span className={`me-3 ${currentStep >= 0 ? 'text-primary' : 'text-muted'}`}>Choose Method</span>
+                
+                <div className={`border-top ${currentStep >= 1 ? 'border-primary' : 'border-muted'}`} style={{ width: '60px', height: '2px' }}></div>
+                
+                <div className={`rounded-circle d-flex align-items-center justify-content-center mx-3 ${currentStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
+                  {currentStep > 1 ? <KTIcon iconName="check" className="fs-6" /> : '2'}
+                </div>
+                <span className={`me-3 ${currentStep >= 1 ? 'text-primary' : 'text-muted'}`}>
+                  {estimateMethod === 'ai' ? 'Select Photos' : 'Build Estimate'}
+                </span>
                 
                 <div className={`border-top ${currentStep >= 2 ? 'border-primary' : 'border-muted'}`} style={{ width: '60px', height: '2px' }}></div>
                 
                 <div className={`rounded-circle d-flex align-items-center justify-content-center mx-3 ${currentStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
-                  {currentStep > 2 ? <KTIcon iconName="check" className="fs-6" /> : '2'}
+                  {currentStep > 2 ? <KTIcon iconName="check" className="fs-6" /> : '3'}
                 </div>
-                <span className={`me-3 ${currentStep >= 2 ? 'text-primary' : 'text-muted'}`}>Build Estimate</span>
+                <span className={`me-3 ${currentStep >= 2 ? 'text-primary' : 'text-muted'}`}>
+                  {estimateMethod === 'ai' ? 'AI Analysis' : 'Review & Send'}
+                </span>
                 
                 <div className={`border-top ${currentStep >= 3 ? 'border-primary' : 'border-muted'}`} style={{ width: '60px', height: '2px' }}></div>
                 
                 <div className={`rounded-circle d-flex align-items-center justify-content-center mx-3 ${currentStep >= 3 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
-                  3
+                  {currentStep > 3 ? <KTIcon iconName="check" className="fs-6" /> : '4'}
                 </div>
-                <span className={`${currentStep >= 3 ? 'text-primary' : 'text-muted'}`}>Present to Customer</span>
+                <span className={`${currentStep >= 3 ? 'text-primary' : 'text-muted'}`}>Review & Send</span>
               </div>
             </div>
 
-            {/* Step 1: 3-Stage AI Pipeline */}
-            {currentStep === 1 && (
+            {/* Step 0: Method Selection */}
+            {currentStep === 0 && (
               <div>
+                <div className="text-center mb-8">
+                  <h4 className="mb-3">Choose Your Estimate Method</h4>
+                  <p className="text-muted">Select how you'd like to create your estimate</p>
+                </div>
+
+                <div className="row g-6 mb-8">
+                  {/* AI-Powered */}
+                  <div className="col-md-4">
+                    <div className="card h-100 hover-elevate-up">
+                      <div className="card-body text-center">
+                        <div className="mb-4 text-primary">
+                          <KTIcon iconName="technology" className="fs-3x" />
+                        </div>
+                        <h5 className="mb-3">AI-Powered</h5>
+                        <p className="text-muted small mb-4">
+                          Upload photos and let AI analyze damage, generate repairs, and create pricing
+                        </p>
+                        <div className="text-start mb-4">
+                          <div className="d-flex align-items-center mb-2">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Photo-based damage analysis</small>
+                          </div>
+                          <div className="d-flex align-items-center mb-2">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Automated scope generation</small>
+                          </div>
+                          <div className="d-flex align-items-center">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Smart pricing suggestions</small>
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-primary w-100"
+                          onClick={async () => {
+                            setEstimateMethod('ai')
+                            trackAction('estimate_method_selected:ai')
+                            // Load photos before proceeding
+                            await loadAvailablePhotos()
+                            setCurrentStep(1)
+                          }}
+                        >
+                          Use AI Assistant
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Template Based */}
+                  <div className="col-md-4">
+                    <div className="card h-100 hover-elevate-up">
+                      <div className="card-body text-center">
+                        <div className="mb-4 text-info">
+                          <KTIcon iconName="element-11" className="fs-3x" />
+                        </div>
+                        <h5 className="mb-3">Quick Templates</h5>
+                        <p className="text-muted small mb-4">
+                          Choose from pre-built templates for common services and customize as needed
+                        </p>
+                        <div className="text-start mb-4">
+                          <div className="d-flex align-items-center mb-2">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Industry-standard pricing</small>
+                          </div>
+                          <div className="d-flex align-items-center mb-2">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Customizable line items</small>
+                          </div>
+                          <div className="d-flex align-items-center">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Fast estimate creation</small>
+                          </div>
+                        </div>
+                        <button
+                          className="btn btn-info w-100"
+                          onClick={() => {
+                            setEstimateMethod('template')
+                            setCurrentStep(2) // Skip to template selection
+                            trackAction('estimate_method_selected:template')
+                          }}
+                        >
+                          Use Templates
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Manual Form */}
+                  <div className="col-md-4">
+                    <div className="card h-100 hover-elevate-up">
+                      <div className="card-body text-center">
+                        <div className="mb-4 text-success">
+                          <KTIcon iconName="notepad-edit" className="fs-3x" />
+                        </div>
+                        <h5 className="mb-3">Manual Entry</h5>
+                        <p className="text-muted small mb-4">
+                          Complete control with our comprehensive estimate form for complex projects
+                        </p>
+                        <div className="text-start mb-4">
+                          <div className="d-flex align-items-center mb-2">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Full customization</small>
+                          </div>
+                          <div className="d-flex align-items-center mb-2">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Detailed line items</small>
+                          </div>
+                          <div className="d-flex align-items-center">
+                            <KTIcon iconName="check-circle" className="fs-6 text-success me-2" />
+                            <small>Advanced pricing options</small>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-success w-100"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            console.log('Manual entry button clicked')
+                            trackAction('estimate_method_selected:manual')
+                            setEstimateMethod('manual')
+                            setShowManualForm(true)
+                          }}
+                        >
+                          Manual Entry
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Activity */}
+                {existingEstimate && (
+                  <div className="alert alert-info d-flex align-items-center">
+                    <KTIcon iconName="information" className="fs-2 me-3" />
+                    <div>
+                      <strong>Previous Estimate Found</strong>
+                      <p className="mb-0 text-muted">
+                        Version {existingEstimate.version || 1} created on {new Date(existingEstimate.created_at).toLocaleDateString()}
+                        {' - '}${existingEstimate.total_amount?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 1: Photo Selection for AI */}
+            {currentStep === 1 && estimateMethod === 'ai' && (
+              <div>
+                <div className="text-center mb-8">
+                  <h4 className="mb-3">📸 Select Photos for AI Analysis</h4>
+                  <p className="text-muted">Choose the photos you want the AI to analyze for damage assessment</p>
+                </div>
+
+                {availablePhotos.length === 0 ? (
+                  <div className="text-center py-5">
+                    <KTIcon iconName="picture" className="fs-3x text-muted mb-4" />
+                    <h5 className="text-muted">No Photos Available</h5>
+                    <p className="text-muted mb-4">No photos have been uploaded for this lead yet.</p>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        // TODO: Open photo upload modal
+                        showToast.info('Photo upload feature coming soon')
+                      }}
+                    >
+                      <KTIcon iconName="cloud-add" className="fs-4 me-2" />
+                      Upload Photos
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="row g-4 mb-6">
+                      {availablePhotos.map(photo => (
+                        <div key={photo.id} className="col-md-4 col-lg-3">
+                          <div 
+                            className={`card cursor-pointer h-100 ${photo.selected ? 'border-primary shadow-sm' : 'border-gray-300'}`}
+                            onClick={() => togglePhotoSelection(photo.id)}
+                          >
+                            <div className="position-relative">
+                              <img 
+                                src={photo.file_url} 
+                                alt={photo.description}
+                                className="card-img-top"
+                                style={{ height: '200px', objectFit: 'cover' }}
+                              />
+                              {photo.selected && (
+                                <div className="position-absolute top-0 end-0 m-3">
+                                  <div className="btn btn-sm btn-primary rounded-circle">
+                                    <KTIcon iconName="check" className="fs-6" />
+                                  </div>
+                                </div>
+                              )}
+                              <div className="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-50 text-white p-2">
+                                <small>{photo.photo_type || 'General'}</small>
+                              </div>
+                            </div>
+                            <div className="card-body">
+                              <p className="text-muted small mb-2">{photo.description || 'No description'}</p>
+                              {photo.selected && (
+                                <textarea
+                                  className="form-control form-control-sm"
+                                  placeholder="Add notes about what to analyze in this photo..."
+                                  value={photo.userNote || ''}
+                                  onChange={(e) => {
+                                    e.stopPropagation()
+                                    updatePhotoNote(photo.id, e.target.value)
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  rows={2}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Selection Summary */}
+                    <div className="d-flex justify-content-between align-items-center p-4 bg-light rounded">
+                      <div>
+                        <h6 className="mb-0">
+                          {availablePhotos.filter(p => p.selected).length} of {availablePhotos.length} photos selected
+                        </h6>
+                        <small className="text-muted">
+                          {availablePhotos.filter(p => p.selected).length === 0 
+                            ? 'Select at least one photo to continue'
+                            : 'AI will analyze the selected photos for damage and repairs'
+                          }
+                        </small>
+                      </div>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setCurrentStep(2)}
+                        disabled={availablePhotos.filter(p => p.selected).length === 0}
+                      >
+                        Continue to AI Analysis
+                        <KTIcon iconName="arrow-right" className="fs-4 ms-2" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Step 2: 3-Stage AI Pipeline */}
+            {currentStep === 2 && estimateMethod === 'ai' && (
+              <div>
+                {/* Lead Info Banner */}
+                {lead && (
+                  <div className="alert alert-primary d-flex align-items-center mb-6">
+                    <KTIcon iconName="user" className="fs-2 me-3" />
+                    <div>
+                      <h6 className="mb-0">Creating estimate for: <strong>{lead.name}</strong></h6>
+                      <p className="mb-0 text-muted small">
+                        {lead.service_type} • {lead.contact?.phone || 'No phone'} • {lead.urgency} priority
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Pipeline Header */}
                 <div className="text-center mb-8">
                   <h4 className="mb-3">🤖 AI-Powered Estimate Builder</h4>
@@ -921,8 +1522,8 @@ if (data?.narrative) {
 
                         <button
                           className="btn btn-primary btn-sm w-100"
-                          onClick={() => setShowPhotoSelector(true)}
-                          disabled={aiGenerating || availablePhotos.length === 0}
+                          onClick={runStage1AnalyzeDamage}
+                          disabled={aiGenerating || availablePhotos.filter(p => p.selected).length === 0}
                         >
                           {aiStage === 's1' ? (
                             <>
@@ -1224,127 +1825,80 @@ if (data?.narrative) {
                   </div>
                 </div>
 
-                {/* Photo Selector Modal */}
-                {showPhotoSelector && (
-                  <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1070 }}>
-                    <div className="modal-dialog modal-lg">
-                      <div className="modal-content">
-                        <div className="modal-header">
-                          <h5 className="modal-title">📸 Select Photos for Analysis</h5>
-                          <button 
-                            type="button" 
-                            className="btn-close" 
-                            onClick={() => setShowPhotoSelector(false)}
-                          ></button>
-                        </div>
-                        <div className="modal-body">
-                          {availablePhotos.length === 0 ? (
-                            <div className="text-center py-4">
-                              <KTIcon iconName="picture" className="fs-2x text-muted mb-3" />
-                              <p className="text-muted">No photos available for this job</p>
-                            </div>
-                          ) : (
-                            <div className="row g-3">
-                              {availablePhotos.map(photo => (
-                                <div key={photo.id} className="col-md-6">
-                                  <div className={`card cursor-pointer ${photo.selected ? 'border-primary bg-light-primary' : ''}`} 
-                                       onClick={() => togglePhotoSelection(photo.id)}>
-                                    <div className="position-relative">
-                                      <img 
-                                        src={photo.file_url} 
-                                        alt={photo.description}
-                                        className="card-img-top"
-                                        style={{ height: '150px', objectFit: 'cover' }}
-                                      />
-                                      {photo.selected && (
-                                        <div className="position-absolute top-0 end-0 m-2">
-                                          <div className="badge badge-primary">
-                                            <KTIcon iconName="check" className="fs-8" />
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="card-body p-3">
-                                      <small className="text-muted d-block mb-2">{photo.photo_type}</small>
-                                      <small>{photo.description || 'No description'}</small>
-                                      {photo.selected && (
-                                        <textarea
-                                          className="form-control form-control-sm mt-2"
-                                          placeholder="Add analysis notes..."
-                                          value={photo.userNote}
-                                          onChange={(e) => {
-                                            e.stopPropagation()
-                                            updatePhotoNote(photo.id, e.target.value)
-                                          }}
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="modal-footer">
-                          <div className="d-flex justify-content-between w-100">
-                            <span className="text-muted">
-                              {availablePhotos.filter(p => p.selected).length} photos selected
-                            </span>
-                            <div>
-                              <button 
-                                type="button" 
-                                className="btn btn-light me-2" 
-                                onClick={() => setShowPhotoSelector(false)}
-                              >
-                                Cancel
-                              </button>
-                              <button 
-                                type="button" 
-                                className="btn btn-primary"
-                                onClick={() => {
-                                  setShowPhotoSelector(false)
-                                  runStage1AnalyzeDamage()
-                                }}
-                                disabled={availablePhotos.filter(p => p.selected).length === 0}
-                              >
-                                Analyze Selected Photos
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Step 2: Build Good, Better, Best */}
-            {currentStep === 2 && (
+            {/* Step 2: Template Selection (for template method) */}
+            {currentStep === 2 && estimateMethod === 'template' && (
               <div>
-                {/* Job Info Header */}
-                {jobDetails && (
+                {/* Lead Info Banner */}
+                {lead && (
+                  <div className="alert alert-primary d-flex align-items-center mb-6">
+                    <KTIcon iconName="user" className="fs-2 me-3" />
+                    <div>
+                      <h6 className="mb-0">Creating estimate for: <strong>{lead.name}</strong></h6>
+                      <p className="mb-0 text-muted small">
+                        {lead.service_type} • {lead.contact?.phone || 'No phone'} • {lead.urgency} priority
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-center mb-8">
+                  <h4 className="mb-3">Select an Estimate Template</h4>
+                  <p className="text-muted">Choose a template that matches your service type</p>
+                </div>
+
+                <div className="row g-4 mb-6">
+                  {[
+                    { id: 'hvac_repair', name: 'HVAC Repair', icon: 'thermometer', price: '$350-$1,200' },
+                    { id: 'plumbing_repair', name: 'Plumbing Repair', icon: 'drop', price: '$250-$800' },
+                    { id: 'electrical_repair', name: 'Electrical Repair', icon: 'electricity', price: '$200-$600' },
+                    { id: 'general_maintenance', name: 'General Maintenance', icon: 'wrench', price: '$150-$500' }
+                  ].map(template => (
+                    <div key={template.id} className="col-md-3">
+                      <div className="card h-100 hover-elevate-up cursor-pointer" 
+                           onClick={() => {
+                             applyQuickTemplate(template.id)
+                             setCurrentStep(3) // Move to review
+                           }}>
+                        <div className="card-body text-center">
+                          <KTIcon iconName={template.icon} className="fs-3x text-primary mb-3" />
+                          <h6>{template.name}</h6>
+                          <p className="text-muted small mb-0">{template.price}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Review & Send (Final Step) */}
+            {currentStep === 3 && (
+              <div>
+                {/* Lead Info Header */}
+                {leadDetails && (
                   <div className="card mb-6">
                     <div className="card-body">
                       <div className="row">
                         <div className="col-md-6">
-                          <h5>{jobDetails.accounts?.name || 
-                              (jobDetails.contacts ? (
-                                jobDetails.contacts.name || 
-                                `${jobDetails.contacts.first_name || ''} ${jobDetails.contacts.last_name || ''}`.trim()
+                          <h5>{leadDetails.accounts?.name || 
+                              (leadDetails.contacts ? (
+                                leadDetails.contacts.name || 
+                                `${leadDetails.contacts.first_name || ''} ${leadDetails.contacts.last_name || ''}`.trim()
                               ) : '') || 
                               'Unknown Client'}</h5>
                           <p className="text-muted mb-0">
-                            {jobDetails.accounts?.address_line1}<br/>
-                            {jobDetails.accounts?.city}, {jobDetails.accounts?.state} {jobDetails.accounts?.zip_code}
+                            {leadDetails.location_address || 'No address provided'}<br/>
+                            {leadDetails.location_city}, {leadDetails.location_state}
                           </p>
                         </div>
                         <div className="col-md-6 text-end">
                           <p className="mb-0">
-                            <strong>Contact:</strong> {jobDetails.contacts?.first_name} {jobDetails.contacts?.last_name}<br/>
-                            <strong>Phone:</strong> {jobDetails.contacts?.phone}<br/>
-                            <strong>Email:</strong> {jobDetails.contacts?.email}
+                            <strong>Contact:</strong> {leadDetails.contacts?.first_name} {leadDetails.contacts?.last_name}<br/>
+                            <strong>Phone:</strong> {leadDetails.contacts?.phone}<br/>
+                            <strong>Email:</strong> {leadDetails.contacts?.email}
                           </p>
                         </div>
                       </div>
@@ -1358,7 +1912,7 @@ if (data?.narrative) {
       className="card-body"
       style={{ whiteSpace: 'pre-wrap' }}
       dangerouslySetInnerHTML={{ 
-        __html: typeof marked === 'function' 
+        __html: marked && typeof marked === 'function' 
           ? marked(aiNarrative) as string
           : aiNarrative 
       }}
@@ -1573,22 +2127,88 @@ if (data?.narrative) {
               </button>
               
               {currentStep === 2 && (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={createEstimate}
-                  disabled={loading || !Array.isArray(estimateTiers) || estimateTiers.every(t => t.line_items && t.line_items.length === 0)}
-                >
-                  {loading && <span className="spinner-border spinner-border-sm me-2" />}
-                  <KTIcon iconName="check" className="fs-6 me-1" />
-                  Create Estimate
-                </button>
+                <div className="d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-light"
+                    onClick={() => createEstimate('draft')}
+                    disabled={loading}
+                  >
+                    {loading && <span className="spinner-border spinner-border-sm me-2" />}
+                    <KTIcon iconName="save" className="fs-6 me-1" />
+                    Save as Draft
+                  </button>
+                  
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => createEstimate('send')}
+                    disabled={loading || !Array.isArray(estimateTiers) || estimateTiers.every(t => t.line_items && t.line_items.length === 0)}
+                  >
+                    {loading && <span className="spinner-border spinner-border-sm me-2" />}
+                    <KTIcon iconName="send" className="fs-6 me-1" />
+                    {mode === 'revise' ? `Send v${currentEstimateVersion}` : 'Send to Customer'}
+                  </button>
+                </div>
               )}
             </div>
           )}
         </div>
       </div>
     </div>
+
+    {/* Manual Estimate Form Modal */}
+    {showManualForm && (
+      <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.7)', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1080 }}>
+        <div className="modal-dialog modal-fullscreen" style={{ margin: 0 }}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Create Manual Estimate</h5>
+              <button 
+                type="button" 
+                className="btn-close" 
+                onClick={() => setShowManualForm(false)}
+              ></button>
+            </div>
+            <div className="modal-body">
+              {/* Lead Info Banner */}
+              {lead && (
+                <div className="alert alert-primary d-flex align-items-center mb-4">
+                  <KTIcon iconName="user" className="fs-2 me-3" />
+                  <div>
+                    <h6 className="mb-0">Creating estimate for: <strong>{lead.name}</strong></h6>
+                    <p className="mb-0 text-muted small">
+                      {lead.service_type} • {lead.contact?.phone || 'No phone'} • {lead.urgency} priority
+                    </p>
+                  </div>
+                </div>
+              )}
+              <EstimateForm
+                leadId={effectiveLeadId}
+                estimateContext="journey"
+                onSave={async (data) => {
+                  try {
+                    const result = await estimatesService.createEstimate(data)
+                    return result // Return the saved estimate with id
+                  } catch (error) {
+                    console.error('Error saving estimate:', error)
+                    showToast.error('Error saving estimate')
+                    throw error
+                  }
+                }}
+                onSuccess={(estimateId) => {
+                  setShowManualForm(false)
+                  onEstimateCreated(estimateId)
+                  handleClose()
+                }}
+                onCancel={() => setShowManualForm(false)}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 

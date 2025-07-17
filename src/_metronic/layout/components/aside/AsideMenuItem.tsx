@@ -1,7 +1,7 @@
 import {FC} from 'react'
 import clsx from 'clsx'
 import {Link} from 'react-router-dom'
-import {useLocation} from 'react-router'
+import {useLocation} from 'react-router-dom'
 import {checkIsActive, KTIcon, WithChildren} from '../../../helpers'
 import {useLayout} from '../../core'
 

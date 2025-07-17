@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { KTIcon } from '../../../_metronic/helpers'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
@@ -27,6 +27,16 @@ export const LeadConversionWidget: React.FC<LeadConversionWidgetProps> = ({
   const { userProfile, tenant } = useSupabaseAuth()
   const [converting, setConverting] = useState(false)
   const [showConfirmation, setShowConfirmation] = useState(false)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleConvertToAccount = async () => {
     if (!tenant?.id || !userProfile?.tenant_id) {
@@ -133,7 +143,7 @@ export const LeadConversionWidget: React.FC<LeadConversionWidgetProps> = ({
         })
 
       setShowConfirmation(true)
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         onConversionComplete()
       }, 2000)
 

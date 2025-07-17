@@ -5,9 +5,12 @@ import clsx from 'clsx'
 import { EstimateWithAccount, LineItem } from '../../../services/estimatesService'
 import PhotoCapture from '../../../components/shared/PhotoCapture'
 import { LineItemUploader } from '../../../components/estimates/LineItemUploader'
+import { StandaloneEstimateReminder } from '../../../components/estimates/StandaloneEstimateReminder'
 import { supabase } from '../../../../supabaseClient'
 import { useSupabaseAuth } from '../../../modules/auth/core/SupabaseAuth'
 import { showToast } from '../../../utils/toast'
+import { useCustomerJourneyStore } from '../../../stores/customerJourneyStore'
+import { config } from '../../../../lib/config'
 
 // LineItem interface is now imported from estimatesService
 
@@ -26,16 +29,36 @@ interface Account {
 }
 
 interface EstimateFormValues {
-  clientCustomer: string // Display name for client/customer
-  accountId: string
-  jobId: string // Changed from projectTitle to jobId
-  projectTitle: string // Auto-filled from selected job
+  estimateContext: 'journey' | 'job' | 'standalone' // How the estimate is being created
+  selectedLeadId?: string // For journey context
+  selectedJobId?: string // For change order context
+  selectedClientId?: string // For standalone context
+  projectTitle: string // Project title for the estimate
   description: string
   status: string
   lineItems: LineItem[]
   totalAmount: number
   validUntil: string
   notes: string
+  version: number // Version tracking for estimates
+}
+
+interface Lead {
+  id: string
+  name: string
+  caller_name?: string
+  service_type: string
+  phone_number?: string
+  email?: string
+  full_address?: string
+  notes?: string
+  urgency?: 'low' | 'medium' | 'high'
+  status: 'new' | 'qualified' | 'converted'
+  account_id?: string | null
+  contact_id?: string | null
+  contact_type?: 'residential' | 'business' | null
+  accounts?: { id: string; name: string } | null
+  contacts?: { id: string; first_name: string; last_name: string } | null
 }
 
 interface Job {
@@ -53,8 +76,11 @@ interface EstimateFormProps {
   estimate?: EstimateWithAccount | null
   onSave: (data: any) => void
   onCancel: () => void
-  jobId?: string // Optional job ID to filter photos for job-specific estimates
+  leadId?: string // Optional lead ID for lead-based estimates
+  jobId?: string // Optional job ID (only for approved estimates)
   accountId?: string // Optional account ID to filter photos for account-level estimates
+  estimateContext?: 'journey' | 'job' | 'standalone' // Optional context override
+  onSuccess?: (estimateId: string) => void // Optional success callback
 }
 
 const lineItemSchema = Yup.object().shape({
@@ -73,14 +99,30 @@ const lineItemSchema = Yup.object().shape({
 })
 
 const estimateSchema = Yup.object().shape({
-  clientCustomer: Yup.string()
-    .min(2, 'Minimum 2 characters')
-    .max(100, 'Maximum 100 characters')
-    .required('Client/Customer name is required'),
-  accountId: Yup.string()
-    .required('Client/Customer selection is required'),
-  jobId: Yup.string()
-    .required('Job selection is required'),
+  estimateContext: Yup.string()
+    .oneOf(['journey', 'job', 'standalone'])
+    .required('Please select how this estimate is being created'),
+  selectedLeadId: Yup.string()
+    .when('estimateContext', (estimateContext, schema) => {
+      const contextValue = Array.isArray(estimateContext) ? estimateContext[0] : estimateContext
+      return contextValue === 'journey' 
+        ? schema.required('Please select a lead')
+        : schema.nullable()
+    }),
+  selectedJobId: Yup.string()
+    .when('estimateContext', (estimateContext, schema) => {
+      const contextValue = Array.isArray(estimateContext) ? estimateContext[0] : estimateContext
+      return contextValue === 'job'
+        ? schema.required('Please select a job')
+        : schema.nullable()
+    }),
+  selectedClientId: Yup.string()
+    .when('estimateContext', (estimateContext, schema) => {
+      const contextValue = Array.isArray(estimateContext) ? estimateContext[0] : estimateContext
+      return contextValue === 'standalone'
+        ? schema.required('Please select a client')
+        : schema.nullable()
+    }),
   projectTitle: Yup.string()
     .min(2, 'Minimum 2 characters')
     .max(200, 'Maximum 200 characters')
@@ -89,7 +131,7 @@ const estimateSchema = Yup.object().shape({
     .max(1000, 'Maximum 1000 characters')
     .required('Description is required'),
   status: Yup.string()
-    .oneOf(['draft', 'sent', 'approved', 'rejected', 'expired'])
+    .oneOf(['draft', 'sent', 'revised', 'approved', 'rejected', 'expired'])
     .required('Status is required'),
   lineItems: Yup.array()
     .of(lineItemSchema)
@@ -100,6 +142,7 @@ const estimateSchema = Yup.object().shape({
     .min(new Date(new Date().setHours(0, 0, 0, 0)), 'Valid until date cannot be in the past')
     .required('Valid until date is required'),
   notes: Yup.string().max(1000, 'Maximum 1000 characters'),
+  version: Yup.number().min(1),
 })
 
 // Component to handle auto-calculation
@@ -116,7 +159,7 @@ const TotalCalculator: React.FC = () => {
   return null
 }
 
-export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, onCancel, jobId, accountId }) => {
+export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, onCancel, leadId: propLeadId, jobId, accountId, estimateContext: propEstimateContext, onSuccess }) => {
   const { userProfile } = useSupabaseAuth()
   const [loading, setLoading] = useState(false)
   const [photos, setPhotos] = useState<EstimatePhoto[]>([])
@@ -124,330 +167,259 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
   const [selectedPhotoType, setSelectedPhotoType] = useState<'general' | 'reference' | 'before' | 'after'>('general')
   const [availablePhotos, setAvailablePhotos] = useState<EstimatePhoto[]>([])
   const [showPhotoLibrary, setShowPhotoLibrary] = useState(false)
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [selectedAccountType, setSelectedAccountType] = useState<'business' | 'residential' | null>(
-    estimate ? (estimate.account_id ? 'business' : estimate.contact_id ? 'residential' : null) : null
-  )
-  const [availableJobs, setAvailableJobs] = useState<Job[]>([])
+  const [currentVersion, setCurrentVersion] = useState(1)
   
-  // Debug: log when availableJobs changes
-  useEffect(() => {
-    console.log('Available jobs updated:', availableJobs.length, 'jobs', availableJobs)
-  }, [availableJobs])
-  const [showNewJobForm, setShowNewJobForm] = useState(false)
-  const [newJobTitle, setNewJobTitle] = useState('')
-  const [creatingJob, setCreatingJob] = useState(false)
+  // Get journey context
+  const { lead, siteVisit, leadId: journeyLeadId, step } = useCustomerJourneyStore()
+  const effectiveLeadId = propLeadId || journeyLeadId || estimate?.lead_id
+  
+  // Determine smart default context based on how modal was opened
+  const getDefaultContext = (): 'journey' | 'job' | 'standalone' => {
+    if (propEstimateContext) return propEstimateContext
+    if (effectiveLeadId || lead) return 'journey'
+    if (jobId && !effectiveLeadId) return 'job'
+    return 'standalone'
+  }
+  
+  // Helper variables for UI display
+  const isChangeOrder = jobId && !effectiveLeadId
+  const isStandalone = !effectiveLeadId && !jobId
+  const isJourney = !!effectiveLeadId // Force rebuild
+  
+  // Form state
+  const [availableLeads, setAvailableLeads] = useState<Lead[]>([])
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  
+  // Selected context info
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+  const [selectedClient, setSelectedClient] = useState<Account | null>(null)
+  
   const [showLineItemUploader, setShowLineItemUploader] = useState(false)
+  
+  const getDefaultValidUntil = () => {
+    const date = new Date()
+    date.setDate(date.getDate() + 30) // 30 days validity
+    return date.toISOString().split('T')[0]
+  }
 
-  const formik = useFormik<EstimateFormValues>({
-    initialValues: {
-      clientCustomer: estimate?.accounts?.name || 
-                      (estimate?.contacts ? (
-                        estimate.contacts.name || 
-                        `${estimate.contacts.first_name || ''} ${estimate.contacts.last_name || ''}`.trim()
-                      ) : '') || 
-                      '',
-      accountId: estimate?.account_id || estimate?.contact_id || '',
-      jobId: jobId || estimate?.job_id || '', // Use provided jobId, or estimate's job_id, or empty
-      projectTitle: estimate?.project_title || '',
-      description: estimate?.description || '',
-      status: estimate?.status || 'draft',
-      lineItems: estimate?.lineItems && estimate.lineItems.length > 0 
-        ? estimate.lineItems 
-        : [{ description: '', quantity: 1, unit_price: 0 }],
-      totalAmount: estimate?.total_amount || 0,
-      validUntil: estimate?.valid_until ? estimate.valid_until.split('T')[0] : '',
-      notes: estimate?.notes || '',
-    },
-    validationSchema: estimateSchema,
-    onSubmit: async (values) => {
-      setLoading(true)
-      try {
-        // Determine if this is a business client (account) or residential client (contact)
-        const selectedAccount = accounts.find(acc => acc.id === values.accountId)
-        const isResidentialClient = selectedAccount?.type === 'residential'
+  // Define load functions before useFormik
+  const loadLeads = async () => {
+    if (!userProfile?.tenant_id) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          id,
+          name,
+          caller_name,
+          service_type,
+          phone_number,
+          email,
+          full_address,
+          notes,
+          urgency,
+          status,
+          account_id,
+          contact_id,
+          contact_type,
+          accounts:account_id(id, name),
+          contacts:contact_id(id, first_name, last_name)
+        `)
+        .eq('tenant_id', userProfile.tenant_id)
+        .in('status', ['new', 'qualified'])
+        .order('created_at', { ascending: false })
         
-        const submitData = {
-          account_id: isResidentialClient ? null : values.accountId,
-          contact_id: isResidentialClient ? values.accountId : null,  // Using accountId which contains the contact ID for residential
-          job_id: values.jobId, // Include the selected job ID
-          project_title: values.projectTitle,
-          description: values.description,
-          status: values.status,
-          total_amount: values.totalAmount,
-          valid_until: values.validUntil,
-          notes: values.notes,
-          lineItems: values.lineItems,
-        }
-        await onSave(submitData)
-      } catch (error) {
-        console.error('Error saving estimate:', error)
-      } finally {
-        setLoading(false)
-      }
-    },
-  })
-
-  // Load accounts only once when component mounts with tenant_id
-  useEffect(() => {
-    if (userProfile?.tenant_id) {
-      loadAccounts()
-    }
-  }, [userProfile?.tenant_id])
-
-  // Simple effect to load jobs when we have an estimate
-  useEffect(() => {
-    if (estimate && userProfile?.tenant_id) {
-      // Small delay to ensure component is mounted
-      const timer = setTimeout(() => {
-        console.log('Auto-loading jobs for estimate:', estimate.estimate_number)
-        if (estimate.account_id) {
-          loadJobsForAccount(estimate.account_id, 'business')
-        } else if (estimate.contact_id) {
-          loadJobsForAccount(estimate.contact_id, 'residential')
-        }
-      }, 100)
+      if (error) throw error
+      setAvailableLeads((data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        caller_name: item.caller_name,
+        service_type: item.service_type,
+        phone_number: item.phone_number,
+        email: item.email,
+        full_address: item.full_address,
+        notes: item.notes,
+        urgency: item.urgency,
+        status: item.status,
+        account_id: item.account_id,
+        contact_id: item.contact_id,
+        contact_type: item.contact_type,
+        accounts: Array.isArray(item.accounts) ? item.accounts[0] : item.accounts,
+        contacts: Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+      })))
       
-      return () => clearTimeout(timer)
-    }
-  }, [estimate?.id, userProfile?.tenant_id])
-
-  // Load job details and photos separately
-  useEffect(() => {
-    if (userProfile?.tenant_id) {
-      if (jobId) {
-        loadJobDetails()
+      // Auto-select if we have a leadId
+      if (effectiveLeadId && data) {
+        const lead = data.find(l => l.id === effectiveLeadId)
+        if (lead) {
+          setSelectedLead({
+            id: lead.id,
+            name: lead.name,
+            caller_name: lead.caller_name,
+            service_type: lead.service_type,
+            phone_number: lead.phone_number,
+            email: lead.email,
+            full_address: lead.full_address,
+            notes: lead.notes,
+            urgency: lead.urgency,
+            status: lead.status,
+            account_id: lead.account_id,
+            contact_id: lead.contact_id,
+            contact_type: lead.contact_type,
+            accounts: Array.isArray(lead.accounts) ? lead.accounts[0] : lead.accounts,
+            contacts: Array.isArray(lead.contacts) ? lead.contacts[0] : lead.contacts
+          })
+        }
       }
-      if (jobId || accountId || estimate?.account_id) {
-        loadAvailablePhotos()
-      }
+    } catch (error) {
+      console.error('Error loading leads:', error)
     }
-  }, [userProfile?.tenant_id, jobId, accountId, estimate?.account_id])
-
-
-  const loadJobDetails = async () => {
-    if (!jobId) return
+  }
+  
+  // Load jobs
+  const loadJobs = async () => {
+    if (!userProfile?.tenant_id) return
     
     try {
       const { data, error } = await supabase
         .from('jobs')
         .select(`
           id,
+          title,
+          job_number,
+          status,
           account_id,
           contact_id,
-          accounts(id, name, type),
-          contacts(id, first_name, last_name, contact_type)
+          accounts!left(name),
+          contacts!left(first_name, last_name)
         `)
-        .eq('id', jobId)
-        .single()
-
+        .eq('tenant_id', userProfile.tenant_id)
+        .in('status', ['draft', 'scheduled', 'in_progress'])
+        .order('created_at', { ascending: false })
+        
       if (error) throw error
+      setAvailableJobs((data || []).map(item => ({
+        id: item.id,
+        title: item.title,
+        job_number: item.job_number,
+        status: item.status,
+        account_id: item.account_id,
+        contact_id: item.contact_id,
+        accounts: Array.isArray(item.accounts) ? item.accounts[0] : item.accounts,
+        contacts: Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+      })))
       
-      if (data) {
-        // Handle business account
-        if (data.account_id && data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
-          formik.setFieldValue('accountId', data.account_id)
-          formik.setFieldValue('clientCustomer', data.accounts[0].name || '')
-          setSelectedAccountType('business')
-        }
-        // Handle residential client
-        else if (data.contact_id && data.contacts && Array.isArray(data.contacts) && data.contacts.length > 0) {
-          formik.setFieldValue('accountId', data.contact_id)
-          formik.setFieldValue('clientCustomer', `${data.contacts[0].first_name || ''} ${data.contacts[0].last_name || ''}`.trim())
-          setSelectedAccountType('residential')
-        }
+      // Auto-select if we have a jobId
+      if (jobId && data) {
+        const job = data.find(j => j.id === jobId)
+        if (job) setSelectedJob({
+          id: job.id,
+          title: job.title,
+          job_number: job.job_number,
+          status: job.status,
+          account_id: job.account_id,
+          contact_id: job.contact_id,
+          accounts: Array.isArray(job.accounts) ? job.accounts[0] : job.accounts,
+          contacts: Array.isArray(job.contacts) ? job.contacts[0] : job.contacts
+        })
       }
     } catch (error) {
-      console.error('Error loading job details:', error)
+      console.error('Error loading jobs:', error)
     }
   }
 
-  const loadAccounts = async () => {
-    try {
-      console.log('Loading accounts with userProfile:', userProfile)
-      console.log('Tenant ID:', userProfile?.tenant_id)
-      
-      if (!userProfile?.tenant_id) {
-        console.error('No tenant_id found in user profile')
-        showToast.error('Unable to load clients. Please ensure you are properly logged in.')
-        return
-      }
+  // Load estimate version history if editing
+  useEffect(() => {
+    if (effectiveLeadId && userProfile?.tenant_id) {
+      loadEstimateVersions()
+    }
+  }, [effectiveLeadId, userProfile?.tenant_id])
 
-      // Load business clients (accounts table)
+  // Load photos based on lead/job context
+  useEffect(() => {
+    if (userProfile?.tenant_id && (effectiveLeadId || jobId || estimate?.job_id)) {
+      loadAvailablePhotos()
+    }
+  }, [userProfile?.tenant_id, effectiveLeadId, jobId, estimate?.job_id])
+
+  // Handle context selection changes
+  const handleLeadChange = (leadId: string) => {
+    const lead = availableLeads.find(l => l.id === leadId)
+    if (lead) {
+      setSelectedLead(lead)
+      formik.setFieldValue('selectedLeadId', leadId)
+    }
+  }
+  
+  const handleJobChange = (jobId: string) => {
+    const job = availableJobs.find(j => j.id === jobId)
+    if (job) {
+      setSelectedJob(job)
+      formik.setFieldValue('selectedJobId', jobId)
+    }
+  }
+  
+  const handleClientChange = (clientId: string) => {
+    const client = accounts.find(a => a.id === clientId)
+    if (client) {
+      setSelectedClient(client)
+      formik.setFieldValue('selectedClientId', clientId)
+    }
+  }
+
+
+  const loadEstimateVersions = async () => {
+    // Since estimates don't have lead_id, we can't check for versions by lead
+    // In journey context, this will be the first estimate for the lead
+    // Version tracking would need to be implemented differently
+    setCurrentVersion(1)
+    formik.setFieldValue('version', 1)
+  }
+
+  // Load accounts for standalone mode
+  const loadAccounts = async () => {
+    if (!userProfile?.tenant_id) return
+    
+    try {
+      // Load business accounts
       const { data: accountsData, error: accountsError } = await supabase
         .from('accounts')
         .select('id, name')
         .eq('tenant_id', userProfile.tenant_id)
         .order('name')
-
-      if (accountsError) {
-        console.error('Error loading business accounts:', accountsError)
-        throw accountsError
-      }
-
-      // Load residential clients (contacts table - those without account_id are residential)
+        
+      if (accountsError) throw accountsError
+      
+      // Load residential contacts
       const { data: contactsData, error: contactsError } = await supabase
         .from('contacts')
         .select('id, first_name, last_name, name')
         .eq('tenant_id', userProfile.tenant_id)
-        .is('account_id', null)  // Residential clients don't have an associated business account
+        .is('account_id', null)
         .order('last_name')
-
-      if (contactsError) {
-        console.error('Error loading residential contacts:', contactsError)
-        throw contactsError
-      }
-
-      // Combine business and residential clients
+        
+      if (contactsError) throw contactsError
+      
       const businessClients = (accountsData || []).map(account => ({
         id: account.id,
         name: account.name || '',
         type: 'business' as const
       }))
-
+      
       const residentialClients = (contactsData || []).map(contact => ({
         id: contact.id,
         name: contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed Contact',
         type: 'residential' as const
       }))
-
-      const combined = [...businessClients, ...residentialClients]
-      console.log('Accounts loaded:', combined.length, 'total accounts')
-      setAccounts(combined)
+      
+      setAccounts([...businessClients, ...residentialClients])
     } catch (error) {
-      console.error('Error loading accounts and customers:', error)
-      showToast.error('Failed to load clients. Please refresh and try again.')
-      setAccounts([]) // Ensure accounts is set even on error
+      console.error('Error loading accounts:', error)
+      showToast.error('Failed to load clients')
     }
-  }
-
-
-  const handleClientChange = (accountId: string) => {
-    const selectedAccount = accounts.find(acc => acc.id === accountId)
-    if (selectedAccount) {
-      formik.setFieldValue('accountId', accountId)
-      formik.setFieldValue('clientCustomer', selectedAccount.name)
-      setSelectedAccountType(selectedAccount.type)
-      
-      // Clear job selection and load jobs for this client
-      formik.setFieldValue('jobId', '')
-      formik.setFieldValue('projectTitle', '')
-      loadJobsForAccount(accountId, selectedAccount.type)
-    }
-  }
-
-  const loadJobsForAccount = async (accountId: string, accountType: 'business' | 'residential') => {
-    try {
-      console.log('Loading jobs for:', { accountId, accountType, tenantId: userProfile?.tenant_id })
-      
-      let query = supabase
-        .from('jobs')
-        .select(`
-          id,
-          title,
-          job_number,
-          account_id,
-          contact_id,
-          status
-        `)
-        .eq('tenant_id', userProfile?.tenant_id)
-        .order('created_at', { ascending: false })
-
-      // Filter by client type
-      if (accountType === 'business') {
-        query = query.eq('account_id', accountId)
-      } else {
-        // Residential client
-        query = query.eq('contact_id', accountId)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-
-      console.log('Jobs loaded:', data?.length || 0, 'jobs found')
-      console.log('Jobs data:', data)
-
-      setAvailableJobs(data || [])
-    } catch (error) {
-      console.error('Error loading jobs:', error)
-      setAvailableJobs([])
-    }
-  }
-
-  const handleJobChange = (jobId: string) => {
-    const selectedJob = availableJobs.find(job => job.id === jobId)
-    if (selectedJob) {
-      formik.setFieldValue('jobId', jobId)
-      formik.setFieldValue('projectTitle', selectedJob.title)
-    }
-  }
-
-  const handleCreateNewJob = async () => {
-    if (!newJobTitle.trim() || !userProfile?.tenant_id || !formik.values.accountId) return
-
-    setCreatingJob(true)
-    try {
-      // Determine job data based on client type
-      const isResidentialClient = selectedAccountType === 'residential'
-      
-      const jobData = {
-        title: newJobTitle.trim(),
-        tenant_id: userProfile.tenant_id,
-        account_id: isResidentialClient ? null : formik.values.accountId,
-        contact_id: isResidentialClient ? formik.values.accountId : null,
-        status: 'Scheduled',
-        description: `Job created from estimate for: ${formik.values.clientCustomer}`
-      }
-
-      const { data, error } = await supabase
-        .from('jobs')
-        .insert(jobData)
-        .select()
-        .single()
-
-      if (error) throw error
-
-      // Add to jobs list and select it
-      const newJob: Job = {
-        id: data.id,
-        title: data.title,
-        account_id: data.account_id,
-        contact_id: data.contact_id,
-        status: data.status,
-        accounts: isResidentialClient ? undefined : { name: formik.values.clientCustomer },
-        contacts: isResidentialClient ? { first_name: formik.values.clientCustomer.split(' ')[0] || '', last_name: formik.values.clientCustomer.split(' ').slice(1).join(' ') || '' } : undefined
-      }
-      
-      setAvailableJobs(prev => [newJob, ...prev])
-      
-      // Select the new job
-      formik.setFieldValue('jobId', data.id)
-      formik.setFieldValue('projectTitle', data.title)
-      
-      // Reset form
-      setNewJobTitle('')
-      setShowNewJobForm(false)
-      
-    } catch (error) {
-      console.error('Error creating job:', error)
-      alert('Error creating job. Please try again.')
-    } finally {
-      setCreatingJob(false)
-    }
-  }
-
-  // Helper function to get appropriate label
-  const getClientCustomerLabel = () => {
-    if (selectedAccountType === 'residential') return 'Residential Client'
-    if (selectedAccountType === 'business') return 'Business Client' 
-    return 'Client'
-  }
-
-  const getClientCustomerPlaceholder = () => {
-    if (selectedAccountType === 'residential') return 'Select a residential client...'
-    if (selectedAccountType === 'business') return 'Select a business client...'
-    return 'Select a client...'
   }
 
 
@@ -466,16 +438,15 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
         `)
         .eq('tenant_id', userProfile?.tenant_id)
 
-      // Filter by job ID if provided (most specific)
-      if (jobId) {
-        query = query.eq('job_id', jobId)
+      // Filter by lead ID (primary)
+      if (effectiveLeadId) {
+        query = query.eq('lead_id', effectiveLeadId)
       } 
-      // Otherwise filter by account ID (less specific but still relevant)
-      else if (accountId || estimate?.account_id) {
-        const filterAccountId = accountId || estimate?.account_id
-        query = query.eq('jobs.account_id', filterAccountId)
+      // Otherwise filter by job ID if available (for approved estimates)
+      else if (jobId || estimate?.job_id) {
+        query = query.eq('job_id', jobId || estimate?.job_id)
       }
-      // If no job or account context, don't load any photos
+      // If no context, don't load any photos
       else {
         setAvailablePhotos([])
         return
@@ -495,20 +466,29 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
   const handlePhotoCapture = async (photoUrl: string, photoId: string) => {
     try {
-      // If we have a jobId, save the photo to the job_photos table
-      if (jobId && userProfile?.id) {
+      // Save photo with lead or job reference
+      if (userProfile?.id && userProfile?.tenant_id) {
+        const photoData: any = {
+          id: photoId,
+          tenant_id: userProfile.tenant_id,
+          photo_type: selectedPhotoType,
+          file_path: photoUrl,
+          file_url: photoUrl,
+          description: '',
+          taken_by: userProfile.id
+        }
+        
+        // Add lead or job reference
+        if (effectiveLeadId) {
+          photoData.lead_id = effectiveLeadId
+        }
+        if (jobId || estimate?.job_id) {
+          photoData.job_id = jobId || estimate?.job_id
+        }
+        
         await supabase
           .from('job_photos')
-          .insert({
-            id: photoId,
-            tenant_id: userProfile.tenant_id,
-            job_id: jobId,
-            photo_type: selectedPhotoType,
-            file_path: photoUrl,
-            file_url: photoUrl,
-            description: '',
-            taken_by: userProfile.id
-          })
+          .insert(photoData)
       }
 
       const newPhoto: EstimatePhoto = {
@@ -554,6 +534,239 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
     ))
   }
 
+  // Create formik instance
+  const formik = useFormik<EstimateFormValues>({
+    initialValues: {
+      estimateContext: getDefaultContext(),
+      selectedLeadId: effectiveLeadId || '',
+      selectedJobId: jobId || estimate?.job_id || '',
+      selectedClientId: '',
+      projectTitle: estimate?.project_title || '',
+      description: estimate?.description || '',
+      status: estimate?.status || 'draft',
+      lineItems: estimate?.lineItems && estimate.lineItems.length > 0 
+        ? estimate.lineItems 
+        : [{ description: '', quantity: 1, unit_price: 0 }],
+      totalAmount: estimate?.total_amount || 0,
+      validUntil: estimate?.valid_until ? estimate.valid_until.split('T')[0] : getDefaultValidUntil(),
+      notes: estimate?.notes || '',
+      version: estimate?.version || currentVersion,
+    },
+    validationSchema: estimateSchema,
+    onSubmit: async (values) => {
+      setLoading(true)
+      try {
+        let submitData: any = {
+          tenant_id: userProfile?.tenant_id,
+          project_title: values.projectTitle,
+          description: values.description,
+          status: values.status,
+          total_amount: values.totalAmount,
+          valid_until: values.validUntil,
+          notes: values.notes,
+          lineItems: values.lineItems,
+          version: values.version,
+          context_type: values.estimateContext, // Track for analytics
+        }
+        
+        // Handle based on selected context
+        switch (values.estimateContext) {
+          case 'journey':
+            // Journey mode - use selected lead
+            submitData.lead_id = values.selectedLeadId || effectiveLeadId
+            
+            // First try to get data from the store's lead object
+            const storeLead = lead && lead.id === submitData.lead_id ? lead : null
+            const leadToUse = storeLead || selectedLead
+            
+            // In journey context with effectiveLeadId but no lead data, we can still proceed
+            if (leadToUse || (effectiveLeadId && submitData.lead_id)) {
+              if (leadToUse) {
+                // Use the proper foreign key relationships
+                submitData.account_id = leadToUse.account_id || null
+                submitData.contact_id = leadToUse.contact_id || null
+                
+                // Log for debugging
+                console.log('Lead customer relationships:', {
+                  lead_id: leadToUse.id,
+                  account_id: submitData.account_id,
+                  contact_id: submitData.contact_id,
+                  contact_type: leadToUse.contact_type
+                })
+              } else {
+                // No lead data but we have lead_id - create with just lead_id
+                console.log('Creating estimate with lead_id only - no lead data available')
+                submitData.account_id = null
+                submitData.contact_id = null
+              }
+            } else {
+              // CRITICAL: We should NEVER create an estimate without client info
+              showToast.error('Cannot create estimate: Lead is missing customer information')
+              throw new Error('Lead is missing required customer relationships')
+            }
+            
+            submitData.job_id = null // Jobs created after approval
+            break
+            
+          case 'job':
+            // Change order mode - link to job only
+            submitData.job_id = values.selectedJobId
+            submitData.lead_id = null
+            if (selectedJob) {
+              submitData.account_id = selectedJob.account_id || null
+              submitData.contact_id = selectedJob.contact_id || null
+            }
+            submitData.notes = (submitData.notes ? submitData.notes + '\n\n' : '') + '⚡ Change Order Estimate'
+            break
+            
+          case 'standalone':
+            // Standalone mode - use selected client
+            if (selectedClient) {
+              const isResidential = selectedClient.type === 'residential'
+              submitData.account_id = isResidential ? null : selectedClient.id
+              submitData.contact_id = isResidential ? selectedClient.id : null
+            }
+            submitData.lead_id = null
+            submitData.job_id = null
+            submitData.notes = (submitData.notes ? submitData.notes + '\n\n' : '') + '📋 Standalone Estimate'
+            break
+        }
+        
+        await onSave(submitData)
+        // onSuccess is called separately after onSave completes
+      } catch (error) {
+        console.error('Error saving estimate:', error)
+      } finally {
+        setLoading(false)
+      }
+    },
+  })
+
+  // Update form values when context selections change
+  useEffect(() => {
+    if (formik.values.estimateContext === 'journey' && selectedLead && !estimate) {
+      formik.setFieldValue('projectTitle', `${selectedLead.service_type || 'Service'} - ${selectedLead.name || selectedLead.caller_name || 'Customer'}`)
+      if (selectedLead.notes) {
+        formik.setFieldValue('description', `Initial Request: ${selectedLead.notes}`)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLead, formik.values.estimateContext, estimate])
+  
+  useEffect(() => {
+    if (formik.values.estimateContext === 'job' && selectedJob && !estimate) {
+      formik.setFieldValue('projectTitle', `Change Order - ${selectedJob.title}`)
+      formik.setFieldValue('description', 'Additional work requested by customer')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJob, formik.values.estimateContext, estimate])
+  
+  // Load data based on context
+  useEffect(() => {
+    if (userProfile?.tenant_id) {
+      // Always load these for flexibility
+      loadAccounts()
+      loadLeads()
+      loadJobs()
+    }
+    // Intentionally only running on tenant_id change to avoid infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile?.tenant_id])
+  
+  // In journey context, if we have a leadId but no lead data, fetch it
+  useEffect(() => {
+    const fetchLeadIfNeeded = async () => {
+      if (effectiveLeadId && !lead && userProfile?.tenant_id) {
+        try {
+          const { data, error } = await supabase
+            .from('leads')
+            .select(`
+              id,
+              name,
+              caller_name,
+              service_type,
+              phone_number,
+              email,
+              full_address,
+              notes,
+              urgency,
+              status,
+              account_id,
+              contact_id,
+              contact_type,
+              accounts:account_id(id, name),
+              contacts:contact_id(id, first_name, last_name)
+            `)
+            .eq('id', effectiveLeadId)
+            .eq('tenant_id', userProfile.tenant_id)
+            .single()
+          
+          if (data && !error) {
+            // Update the selected lead so the form can use it
+            setSelectedLead({
+              id: data.id,
+              name: data.name,
+              caller_name: data.caller_name,
+              service_type: data.service_type,
+              phone_number: data.phone_number,
+              email: data.email,
+              full_address: data.full_address,
+              notes: data.notes,
+              urgency: data.urgency,
+              status: data.status,
+              account_id: data.account_id,
+              contact_id: data.contact_id,
+              contact_type: data.contact_type,
+              accounts: Array.isArray(data.accounts) ? data.accounts[0] : data.accounts,
+              contacts: Array.isArray(data.contacts) ? data.contacts[0] : data.contacts
+            })
+            // Also update the form value
+            formik.setFieldValue('selectedLeadId', effectiveLeadId)
+          }
+        } catch (error) {
+          console.error('Error fetching lead for journey context:', error)
+        }
+      }
+    }
+    
+    fetchLeadIfNeeded()
+  }, [effectiveLeadId, lead, userProfile?.tenant_id])
+
+  // Auto-select lead when component mounts with effectiveLeadId
+  useEffect(() => {
+    if (effectiveLeadId && availableLeads.length > 0 && !selectedLead) {
+      const lead = availableLeads.find(l => l.id === effectiveLeadId)
+      if (lead) {
+        setSelectedLead(lead)
+        // Also ensure form field is set
+        formik.setFieldValue('selectedLeadId', effectiveLeadId)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveLeadId, availableLeads])
+
+  // Use lead from journey store if available and no lead is loaded yet
+  useEffect(() => {
+    if (lead && !selectedLead && formik.values.estimateContext === 'journey') {
+      // Convert journey lead to form lead format
+      const formLead: Lead = {
+        id: lead.id,
+        name: lead.name,
+        caller_name: lead.name,
+        service_type: lead.service_type || '',
+        phone_number: lead.contact?.phone,
+        email: lead.contact?.email,
+        full_address: lead.full_address || '',
+        status: 'qualified',
+        account_id: null,
+        contact_id: null
+      }
+      setSelectedLead(formLead)
+      formik.setFieldValue('selectedLeadId', lead.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead, formik.values.estimateContext])
+  
   const handleLineItemsImport = (importedLineItems: LineItem[]) => {
     // Replace existing line items with imported ones
     formik.setFieldValue('lineItems', importedLineItems)
@@ -566,7 +779,17 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
         <div className='modal-content'>
           <div className='modal-header'>
             <h5 className='modal-title'>
-              {estimate ? 'Edit Estimate' : 'Create New Estimate'}
+              {estimate 
+                ? `Edit Estimate${estimate.version ? ` v${estimate.version}` : ''}`
+                : isChangeOrder 
+                  ? 'Create Change Order Estimate'
+                  : isStandalone
+                    ? 'Create Standalone Estimate'
+                    : 'Create New Estimate'
+              }
+              {currentVersion > 1 && !estimate && (
+                <span className='badge badge-light-warning ms-2'>Version {currentVersion}</span>
+              )}
             </h5>
             <button
               type='button'
@@ -578,39 +801,300 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
 
           <form onSubmit={formik.handleSubmit} noValidate>
             <div className='modal-body'>
-              <div className='row'>
-                {/* Client/Customer */}
-                <div className='col-md-6 mb-7'>
-                  <label className='required fw-semibold fs-6 mb-2'>{getClientCustomerLabel()}</label>
-                  <select
-                    className={clsx(
-                      'form-select form-select-solid',
-                      {'is-invalid': formik.touched.accountId && formik.errors.accountId},
-                      {'is-valid': formik.touched.accountId && !formik.errors.accountId}
-                    )}
-                    value={formik.values.accountId}
-                    onChange={(e) => handleClientChange(e.target.value)}
-                    onBlur={formik.handleBlur}
-                    name="accountId"
-                  >
-                    <option value=''>{getClientCustomerPlaceholder()}</option>
-                    {accounts.map(account => (
-                      <option key={account.id} value={account.id}>
-                        {account.name} {account.type === 'business' ? '(Business)' : '(Residential)'}
-                      </option>
-                    ))}
-                  </select>
-                  {formik.touched.accountId && formik.errors.accountId && (
-                    <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.accountId}</span>
-                    </div>
-                  )}
-                  {accounts.length === 0 && (
-                    <div className='form-text text-muted'>
-                      No clients found. Please create business clients in the Accounts section or residential clients in the Contacts section first.
+              {/* Lead Info Banner for Journey Context */}
+              {effectiveLeadId && lead && (
+                <div className="alert alert-primary d-flex align-items-center mb-4">
+                  <i className="ki-duotone ki-user fs-2 me-3">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  <div>
+                    <h6 className="mb-0">Creating estimate for: <strong>{lead.name}</strong></h6>
+                    <p className="mb-0 text-muted small">
+                      {lead.service_type} • {lead.phone_number || 'No phone'} • {lead.full_address || 'No address'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Estimate Context Selector */}
+              <div className='card mb-6'>
+                <div className='card-body'>
+                  <h6 className='mb-4'>How is this estimate being created? <span className='text-danger'>*</span></h6>
+                  <div className='d-flex flex-column gap-4'>
+                    {/* Journey Option */}
+                    <label className={clsx('d-flex align-items-start cursor-pointer', {
+                      'opacity-50': availableLeads.length === 0 && formik.values.estimateContext !== 'journey'
+                    })}>
+                      <input
+                        type='radio'
+                        className='form-check-input me-3 mt-1'
+                        name='estimateContext'
+                        value='journey'
+                        checked={formik.values.estimateContext === 'journey'}
+                        onChange={formik.handleChange}
+                        disabled={availableLeads.length === 0 && !effectiveLeadId}
+                      />
+                      <div className='flex-grow-1'>
+                        <div className='fw-bold text-gray-800'>
+                          <i className='ki-duotone ki-route fs-6 me-1 text-primary'>
+                            <span className='path1'></span>
+                            <span className='path2'></span>
+                          </i>
+                          Linked to a customer lead
+                          <span className='badge badge-light-success ms-2'>Recommended</span>
+                        </div>
+                        <div className='text-muted fs-7 mt-1'>
+                          This estimate will progress the customer journey from lead to job.
+                        </div>
+                      </div>
+                    </label>
+                    
+                    {/* Change Order Option */}
+                    <label className={clsx('d-flex align-items-start cursor-pointer', {
+                      'opacity-50': availableJobs.length === 0 && formik.values.estimateContext !== 'job'
+                    })}>
+                      <input
+                        type='radio'
+                        className='form-check-input me-3 mt-1'
+                        name='estimateContext'
+                        value='job'
+                        checked={formik.values.estimateContext === 'job'}
+                        onChange={formik.handleChange}
+                        disabled={availableJobs.length === 0}
+                      />
+                      <div className='flex-grow-1'>
+                        <div className='fw-bold text-gray-800'>
+                          <i className='ki-duotone ki-layers fs-6 me-1 text-info'>
+                            <span className='path1'></span>
+                            <span className='path2'></span>
+                          </i>
+                          Linked to an existing job (change order)
+                        </div>
+                        <div className='text-muted fs-7 mt-1'>
+                          This estimate will be attached to an existing job. It will not impact the journey.
+                        </div>
+                      </div>
+                    </label>
+                    
+                    {/* Standalone Option */}
+                    <label className='d-flex align-items-start cursor-pointer'>
+                      <input
+                        type='radio'
+                        className='form-check-input me-3 mt-1'
+                        name='estimateContext'
+                        value='standalone'
+                        checked={formik.values.estimateContext === 'standalone'}
+                        onChange={formik.handleChange}
+                      />
+                      <div className='flex-grow-1'>
+                        <div className='fw-bold text-gray-800'>
+                          <i className='ki-duotone ki-document fs-6 me-1 text-warning'>
+                            <span className='path1'></span>
+                            <span className='path2'></span>
+                          </i>
+                          Standalone estimate (internal or bulk request)
+                        </div>
+                        <div className='text-muted fs-7 mt-1'>
+                          This estimate will not be linked to a journey or job.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                  
+                  {formik.touched.estimateContext && formik.errors.estimateContext && (
+                    <div className='fv-plugins-message-container mt-2'>
+                      <span role='alert' className='text-danger'>{formik.errors.estimateContext}</span>
                     </div>
                   )}
                 </div>
+              </div>
+              
+              {/* Context-specific selectors and banners */}
+              {formik.values.estimateContext === 'journey' && (
+                <>
+                  <div className='alert alert-light-primary d-flex align-items-center p-5 mb-6'>
+                    <i className='ki-duotone ki-information-5 fs-2hx text-primary me-4'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                      <span className='path3'></span>
+                    </i>
+                    <div className='d-flex flex-column'>
+                      <h4 className='mb-1'>Customer Journey Estimate</h4>
+                      <span>This estimate will progress the customer journey. Upon approval, it will automatically convert to a job.</span>
+                    </div>
+                  </div>
+                  
+                  {/* Only show lead selector if we don't have a pre-selected lead from journey */}
+                  {!propLeadId && (
+                  <div className='row mb-4'>
+                    <div className='col-md-12'>
+                      <label className='required fw-semibold fs-6 mb-2'>Select Lead</label>
+                      <select
+                        className={clsx(
+                          'form-select form-select-solid',
+                          {'is-invalid': formik.touched.selectedLeadId && formik.errors.selectedLeadId},
+                          {'is-valid': formik.touched.selectedLeadId && !formik.errors.selectedLeadId}
+                        )}
+                        name='selectedLeadId'
+                        value={formik.values.selectedLeadId}
+                        onChange={(e) => handleLeadChange(e.target.value)}
+                        onBlur={formik.handleBlur}
+                      >
+                        <option value=''>Choose a lead...</option>
+                        {availableLeads.map(lead => (
+                          <option key={lead.id} value={lead.id}>
+                            {lead.name || lead.caller_name} - {lead.service_type} ({lead.status})
+                          </option>
+                        ))}
+                      </select>
+                      {formik.touched.selectedLeadId && formik.errors.selectedLeadId && (
+                        <div className='fv-plugins-message-container'>
+                          <span role='alert'>{formik.errors.selectedLeadId}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  )}
+                  
+                  {selectedLead && (
+                    <div className='card bg-light-primary mb-6'>
+                      <div className='card-body'>
+                        <h6 className='mb-3'>Lead Details</h6>
+                        <div className='row'>
+                          <div className='col-md-6'>
+                            <div className='mb-2'><strong>Customer:</strong> {selectedLead.name || selectedLead.caller_name}</div>
+                            <div className='mb-2'><strong>Service:</strong> {selectedLead.service_type}</div>
+                            {selectedLead.urgency && (
+                              <div className='mb-2'>
+                                <strong>Priority:</strong> 
+                                <span className={`badge ms-2 badge-light-${selectedLead.urgency === 'high' ? 'danger' : selectedLead.urgency === 'medium' ? 'warning' : 'success'}`}>
+                                  {selectedLead.urgency}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className='col-md-6'>
+                            {selectedLead.phone_number && <div className='mb-2'><strong>Phone:</strong> {selectedLead.phone_number}</div>}
+                            {selectedLead.email && <div className='mb-2'><strong>Email:</strong> {selectedLead.email}</div>}
+                            {selectedLead.full_address && <div className='mb-2'><strong>Location:</strong> {selectedLead.full_address}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {formik.values.estimateContext === 'job' && (
+                <>
+                  <div className='alert alert-light-info d-flex align-items-center p-5 mb-6'>
+                    <i className='ki-duotone ki-information-5 fs-2hx text-info me-4'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                      <span className='path3'></span>
+                    </i>
+                    <div className='d-flex flex-column'>
+                      <h4 className='mb-1'>Change Order Estimate</h4>
+                      <span>This estimate is for additional work on an existing job. It will not impact the customer journey.</span>
+                    </div>
+                  </div>
+                  
+                  <div className='row mb-4'>
+                    <div className='col-md-12'>
+                      <label className='required fw-semibold fs-6 mb-2'>Select Job</label>
+                      <select
+                        className={clsx(
+                          'form-select form-select-solid',
+                          {'is-invalid': formik.touched.selectedJobId && formik.errors.selectedJobId},
+                          {'is-valid': formik.touched.selectedJobId && !formik.errors.selectedJobId}
+                        )}
+                        name='selectedJobId'
+                        value={formik.values.selectedJobId}
+                        onChange={(e) => handleJobChange(e.target.value)}
+                        onBlur={formik.handleBlur}
+                      >
+                        <option value=''>Choose a job...</option>
+                        {availableJobs.map(job => (
+                          <option key={job.id} value={job.id}>
+                            {job.job_number ? `${job.job_number} - ` : ''}{job.title} ({job.status})
+                          </option>
+                        ))}
+                      </select>
+                      {formik.touched.selectedJobId && formik.errors.selectedJobId && (
+                        <div className='fv-plugins-message-container'>
+                          <span role='alert'>{formik.errors.selectedJobId}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+              
+              {formik.values.estimateContext === 'standalone' && (
+                <>
+                  <div className='alert alert-light-warning d-flex align-items-center p-5 mb-6'>
+                    <i className='ki-duotone ki-information-5 fs-2hx text-warning me-4'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                      <span className='path3'></span>
+                    </i>
+                    <div className='d-flex flex-column'>
+                      <h4 className='mb-1'>Standalone Estimate</h4>
+                      <span>This estimate will not be linked to a customer journey or job.</span>
+                    </div>
+                  </div>
+                  
+                  <div className='row mb-4'>
+                    <div className='col-md-12'>
+                      <label className='required fw-semibold fs-6 mb-2'>Select Client</label>
+                      <select
+                        className={clsx(
+                          'form-select form-select-solid',
+                          {'is-invalid': formik.touched.selectedClientId && formik.errors.selectedClientId},
+                          {'is-valid': formik.touched.selectedClientId && !formik.errors.selectedClientId}
+                        )}
+                        name='selectedClientId'
+                        value={formik.values.selectedClientId}
+                        onChange={(e) => handleClientChange(e.target.value)}
+                        onBlur={formik.handleBlur}
+                      >
+                        <option value=''>Choose a client...</option>
+                        <optgroup label='Business Clients'>
+                          {accounts.filter(a => a.type === 'business').map(account => (
+                            <option key={account.id} value={account.id}>{account.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label='Residential Clients'>
+                          {accounts.filter(a => a.type === 'residential').map(account => (
+                            <option key={account.id} value={account.id}>{account.name}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      {formik.touched.selectedClientId && formik.errors.selectedClientId && (
+                        <div className='fv-plugins-message-container'>
+                          <span role='alert'>{formik.errors.selectedClientId}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Show reminder for standalone estimates if it's an existing estimate */}
+                  {estimate && (
+                    <StandaloneEstimateReminder
+                      estimateId={estimate.id}
+                      isStandalone={true}
+                      onLinkToJourney={() => {
+                        // Close this form and potentially open the link modal
+                        showToast.info('Please use the "Link to Journey" option from the estimates list')
+                        onCancel()
+                      }}
+                    />
+                  )}
+                </>
+              )}
+
+              <div className='row'>
 
                 {/* Status */}
                 <div className='col-md-6 mb-7'>
@@ -625,6 +1109,7 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                   >
                     <option value='draft'>Draft</option>
                     <option value='sent'>Sent</option>
+                    <option value='revised'>Revised</option>
                     <option value='approved'>Approved</option>
                     <option value='rejected'>Rejected</option>
                     <option value='expired'>Expired</option>
@@ -636,129 +1121,49 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                   )}
                 </div>
 
-                {/* Job Selection */}
+                {/* Project Title */}
                 <div className='col-md-12 mb-7'>
-                  <label className='required fw-semibold fs-6 mb-2'>
-                    Select Job
-                    {estimate && availableJobs.length === 0 && (
-                      <button
-                        type='button'
-                        className='btn btn-link btn-sm ms-2'
-                        onClick={() => {
-                          console.log('Manual job load triggered')
-                          if (estimate.account_id) {
-                            loadJobsForAccount(estimate.account_id, 'business')
-                          } else if (estimate.contact_id) {
-                            loadJobsForAccount(estimate.contact_id, 'residential')
-                          }
-                        }}
-                      >
-                        (Load Jobs)
-                      </button>
+                  <label className='required fw-semibold fs-6 mb-2'>Project Title</label>
+                  <input
+                    type='text'
+                    className={clsx(
+                      'form-control form-control-solid',
+                      {'is-invalid': formik.touched.projectTitle && formik.errors.projectTitle},
+                      {'is-valid': formik.touched.projectTitle && !formik.errors.projectTitle}
                     )}
-                  </label>
-                  {!showNewJobForm ? (
-                    <div className='d-flex gap-2'>
-                      <select
-                        className={clsx(
-                          'form-select form-select-solid flex-grow-1',
-                          {'is-invalid': formik.touched.jobId && formik.errors.jobId},
-                          {'is-valid': formik.touched.jobId && !formik.errors.jobId}
-                        )}
-                        value={formik.values.jobId}
-                        onChange={(e) => handleJobChange(e.target.value)}
-                        onBlur={formik.handleBlur}
-                        name="jobId"
-                        disabled={!formik.values.accountId}
-                      >
-                        <option value=''>
-                          {!formik.values.accountId 
-                            ? 'Please select a client first' 
-                            : availableJobs.length === 0 
-                            ? 'No jobs found for this client'
-                            : 'Select a job...'}
-                        </option>
-                        {availableJobs.map(job => (
-                          <option key={job.id} value={job.id}>
-                            {job.job_number ? `${job.job_number} - ` : ''}{job.title} ({job.status})
-                          </option>
-                        ))}
-                      </select>
-                      {formik.values.accountId && (
-                        <button
-                          type='button'
-                          className='btn btn-light-primary btn-sm'
-                          onClick={() => setShowNewJobForm(true)}
-                          title='Create new job'
-                        >
-                          <i className='ki-duotone ki-plus fs-3'></i>
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className='d-flex flex-column gap-2'>
-                      <input
-                        type='text'
-                        className='form-control form-control-solid'
-                        placeholder='Enter job title'
-                        value={newJobTitle}
-                        onChange={(e) => setNewJobTitle(e.target.value)}
-                      />
-                      <div className='d-flex gap-2'>
-                        <button
-                          type='button'
-                          className='btn btn-primary btn-sm'
-                          onClick={handleCreateNewJob}
-                          disabled={!newJobTitle.trim() || creatingJob}
-                        >
-                          {creatingJob ? (
-                            <>
-                              <span className='spinner-border spinner-border-sm align-middle me-2'></span>
-                              Creating...
-                            </>
-                          ) : (
-                            <>
-                              <i className='ki-duotone ki-check fs-3 me-1'></i>
-                              Create Job
-                            </>
-                          )}
-                        </button>
-                        <button
-                          type='button'
-                          className='btn btn-light btn-sm'
-                          onClick={() => {
-                            setShowNewJobForm(false)
-                            setNewJobTitle('')
-                          }}
-                        >
-                          <i className='ki-duotone ki-cross fs-3 me-1'></i>
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {formik.touched.jobId && formik.errors.jobId && (
+                    placeholder='Enter project title'
+                    {...formik.getFieldProps('projectTitle')}
+                  />
+                  {formik.touched.projectTitle && formik.errors.projectTitle && (
                     <div className='fv-plugins-message-container'>
-                      <span role='alert'>{formik.errors.jobId}</span>
+                      <span role='alert'>{formik.errors.projectTitle}</span>
                     </div>
                   )}
-                  
-                  {/* Display selected job title (read-only) */}
-                  {formik.values.jobId && formik.values.projectTitle && (
-                    <div className='mt-3'>
-                      <label className='fw-semibold fs-6 mb-2'>Project Title</label>
-                      <input
-                        type='text'
-                        className='form-control form-control-solid bg-light'
-                        value={formik.values.projectTitle}
-                        readOnly
-                      />
-                      <div className='form-text text-muted'>
-                        Project title is automatically filled from the selected job
+                  <div className='form-text text-muted'>
+                    This estimate will be linked to the current customer lead. Once approved, it will convert into a job automatically.
+                  </div>
+                </div>
+                
+                {/* Show job info if estimate is approved */}
+                {formik.values.status === 'approved' && (jobId || estimate?.job_id) && (
+                  <div className='col-md-12 mb-7'>
+                    <div className='alert alert-light-success d-flex align-items-center p-5'>
+                      <i className='ki-duotone ki-check-circle fs-2hx text-success me-4'>
+                        <span className='path1'></span>
+                        <span className='path2'></span>
+                      </i>
+                      <div className='d-flex flex-column'>
+                        <h4 className='mb-1 text-success'>Estimate Approved</h4>
+                        <span>This estimate has been converted to a job.</span>
+                        {(jobId || estimate?.job_id) && (
+                          <a href={`/jobs/${jobId || estimate?.job_id}`} className='btn btn-sm btn-light-success mt-2'>
+                            View Job Details
+                          </a>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Description */}
                 <div className='col-md-12 mb-7'>
@@ -989,7 +1394,14 @@ export const EstimateForm: React.FC<EstimateFormProps> = ({ estimate, onSave, on
                 <div className='col-md-12 mb-7'>
                   <div className='card'>
                     <div className='card-header'>
-                      <h3 className='card-title'>Photos</h3>
+                      <h3 className='card-title'>
+                        Photos
+                        {siteVisit && availablePhotos.length > 0 && (
+                          <span className='badge badge-light-primary ms-2'>
+                            {availablePhotos.length} from site visit
+                          </span>
+                        )}
+                      </h3>
                       <div className='card-toolbar'>
                         <button
                           type='button'

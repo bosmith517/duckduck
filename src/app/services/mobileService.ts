@@ -1,4 +1,4 @@
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Camera, CameraResultType, CameraSource, GalleryPhotos, GalleryPhoto } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -17,6 +17,11 @@ export interface PhotoResult {
   dataUrl: string;
   format: string;
   saved: boolean;
+}
+
+export interface MultiPhotoResult {
+  photos: PhotoResult[];
+  count: number;
 }
 
 export class MobileService {
@@ -66,6 +71,83 @@ export class MobileService {
     } catch (error) {
       console.error('Error selecting photo:', error);
       throw new Error('Failed to select photo');
+    }
+  }
+
+  static async selectMultiplePhotos(limit?: number): Promise<MultiPhotoResult> {
+    try {
+      // Check if pickImages is available (Capacitor Camera v5.0.0+)
+      if ('pickImages' in Camera) {
+        const result = await (Camera as any).pickImages({
+          quality: 90,
+          limit: limit || 0, // 0 = no limit
+        }) as GalleryPhotos;
+
+        const photos: PhotoResult[] = [];
+        
+        for (const photo of result.photos) {
+          // Convert web path to data URL
+          const response = await fetch(photo.webPath);
+          const blob = await response.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+
+          photos.push({
+            dataUrl,
+            format: photo.format || 'jpeg',
+            saved: false,
+          });
+        }
+
+        return {
+          photos,
+          count: photos.length,
+        };
+      } else {
+        // Fallback to single selection for older versions
+        const photo = await this.selectPhoto();
+        return {
+          photos: [photo],
+          count: 1,
+        };
+      }
+    } catch (error) {
+      console.error('Error selecting multiple photos:', error);
+      throw new Error('Failed to select photos');
+    }
+  }
+
+  static async takeMultiplePhotos(count: number): Promise<MultiPhotoResult> {
+    const photos: PhotoResult[] = [];
+    
+    try {
+      for (let i = 0; i < count; i++) {
+        const shouldContinue = await new Promise<boolean>((resolve) => {
+          if (i === 0) {
+            resolve(true);
+          } else {
+            // Show confirmation for next photo
+            const message = `Photo ${i} captured. Take photo ${i + 1} of ${count}?`;
+            resolve(window.confirm(message));
+          }
+        });
+
+        if (!shouldContinue) break;
+
+        const photo = await this.takePhoto();
+        photos.push(photo);
+      }
+
+      return {
+        photos,
+        count: photos.length,
+      };
+    } catch (error) {
+      console.error('Error taking multiple photos:', error);
+      throw new Error('Failed to take photos');
     }
   }
 

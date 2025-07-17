@@ -100,6 +100,7 @@ export interface Job {
   account_id: string
   contact_id?: string
   lead_id?: string
+  estimate_id?: string // Reference to the estimate this job was created from
   assigned_technician_id?: string
   created_at: string
   updated_at: string
@@ -114,6 +115,13 @@ export interface Job {
   actual_hours?: number
   estimated_cost?: number
   actual_cost?: number
+  // Enhanced financial fields
+  contract_price?: number
+  estimated_material_cost?: number
+  estimated_labor_cost?: number
+  estimated_equipment_cost?: number
+  estimated_overhead_cost?: number
+  completion_percentage?: number
   location_address?: string
   location_city?: string
   location_state?: string

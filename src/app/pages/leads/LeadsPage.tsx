@@ -6,6 +6,9 @@ import { NewInquiryButton } from '../../components/workflows/WorkflowLauncher'
 import { PromoteToJobModal } from '../../components/workflows/PromoteToJobModal'
 import { EditLeadModal } from '../../components/workflows/EditLeadModal'
 import { SiteVisitModal } from '../../components/workflows/SiteVisitModal'
+import { CreateEstimateModal } from '../../components/workflows/CreateEstimateModal'
+import { phoneNumbersMatch } from '../../../lib/phoneUtils'
+import { showToast } from '../../utils/toast'
 
 interface Lead {
   id: string
@@ -38,6 +41,7 @@ const LeadsPage: React.FC = () => {
   const [showPromoteModal, setShowPromoteModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showSiteVisitModal, setShowSiteVisitModal] = useState(false)
+  const [showCreateEstimateModal, setShowCreateEstimateModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
   useEffect(() => {
@@ -106,6 +110,19 @@ const LeadsPage: React.FC = () => {
     setSelectedLead(null)
     // Refresh leads to show updated status
     fetchLeads()
+  }
+
+  const handleCreateEstimate = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowCreateEstimateModal(true)
+  }
+
+  const handleEstimateCreated = (estimateId: string) => {
+    setShowCreateEstimateModal(false)
+    setSelectedLead(null)
+    // Refresh leads to show updated status
+    fetchLeads()
+    showToast.success('Estimate created successfully!')
   }
 
   const handleMarkUnqualified = async (leadId: string) => {
@@ -180,11 +197,14 @@ const LeadsPage: React.FC = () => {
   }
 
   const filteredLeads = leads.filter(lead => {
+    const term = searchTerm.toLowerCase()
+    
     const matchesSearch = 
-      lead.caller_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.caller_name.toLowerCase().includes(term) ||
       lead.phone_number.includes(searchTerm) ||
-      lead.initial_request.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase()))
+      phoneNumbersMatch(searchTerm, lead.phone_number) ||
+      lead.initial_request.toLowerCase().includes(term) ||
+      (lead.email && lead.email.toLowerCase().includes(term))
 
     const matchesStatus = statusFilter === 'all' || lead.status === statusFilter
     const matchesUrgency = urgencyFilter === 'all' || lead.urgency === urgencyFilter
@@ -437,9 +457,9 @@ const LeadsPage: React.FC = () => {
                           )}
                           
                           {lead.status === 'site_visit_completed' && (
-                            <a
-                              href='/estimates'
+                            <button
                               className='btn btn-sm btn-primary'
+                              onClick={() => handleCreateEstimate(lead)}
                               title='Create Estimate from Site Visit'
                             >
                               <i className='ki-duotone ki-document fs-4'>
@@ -447,7 +467,7 @@ const LeadsPage: React.FC = () => {
                                 <span className='path2'></span>
                               </i>
                               Create Estimate
-                            </a>
+                            </button>
                           )}
                           {lead.status === 'converted' && lead.converted_to_job_id && (
                             <a
@@ -528,6 +548,19 @@ const LeadsPage: React.FC = () => {
           leadId={selectedLead.id}
           leadData={selectedLead}
           onSuccess={handleSiteVisitScheduled}
+        />
+      )}
+
+      {/* Create Estimate Modal */}
+      {showCreateEstimateModal && selectedLead && (
+        <CreateEstimateModal
+          isOpen={showCreateEstimateModal}
+          onClose={() => {
+            setShowCreateEstimateModal(false)
+            setSelectedLead(null)
+          }}
+          leadId={selectedLead.id}
+          onEstimateCreated={handleEstimateCreated}
         />
       )}
     </>

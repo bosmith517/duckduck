@@ -3,6 +3,8 @@ import { PageTitle } from '../../../_metronic/layout/core'
 import { KTCard, KTCardBody } from '../../../_metronic/helpers'
 import { supabase, Job, Account, Contact } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { ScheduleEventForm } from '../../components/schedule/ScheduleEventForm'
+import { showToast } from '../../utils/toast'
 
 interface ScheduleEvent {
   id: string
@@ -87,7 +89,7 @@ const SchedulePage: React.FC = () => {
     }
   ])
 
-  // Fetch real jobs from database
+  // Fetch all appointments from multiple sources
   const fetchJobsAsEvents = async () => {
     if (!userProfile?.tenant_id) return
 
@@ -95,33 +97,69 @@ const SchedulePage: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      const { data: jobs, error: jobsError } = await supabase
-        .from('jobs')
-        .select(`
-          *,
-          account:accounts(*),
-          contact:contacts(*)
-        `)
-        .eq('tenant_id', userProfile.tenant_id)
-        .not('start_date', 'is', null)
-        .order('start_date', { ascending: true })
+      // Fetch multiple data sources in parallel
+      const [jobsResult, leadsResult, calendarResult, bookingsResult] = await Promise.all([
+        // 1. Fetch jobs with start dates
+        supabase
+          .from('jobs')
+          .select(`
+            *,
+            account:accounts(*),
+            contact:contacts(*)
+          `)
+          .eq('tenant_id', userProfile.tenant_id)
+          .not('start_date', 'is', null)
+          .order('start_date', { ascending: true }),
+        
+        // 2. Fetch leads with scheduled site visits
+        supabase
+          .from('leads')
+          .select(`
+            *,
+            contact:contacts(*),
+            account:accounts(*)
+          `)
+          .eq('tenant_id', userProfile.tenant_id)
+          .not('site_visit_date', 'is', null)
+          .order('site_visit_date', { ascending: true }),
+        
+        // 3. Fetch calendar events
+        supabase
+          .from('calendar_events')
+          .select(`
+            *,
+            lead:leads(
+              *,
+              contact:contacts(*),
+              account:accounts(*)
+            ),
+            job:jobs(
+              *,
+              account:accounts(*),
+              contact:contacts(*)
+            )
+          `)
+          .eq('tenant_id', userProfile.tenant_id)
+          .order('start_time', { ascending: true }),
+        
+        // 4. Fetch customer bookings
+        supabase
+          .from('bookings')
+          .select('*')
+          .eq('tenant_id', userProfile.tenant_id)
+          .order('start_time', { ascending: true })
+      ])
 
-      if (jobsError) {
-        console.error('Error fetching jobs:', jobsError)
-        setError('Failed to fetch jobs')
-        // Fall back to mock data if database fails
-        setEvents(initialMockEvents)
-        return
-      }
+      const scheduleEvents: ScheduleEvent[] = []
 
-      if (jobs && jobs.length > 0) {
-        // Convert jobs to schedule events
-        const scheduleEvents: ScheduleEvent[] = jobs.map(job => {
+      // Process jobs
+      if (jobsResult.data && !jobsResult.error) {
+        jobsResult.data.forEach(job => {
           const startDate = job.start_date ? new Date(job.start_date) : new Date()
-          const dueDate = job.due_date ? new Date(job.due_date) : new Date(startDate.getTime() + 8 * 60 * 60 * 1000) // +8 hours default
+          const dueDate = job.due_date ? new Date(job.due_date) : new Date(startDate.getTime() + 8 * 60 * 60 * 1000)
           
-          return {
-            id: job.id,
+          scheduleEvents.push({
+            id: `job-${job.id}`,
             title: job.title || 'Untitled Job',
             client: job.account?.name || 
                     (job.contact ? (
@@ -136,19 +174,109 @@ const SchedulePage: React.FC = () => {
             date: startDate.toISOString().split('T')[0],
             location: [job.location_address, job.location_city, job.location_state]
               .filter(Boolean).join(', ') || 'Location TBD',
-            assignedTo: ['Technician'], // TODO: Add technician assignment
+            assignedTo: ['Technician'],
             status: mapJobStatusToEventStatus(job.status),
             notes: job.notes || '',
             job,
             account: job.account,
             contact: job.contact
-          }
+          })
         })
-        
-        setEvents(scheduleEvents)
-      } else {
-        // No jobs found, use mock data for demo
-        setEvents(initialMockEvents)
+      }
+
+      // Process leads with site visits
+      if (leadsResult.data && !leadsResult.error) {
+        leadsResult.data.forEach(lead => {
+          const visitDate = new Date(lead.site_visit_date)
+          
+          scheduleEvents.push({
+            id: `lead-${lead.id}`,
+            title: `Site Visit - ${lead.title || 'Lead'}`,
+            client: lead.account?.name || 
+                    (lead.contact ? (
+                      lead.contact.name || 
+                      `${lead.contact.first_name || ''} ${lead.contact.last_name || ''}`.trim()
+                    ) : '') || 
+                    lead.name || 
+                    'Unknown Client',
+            jobId: `LEAD-${lead.id.slice(0, 8)}`,
+            type: 'meeting',
+            startTime: visitDate.toTimeString().slice(0, 5),
+            endTime: new Date(visitDate.getTime() + 60 * 60 * 1000).toTimeString().slice(0, 5), // 1 hour default
+            date: visitDate.toISOString().split('T')[0],
+            location: lead.full_address || lead.street_address || 'Location TBD',
+            assignedTo: [lead.assigned_rep ? 'Assigned' : 'Unassigned'],
+            status: lead.status === 'site_visit_scheduled' ? 'scheduled' : 'completed',
+            notes: lead.site_visit_notes || 'Site visit scheduled'
+          })
+        })
+      }
+
+      // Process calendar events
+      if (calendarResult.data && !calendarResult.error) {
+        calendarResult.data.forEach(event => {
+          const startTime = new Date(event.start_time)
+          const endTime = event.end_time ? new Date(event.end_time) : new Date(startTime.getTime() + 60 * 60 * 1000)
+          
+          // Skip if this calendar event is already represented as a job or lead
+          if (event.job_id && scheduleEvents.some(e => e.id === `job-${event.job_id}`)) return
+          if (event.lead_id && scheduleEvents.some(e => e.id === `lead-${event.lead_id}`)) return
+          
+          scheduleEvents.push({
+            id: `calendar-${event.id}`,
+            title: event.title || 'Calendar Event',
+            client: event.lead?.contact?.name || event.job?.account?.name || 'Unknown',
+            jobId: `EVENT-${event.id.slice(0, 8)}`,
+            type: event.event_type === 'site_visit' ? 'meeting' : 
+                  event.event_type === 'job_work' ? 'work' : 
+                  event.event_type === 'inspection' ? 'inspection' : 'meeting',
+            startTime: startTime.toTimeString().slice(0, 5),
+            endTime: endTime.toTimeString().slice(0, 5),
+            date: startTime.toISOString().split('T')[0],
+            location: event.location || 'Location TBD',
+            assignedTo: [event.assigned_to || 'Unassigned'],
+            status: event.status === 'completed' ? 'completed' : 
+                    event.status === 'cancelled' ? 'cancelled' : 'scheduled',
+            notes: event.description || ''
+          })
+        })
+      }
+
+      // Process bookings
+      if (bookingsResult.data && !bookingsResult.error) {
+        bookingsResult.data.forEach(booking => {
+          const startTime = new Date(booking.start_time)
+          const endTime = booking.end_time ? new Date(booking.end_time) : new Date(startTime.getTime() + 60 * 60 * 1000)
+          
+          scheduleEvents.push({
+            id: `booking-${booking.id}`,
+            title: `Customer Booking - ${booking.customer_name || 'Unknown'}`,
+            client: booking.customer_name || 'Unknown',
+            jobId: `BOOK-${booking.id.slice(0, 8)}`,
+            type: 'meeting',
+            startTime: startTime.toTimeString().slice(0, 5),
+            endTime: endTime.toTimeString().slice(0, 5),
+            date: startTime.toISOString().split('T')[0],
+            location: 'Location TBD',
+            assignedTo: ['Unassigned'],
+            status: booking.status === 'confirmed' ? 'scheduled' : 
+                    booking.status === 'completed' ? 'completed' : 'cancelled',
+            notes: booking.notes || 'Customer booking'
+          })
+        })
+      }
+
+      // Sort all events by date and time
+      scheduleEvents.sort((a, b) => {
+        const dateA = new Date(`${a.date}T${a.startTime}`)
+        const dateB = new Date(`${b.date}T${b.startTime}`)
+        return dateA.getTime() - dateB.getTime()
+      })
+
+      setEvents(scheduleEvents.length > 0 ? scheduleEvents : initialMockEvents)
+      
+      if (scheduleEvents.length === 0) {
+        setError('No appointments found. Showing demo data.')
       }
     } catch (err) {
       console.error('Error in fetchJobsAsEvents:', err)
@@ -275,7 +403,7 @@ const SchedulePage: React.FC = () => {
 
   const handleSaveEvent = async (eventData: any) => {
     if (!userProfile?.tenant_id) {
-      alert('You must be logged in to create events')
+      showToast.error('You must be logged in to create events')
       return
     }
 
@@ -305,7 +433,7 @@ const SchedulePage: React.FC = () => {
 
       if (jobError) {
         console.error('Error creating job:', jobError)
-        alert('Failed to create job: ' + jobError.message)
+        showToast.error('Failed to create job: ' + jobError.message)
         return
       }
 
@@ -338,27 +466,64 @@ const SchedulePage: React.FC = () => {
       
     } catch (err) {
       console.error('Error saving event:', err)
-      alert('Failed to save event. Please try again.')
+      showToast.error('Failed to save event. Please try again.')
     }
   }
 
   const handleEditEvent = (eventId: string) => {
-    alert(`Edit event ${eventId}`)
+    showToast.info('Edit functionality coming soon')
   }
 
   const handleMarkComplete = async (eventId: string) => {
     if (!userProfile?.tenant_id) return
 
     try {
-      const { error } = await supabase
-        .from('jobs')
-        .update({ status: 'Completed' })
-        .eq('id', eventId)
-        .eq('tenant_id', userProfile.tenant_id)
+      // Determine the type of event and update accordingly
+      const [type, id] = eventId.split('-')
+      
+      let error = null
+      
+      switch (type) {
+        case 'job':
+          const jobResult = await supabase
+            .from('jobs')
+            .update({ status: 'Completed' })
+            .eq('id', id)
+            .eq('tenant_id', userProfile.tenant_id)
+          error = jobResult.error
+          break
+          
+        case 'lead':
+          const leadResult = await supabase
+            .from('leads')
+            .update({ status: 'site_visit_completed' })
+            .eq('id', id)
+            .eq('tenant_id', userProfile.tenant_id)
+          error = leadResult.error
+          break
+          
+        case 'calendar':
+          const calendarResult = await supabase
+            .from('calendar_events')
+            .update({ status: 'completed' })
+            .eq('id', id)
+            .eq('tenant_id', userProfile.tenant_id)
+          error = calendarResult.error
+          break
+          
+        case 'booking':
+          const bookingResult = await supabase
+            .from('bookings')
+            .update({ status: 'completed' })
+            .eq('id', id)
+            .eq('tenant_id', userProfile.tenant_id)
+          error = bookingResult.error
+          break
+      }
 
       if (error) {
-        console.error('Error updating job status:', error)
-        alert('Failed to update job status')
+        console.error('Error updating status:', error)
+        showToast.error('Failed to update status')
         return
       }
 
@@ -370,8 +535,8 @@ const SchedulePage: React.FC = () => {
       ))
       
     } catch (err) {
-      console.error('Error marking job complete:', err)
-      alert('Failed to mark job as complete')
+      console.error('Error marking complete:', err)
+      showToast.error('Failed to mark as complete')
     }
   }
 
@@ -391,7 +556,7 @@ const SchedulePage: React.FC = () => {
 
       if (error) {
         console.error('Error deleting job:', error)
-        alert('Failed to delete job')
+        showToast.error('Failed to delete job')
         return
       }
 
@@ -400,7 +565,7 @@ const SchedulePage: React.FC = () => {
       
     } catch (err) {
       console.error('Error deleting job:', err)
-      alert('Failed to delete job')
+      showToast.error('Failed to delete job')
     }
   }
 
@@ -549,8 +714,8 @@ const SchedulePage: React.FC = () => {
           <KTCard>
             <div className='card-header border-0 pt-5'>
               <h3 className='card-title align-items-start flex-column'>
-                <span className='card-label fw-bold fs-3 mb-1'>Project Schedule</span>
-                <span className='text-muted mt-1 fw-semibold fs-7'>Manage appointments and work schedules</span>
+                <span className='card-label fw-bold fs-3 mb-1'>All Appointments</span>
+                <span className='text-muted mt-1 fw-semibold fs-7'>View all scheduled appointments, site visits, jobs, and bookings</span>
               </h3>
               <div className='card-toolbar'>
                 <button 
@@ -721,93 +886,12 @@ const SchedulePage: React.FC = () => {
       </div>
 
       {/* New Event Modal */}
-      {showEventForm && (
-        <div className='modal fade show d-block' style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
-          <div className='modal-dialog modal-lg'>
-            <div className='modal-content'>
-              <div className='modal-header'>
-                <h5 className='modal-title'>Create New Event</h5>
-                <button 
-                  type='button' 
-                  className='btn-close' 
-                  onClick={() => setShowEventForm(false)}
-                ></button>
-              </div>
-              <div className='modal-body'>
-                <form onSubmit={(e) => {
-                  e.preventDefault()
-                  const formData = new FormData(e.target as HTMLFormElement)
-                  const eventData = {
-                    title: formData.get('title'),
-                    client: formData.get('client'),
-                    type: formData.get('type'),
-                    startTime: formData.get('startTime'),
-                    endTime: formData.get('endTime'),
-                    date: formData.get('date'),
-                    location: formData.get('location'),
-                    assignedTo: formData.get('assignedTo'),
-                    notes: formData.get('notes')
-                  }
-                  handleSaveEvent(eventData)
-                }}>
-                  <div className='row g-3'>
-                    <div className='col-md-6'>
-                      <label className='form-label required'>Event Title</label>
-                      <input type='text' name='title' className='form-control' required />
-                    </div>
-                    <div className='col-md-6'>
-                      <label className='form-label required'>Client Name</label>
-                      <input type='text' name='client' className='form-control' required />
-                    </div>
-                    <div className='col-md-6'>
-                      <label className='form-label required'>Event Type</label>
-                      <select name='type' className='form-select' required>
-                        <option value=''>Select Type</option>
-                        <option value='meeting'>Meeting</option>
-                        <option value='work'>Work</option>
-                        <option value='inspection'>Inspection</option>
-                        <option value='delivery'>Delivery</option>
-                      </select>
-                    </div>
-                    <div className='col-md-6'>
-                      <label className='form-label required'>Date</label>
-                      <input type='date' name='date' className='form-control' defaultValue={selectedDate} required />
-                    </div>
-                    <div className='col-md-6'>
-                      <label className='form-label required'>Start Time</label>
-                      <input type='time' name='startTime' className='form-control' required />
-                    </div>
-                    <div className='col-md-6'>
-                      <label className='form-label required'>End Time</label>
-                      <input type='time' name='endTime' className='form-control' required />
-                    </div>
-                    <div className='col-12'>
-                      <label className='form-label required'>Location</label>
-                      <input type='text' name='location' className='form-control' placeholder='123 Main St, City, State' required />
-                    </div>
-                    <div className='col-12'>
-                      <label className='form-label required'>Assigned To</label>
-                      <input type='text' name='assignedTo' className='form-control' placeholder='Technician name' required />
-                    </div>
-                    <div className='col-12'>
-                      <label className='form-label'>Notes</label>
-                      <textarea name='notes' className='form-control' rows={3} placeholder='Additional notes...'></textarea>
-                    </div>
-                  </div>
-                  <div className='modal-footer'>
-                    <button type='button' className='btn btn-light' onClick={() => setShowEventForm(false)}>
-                      Cancel
-                    </button>
-                    <button type='submit' className='btn btn-primary'>
-                      Create Event
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ScheduleEventForm
+        isOpen={showEventForm}
+        onClose={() => setShowEventForm(false)}
+        onSave={handleSaveEvent}
+        selectedDate={selectedDate}
+      />
     </>
   )
 }

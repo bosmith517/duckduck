@@ -45,8 +45,8 @@ const I18nProvider: FC<WithChildren> = ({children}) => {
   const messages = allMessages[locale]
 
   return (
-    <IntlProvider locale={locale} messages={messages}>
-      {children}
+    <IntlProvider locale={locale} messages={messages || enMessages}>
+      {children as any}
     </IntlProvider>
   )
 }

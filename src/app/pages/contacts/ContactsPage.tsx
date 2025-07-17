@@ -8,6 +8,7 @@ import { QuickAddClient } from '../../components/clients/QuickAddClient'
 import { CustomerWorkflowModal } from '../../components/workflows/CustomerWorkflowModal'
 import { Job } from '../../../supabaseClient'
 import { useLocation } from 'react-router-dom'
+import { normalizePhoneNumber, phoneNumbersMatch } from '../../../lib/phoneUtils'
 
 const ContactsPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
@@ -154,8 +155,8 @@ const ContactsPage: React.FC = () => {
         account_id: newContact.account_id,
         title: newContact.title,
         email: newContact.email,
-        phone: newContact.phone,
-        mobile: newContact.mobile,
+        phone: normalizePhoneNumber(newContact.phone) || newContact.phone,
+        mobile: normalizePhoneNumber(newContact.mobile) || newContact.mobile,
         notes: newContact.notes,
         tenant_id: newContact.tenant_id
         // Note: is_primary is kept in local storage only
@@ -343,12 +344,29 @@ const ContactsPage: React.FC = () => {
     setWorkflowContact(null)
   }
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (contact.email && contact.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (contact.account?.name && contact.account.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  const filteredContacts = contacts.filter(contact => {
+    const term = searchTerm.toLowerCase()
+    
+    // Basic text searches
+    const textMatches = 
+      contact.first_name.toLowerCase().includes(term) ||
+      contact.last_name.toLowerCase().includes(term) ||
+      (contact.email && contact.email.toLowerCase().includes(term)) ||
+      (contact.account?.name && contact.account.name.toLowerCase().includes(term))
+    
+    // Phone number search with normalization
+    const phoneMatches = contact.phone && (
+      contact.phone.toLowerCase().includes(term) ||
+      phoneNumbersMatch(searchTerm, contact.phone)
+    )
+    
+    const mobileMatches = contact.mobile && (
+      contact.mobile.toLowerCase().includes(term) ||
+      phoneNumbersMatch(searchTerm, contact.mobile)
+    )
+    
+    return textMatches || phoneMatches || mobileMatches
+  })
 
   return (
     <>

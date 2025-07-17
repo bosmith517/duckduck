@@ -5,11 +5,16 @@ import { estimatesService, EstimateWithAccount } from '../../services/estimatesS
 import { ConvertToJobModal } from './components/ConvertToJobModal'
 import { EstimateForm } from './components/EstimateForm'
 import { EstimateStatusModal } from './components/EstimateStatusModal'
+import { LinkEstimateToLeadModal } from '../../components/estimates/LinkEstimateToLeadModal'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
 import { jobActivityService } from '../../services/jobActivityService'
+import { useCustomerJourneyStore } from '../../stores/customerJourneyStore'
+import { showToast } from '../../utils/toast'
 
 const EstimatesPage: React.FC = () => {
   const { userProfile } = useSupabaseAuth()
+  const journeyLead = useCustomerJourneyStore(state => state.lead)
+  const journeyJob = useCustomerJourneyStore(state => state.job)
   const [estimates, setEstimates] = useState<EstimateWithAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -22,6 +27,10 @@ const EstimatesPage: React.FC = () => {
     estimateId: string
     currentStatus: string
     newStatus: string
+  } | null>(null)
+  const [linkToLeadModal, setLinkToLeadModal] = useState<{
+    estimateId: string
+    estimateNumber: string
   } | null>(null)
 
   useEffect(() => {
@@ -43,7 +52,7 @@ const EstimatesPage: React.FC = () => {
 
   const handleCreateEstimate = async (estimateData: any) => {
     if (!userProfile?.tenant_id) {
-      alert('Authentication error. Please refresh and try again.')
+      showToast.error('Authentication error. Please refresh and try again.')
       return
     }
 
@@ -54,16 +63,23 @@ const EstimatesPage: React.FC = () => {
       }
       const createdEstimate = await estimatesService.createEstimate(estimateWithTenant)
       
-      // Log estimate creation activity if job_id exists
-      if (userProfile?.id && estimateData.job_id) {
+      // Log estimate creation activity
+      if (userProfile?.id && estimateData.lead_id) {
         try {
-          await jobActivityService.logEstimateCreated(
-            estimateData.job_id,
-            userProfile.tenant_id,
-            userProfile.id,
-            createdEstimate.id,
-            estimateData.total_amount || 0
-          )
+          await jobActivityService.logActivity({
+            leadId: estimateData.lead_id,
+            jobId: estimateData.job_id,
+            tenantId: userProfile.tenant_id,
+            userId: userProfile.id,
+            activityType: 'estimate_created',
+            title: 'Estimate Created',
+            description: `Created estimate v${estimateData.version || 1} for ${estimateData.total_amount || 0}`,
+            metadata: {
+              estimate_id: createdEstimate.id,
+              version: estimateData.version || 1,
+              total_amount: estimateData.total_amount || 0
+            }
+          })
         } catch (logError) {
           console.error('Failed to log estimate creation activity:', logError)
         }
@@ -71,10 +87,10 @@ const EstimatesPage: React.FC = () => {
       
       setShowEstimateForm(false)
       loadEstimates()
-      // Show success toast
+      showToast.success('Estimate created successfully!')
     } catch (error) {
       console.error('Error creating estimate:', error)
-      // Show error toast
+      showToast.error('Failed to create estimate')
     }
   }
 
@@ -86,10 +102,10 @@ const EstimatesPage: React.FC = () => {
       setShowEstimateForm(false)
       setEditingEstimate(null)
       loadEstimates()
-      // Show success toast
+      showToast.success('Estimate updated successfully!')
     } catch (error) {
       console.error('Error updating estimate:', error)
-      // Show error toast
+      showToast.error('Failed to update estimate')
     }
   }
 
@@ -187,6 +203,18 @@ const EstimatesPage: React.FC = () => {
     return daysUntilExpiry <= 7 && daysUntilExpiry > 0
   }
 
+  const getEstimateContext = (estimate: EstimateWithAccount) => {
+    if (estimate.lead_id && !estimate.job_id) {
+      return { type: 'journey', label: 'Journey', color: 'success' }
+    } else if (estimate.job_id && !estimate.lead_id) {
+      return { type: 'change_order', label: 'Change Order', color: 'info' }
+    } else if (!estimate.lead_id && !estimate.job_id) {
+      return { type: 'standalone', label: 'Standalone', color: 'warning' }
+    } else {
+      return { type: 'hybrid', label: 'Linked', color: 'primary' }
+    }
+  }
+
   const filteredEstimates = estimates
 
   return (
@@ -216,6 +244,9 @@ const EstimatesPage: React.FC = () => {
                   >
                     <i className='ki-duotone ki-plus fs-2'></i>
                     New Custom Estimate
+                    {journeyLead && (
+                      <span className='badge badge-light-success ms-2'>Journey Active</span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -313,7 +344,17 @@ const EstimatesPage: React.FC = () => {
                             </div>
                           </td>
                           <td>
-                            <span className='text-dark fw-bold fs-6'>{estimate.project_title}</span>
+                            <div className='d-flex flex-column'>
+                              <span className='text-dark fw-bold fs-6'>{estimate.project_title}</span>
+                              {(() => {
+                                const context = getEstimateContext(estimate)
+                                return (
+                                  <span className={`badge badge-light-${context.color} fs-8 mt-1`}>
+                                    {context.label}
+                                  </span>
+                                )
+                              })()}
+                            </div>
                           </td>
                           <td>
                             <span className={getStatusBadge(estimate.status)}>
@@ -451,6 +492,32 @@ const EstimatesPage: React.FC = () => {
                                 </a>
                               )}
 
+                              {/* Link to Journey option for standalone estimates */}
+                              {getEstimateContext(estimate).type === 'standalone' && (
+                                <a
+                                  href='#'
+                                  className='btn btn-icon btn-bg-light btn-active-color-warning btn-sm me-1'
+                                  title='Link to Customer Journey'
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    setLinkToLeadModal({
+                                      estimateId: estimate.id,
+                                      estimateNumber: estimate.estimate_number || 'Unknown'
+                                    })
+                                  }}
+                                >
+                                  <i className='ki-duotone ki-route fs-3'>
+                                    <span className='path1'></span>
+                                    <span className='path2'></span>
+                                  </i>
+                                </a>
+                              )}
+
+                              {/* Show revision count */}
+                              {estimate.version && estimate.version > 1 && (
+                                <span className='badge badge-light-info me-2'>v{estimate.version}</span>
+                              )}
+                              
                               {/* Go to Job button for converted estimates */}
                               {estimate.job_id && (
                                 <a
@@ -505,6 +572,8 @@ const EstimatesPage: React.FC = () => {
             setShowEstimateForm(false)
             setEditingEstimate(null)
           }}
+          leadId={editingEstimate?.lead_id || journeyLead?.id}
+          jobId={editingEstimate?.job_id || journeyJob?.id}
           accountId={editingEstimate?.account_id || editingEstimate?.contact_id || undefined}
         />
       )}
@@ -533,6 +602,20 @@ const EstimatesPage: React.FC = () => {
             feedback
           )}
           onCancel={() => setStatusChangeModal(null)}
+        />
+      )}
+
+      {/* Link to Lead Modal */}
+      {linkToLeadModal && (
+        <LinkEstimateToLeadModal
+          estimateId={linkToLeadModal.estimateId}
+          estimateNumber={linkToLeadModal.estimateNumber}
+          isOpen={true}
+          onClose={() => setLinkToLeadModal(null)}
+          onLinked={(leadId) => {
+            loadEstimates() // Reload to show updated context
+            showToast.success('Estimate successfully linked to customer journey!')
+          }}
         />
       )}
     </>

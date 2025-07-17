@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
+import react from '@vitejs/plugin-react'
 import path from 'path' // You need to import the 'path' module
 
 // https://vitejs.dev/config/
@@ -27,7 +27,7 @@ export default defineConfig({
   },
   // Handle SignalWire package optimization
   optimizeDeps: {
-    include: ['@signalwire/js', 'react', 'react-dom', 'react/jsx-runtime'],
+    include: ['@signalwire/js', 'react', 'react-dom', 'react/jsx-runtime', 'react-router-dom'],
     exclude: ['@vite/client', '@vite/env']
   },
   // This section fixes SignalWire WebSocket issues
@@ -36,7 +36,8 @@ export default defineConfig({
       'ws': 'isomorphic-ws', // Use browser-friendly WebSocket polyfill
       'react': path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom')
-    }
+    },
+    dedupe: ['react', 'react-dom']
   },
   define: {
     global: 'globalThis',

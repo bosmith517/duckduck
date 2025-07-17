@@ -1,6 +1,5 @@
 
 import React, {useEffect, useRef, useState} from 'react'
-import {CopyToClipboard} from 'react-copy-to-clipboard'
 import {Highlight} from 'prism-react-renderer'
 import {OverlayTrigger, Tooltip} from 'react-bootstrap'
 
@@ -42,9 +41,16 @@ const CodeBlock: React.FC<Props> = ({code, language}) => {
           placement='top'
           overlay={<Tooltip id='tooltip-copy-to-clipboard'>Copy Code</Tooltip>}
         >
-          <CopyToClipboard text={code} onCopy={() => setCopied(true)}>
-            <a className='highlight-copy btn'>{copied ? 'copied' : 'copy'}</a>
-          </CopyToClipboard>
+          <a 
+            className='highlight-copy btn' 
+            onClick={() => {
+              navigator.clipboard.writeText(code).then(() => {
+                setCopied(true)
+              })
+            }}
+          >
+            {copied ? 'copied' : 'copy'}
+          </a>
         </OverlayTrigger>
 
         <div className='highlight-code' ref={codeRef}>

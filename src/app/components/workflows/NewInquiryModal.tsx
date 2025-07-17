@@ -1,9 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useFormik } from 'formik'
 import * as Yup from 'yup'
 import clsx from 'clsx'
 import { supabase } from '../../../supabaseClient'
 import { useSupabaseAuth } from '../../modules/auth/core/SupabaseAuth'
+import { useCustomerJourneyStore, journeyEventBus, JOURNEY_EVENTS } from '../../stores/customerJourneyStore'
+import { useSmartAssistant } from '../../hooks/useSmartAssistant'
+import { StepTrackerMini } from '../journey/StepTracker'
+import type { LeadSchema } from '../../contexts/CustomerJourneyContext'
+import { normalizePhoneNumber, phoneNumbersMatch } from '../../../lib/phoneUtils'
 
 interface NewInquiryModalProps {
   isOpen: boolean
@@ -74,8 +79,11 @@ const inquirySchema = Yup.object().shape({
     .oneOf(['business', 'individual'], 'Please select caller type')
     .required('Caller type is required'),
   phone_number: Yup.string()
-    .matches(/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number')
-    .required('Phone number is required'),
+    .required('Phone number is required')
+    .test('phone-valid', 'Please enter a valid phone number', (value) => {
+      if (!value) return false
+      return normalizePhoneNumber(value) !== null
+    }),
   email: Yup.string().email('Invalid email format'),
   lead_source: Yup.string().required('Please specify how they heard about you'),
   initial_request: Yup.string()
@@ -104,6 +112,18 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
 }) => {
   const { userProfile } = useSupabaseAuth()
   const [loading, setLoading] = useState(false)
+  
+  // Customer Journey integration
+  const { setLead, updateStep, startNewJourney } = useCustomerJourneyStore()
+  const { trackAction } = useSmartAssistant()
+  
+  // Start new journey when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      startNewJourney()
+      trackAction('opened_new_inquiry_modal')
+    }
+  }, [isOpen, startNewJourney, trackAction])
 
   // Helper functions for dynamic labels
   const getCallerLabel = (callerType: string) => {
@@ -155,11 +175,16 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
     setLoading(true)
     try {
       // 1. Create Lead Record with error handling for schema mismatches
+      const normalizedPhone = normalizePhoneNumber(values.phone_number) || values.phone_number
+      
       const leadData = {
         tenant_id: userProfile.tenant_id,
+        name: values.caller_name, // Add name field
         caller_name: values.caller_name,
         caller_type: values.caller_type, // 'business' for clients, 'individual' for customers
-        phone_number: values.phone_number,
+        contact_type: values.caller_type === 'business' ? 'business' : 'residential', // Map to contact_type
+        company_name: values.caller_type === 'business' ? (values.business_name || values.caller_name) : null,
+        phone_number: normalizedPhone,
         email: values.email || null,
         lead_source: values.lead_source,
         initial_request: values.initial_request,
@@ -253,10 +278,10 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
         contactId = contact.id
 
         // Update lead with contact reference
-        console.log('Updating lead with converted_contact_id:', contactId)
+        console.log('Updating lead with contact_id:', contactId)
         const { error: updateContactError } = await supabase
           .from('leads')
-          .update({ converted_contact_id: contactId })
+          .update({ contact_id: contactId })
           .eq('id', lead.id)
         
         if (updateContactError) {
@@ -299,10 +324,10 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
         accountId = account.id
 
         // Update lead with account reference
-        console.log('Updating lead with converted_account_id:', accountId)
+        console.log('Updating lead with account_id:', accountId)
         const { error: updateAccountError } = await supabase
           .from('leads')
-          .update({ converted_account_id: accountId })
+          .update({ account_id: accountId })
           .eq('id', lead.id)
         
         if (updateAccountError) {
@@ -417,6 +442,32 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
         }
       }
 
+      // Update Customer Journey Store
+      const journeyLead: LeadSchema = {
+        id: lead.id,
+        name: lead.caller_name || lead.name || '',
+        contact: {
+          email: lead.email,
+          phone: lead.phone_number || lead.phone
+        },
+        service_type: lead.initial_request || '',
+        urgency: lead.urgency as 'low' | 'medium' | 'high',
+        source: lead.lead_source,
+        notes: lead.notes,
+        status: 'new',
+        site_visit_date: lead.site_visit_date,
+        full_address: lead.full_address || lead.street_address,
+        created_at: lead.created_at,
+        updated_at: lead.updated_at || lead.created_at,
+        // Include customer relationship fields
+        account_id: accountId || undefined,
+        contact_id: contactId || undefined,
+        contact_type: values.caller_type === 'business' ? 'business' : 'residential'
+      }
+      
+      setLead(journeyLead)
+      trackAction('lead_created_successfully')
+      
       // Success - close modal and return lead ID
       onSuccess(lead.id)
       formik.resetForm()
@@ -459,6 +510,9 @@ export const NewInquiryModal: React.FC<NewInquiryModalProps> = ({
 
           <form onSubmit={formik.handleSubmit} noValidate>
             <div className="modal-body">
+              {/* Journey Progress */}
+              <StepTrackerMini className="mb-5" />
+              
               <div className="notice d-flex bg-light-info rounded border-info border border-dashed p-6 mb-7">
                 <div className="d-flex flex-stack flex-grow-1">
                   <div className="fw-semibold">

@@ -20,12 +20,14 @@ import { InspectionManager } from '../../components/jobs/InspectionManager'
 import { MilestoneManager } from '../../components/jobs/MilestoneManager'
 import { TeamAssignmentManager } from '../../components/jobs/TeamAssignmentManager'
 import { MaterialOrderManager } from '../../components/jobs/MaterialOrderManager'
+import CopyPortalLink from '../../components/jobs/CopyPortalLink'
 
 interface JobWithRelations {
   id: string
   tenant_id: string
   account_id: string
   contact_id?: string
+  lead_id?: string
   created_at: string
   updated_at: string
   status?: string
@@ -803,21 +805,7 @@ const JobDetailsPage: React.FC = () => {
                       </div>
                       {/* Customer Portal URL */}
                       {portalUrl && (
-                        <div className='alert alert-success d-flex align-items-center p-5 mb-4'>
-                          <i className='ki-duotone ki-user-tick fs-2hx text-success me-4'>
-                            <span className='path1'></span>
-                            <span className='path2'></span>
-                            <span className='path3'></span>
-                          </i>
-                          <div className='d-flex flex-column'>
-                            <h5 className='mb-1'>Customer Portal Generated!</h5>
-                            <span className='fw-bold'>Portal Link:</span>
-                            <a href={portalUrl} target='_blank' rel='noopener noreferrer' className='link-primary fw-semibold'>
-                              {portalUrl}
-                            </a>
-                            <span className='text-muted fs-7 mt-1'>Customer has been notified via SMS/email</span>
-                          </div>
-                        </div>
+                        <CopyPortalLink portalUrl={portalUrl} jobNumber={job.job_number} />
                       )}
                       
                       <div className='d-flex justify-content-between mb-4'>
@@ -1027,8 +1015,10 @@ const JobDetailsPage: React.FC = () => {
             <div>
               <JobActivityTimeline 
                 jobId={job.id} 
+                leadId={job.lead_id}
                 showCustomerView={false}
                 showAddNoteButton={true}
+                showCompleteJourney={true}
                 onAddNote={handleAddNote}
               />
               

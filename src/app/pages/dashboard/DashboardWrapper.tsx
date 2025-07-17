@@ -23,13 +23,22 @@ import { KTIcon } from '../../../_metronic/helpers'
 import { supabase } from '../../../supabaseClient'
 import { NewInquiryButton } from '../../components/workflows/WorkflowLauncher'
 import { useUserPermissions } from '../../hooks/useUserPermissions'
+import StepTracker from '../../components/journey/StepTracker'
+import { useCustomerJourneyStore } from '../../stores/customerJourneyStore'
+import { config } from '../../../lib/config'
+import { useNavigate } from 'react-router-dom'
 
 const DashboardPage = () => {
   const { tenant } = useSupabaseAuth()
   const { canManageInfrastructure } = useUserPermissions()
+  const { leadId, step } = useCustomerJourneyStore()
+  const navigate = useNavigate()
   
   // Show quick setup if onboarding not completed
   const showQuickSetup = !tenant?.onboarding_completed
+  
+  // Show journey tracker if there's an active journey and unified journey is enabled
+  const showJourneyTracker = leadId && step !== 'completed' && config.journey.enabled
 
   const handleQuickSetup = () => {
     // Quick Setup button clicked
@@ -141,6 +150,53 @@ const DashboardPage = () => {
         </div>
       </div>
     </div>
+
+    {/* Active Journey Tracker */}
+    {showJourneyTracker && (
+      <div className='row g-5 g-xl-8 mb-6'>
+        <div className='col-12'>
+          <div className='card'>
+            <div className='card-header border-0 pt-5'>
+              <h3 className='card-title align-items-start flex-column'>
+                <span className='card-label fw-bold fs-3 mb-1'>Active Customer Journey</span>
+                <span className='text-muted mt-1 fw-semibold fs-7'>Track progress from inquiry to completion</span>
+              </h3>
+            </div>
+            <div className='card-body pt-0'>
+              <StepTracker 
+                showDescriptions={true}
+                showAISuggestions={true}
+                onStepClick={(step) => {
+                  // Navigate to appropriate page based on step (SPA navigation)
+                  switch (step) {
+                    case 'new_inquiry':
+                      navigate('/leads')
+                      break
+                    case 'site_visit':
+                      navigate('/schedule')
+                      break
+                    case 'estimate':
+                      navigate('/estimates')
+                      break
+                    case 'conversion':
+                      navigate('/estimates')
+                      break
+                    case 'job_tracking':
+                      navigate('/jobs')
+                      break
+                    case 'portal':
+                      navigate('/billing/customer-portal')
+                      break
+                    default:
+                      break
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Quick Setup Banner - For contractor users */}
     {showQuickSetup && !canManageInfrastructure() && (

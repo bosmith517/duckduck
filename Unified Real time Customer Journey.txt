@@ -1,0 +1,358 @@
+ Product Requirement Prompt: Unified Real-Time Customer Journey & AI-Assisted Workflow         
+  System (v3)
+
+  Title
+
+  Create a Connected, Real-Time Customer Journey System with AI Assistance, Multi-Photo
+  Batch Upload, and Live Component Communication
+
+  1. Purpose & Vision
+
+  Transform the existing collection of 30+ isolated customer journey components into a
+  single, coherent workflow layer that:
+  - Glues every component together with real-time synchronization
+  - Feeds structured data to AI helpers for contextual assistance
+  - Provides live updates without page refreshes
+  - Supports batch photo capture and upload
+  - Guides contractors smoothly from lead capture through job completion
+
+  2. Business Goals & Success Metrics
+
+  | Goal                             | KPI / Success Metric
+    |
+  |----------------------------------|-----------------------------------------------------     
+  --|
+  | Reduce lead-to-job cycle time    | -25% average days from inquiry → scheduled job
+    |
+  | Increase contractor productivity | ≥2 contextual AI suggestions per step, ≥60% accepted     
+    |
+  | Eliminate data re-entry          | 0 duplicate form fills across journey
+    |
+  | Improve photo capture efficiency | Upload/capture ≥5 photos in one action, <5s per
+  batch |
+  | Component communication          | <100ms update propagation between components
+    |
+  | User satisfaction                | Zero manual refreshes needed
+    |
+
+  3. Current State Assessment
+
+  ❌ Problems to Solve
+
+  - No Real-time Updates: Components write to database but don't notify each other
+  - No Shared State: Each of 30+ components works in isolation
+  - No Event System: Components can't communicate directly
+  - Database as Message Bus: Requires manual refresh to see updates
+  - Limited Communication: Only 5-6 components have parent-child callbacks
+  - Broken Photo Upload: Multi-photo selection not working
+
+  📁 Components to Connect
+
+  Workflow Components (/src/app/components/workflows/)
+  - CustomerWorkflowModal.tsx - Main journey orchestrator
+  - WorkflowLauncher.tsx - Journey initiator
+  - NewInquiryModal.tsx - Lead capture (Step 1)
+  - SiteVisitModal.tsx - Schedule visits (Step 2)
+  - CreateEstimateModal.tsx - AI estimate creation (Step 3)
+  - PromoteToJobModal.tsx - Lead to job conversion (Step 4)
+
+  Portal & Tracking (/src/app/components/customer-portal/)
+  - SmartDashboard.tsx, JobHistoryTimeline.tsx, LiveJobLog.tsx
+  - ServiceSchedulingModal.tsx, ReferralDashboard.tsx, MaintenanceHub.tsx
+
+  Onboarding (/src/app/components/onboarding/)
+  - CustomerIntakeModal.tsx, HomeownerOnboardingModal.tsx
+  - ContractorOnboarding.tsx, OnboardingGuard.tsx
+
+  4. Functional Requirements
+
+  4.1 Global Journey Store
+
+  Create useCustomerJourneyStore() using Zustand:
+  interface JourneyStore {
+    // Current state
+    step: 'new_inquiry' | 'site_visit' | 'estimate' | 'conversion' | 'job_tracking' |
+  'portal'
+    leadId?: string
+    siteVisitId?: string
+    estimateId?: string
+    jobId?: string
+    contactId?: string
+    accountId?: string
+
+    // Photo batch state
+    photoQueue: File[]
+    uploadProgress: number
+
+    // Methods
+    setJourney: (data: Partial<JourneyData>) => void
+    addPhotos: (files: File[]) => void
+    clearPhotoQueue: () => void
+  }
+
+  4.2 Real-Time Sync Layer
+
+  Implement Supabase real-time subscriptions:
+  // Subscribe to all journey-related tables
+  supabase.channel('journey-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' },
+  handleLeadChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'site_visits' },
+  handleVisitChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'estimates' },
+  handleEstimateChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' },
+  handleJobChange)
+    .subscribe()
+
+  4.3 Event Bus System
+
+  Lightweight EventEmitter for fine-grained component communication:
+  // journeyBus.ts
+  export const journeyBus = new EventEmitter()
+
+  // Usage examples
+  journeyBus.emit('leadQualified', { leadId, score })
+  journeyBus.emit('siteVisitScheduled', { visitId, date })
+  journeyBus.emit('estimateApproved', { estimateId, jobId })
+  journeyBus.emit('photoBatchUploaded', { count, jobId })
+
+  4.4 Visual Step Tracker Component
+
+  Reusable progress indicator:
+  <StepTracker
+    currentStep={journey.step}
+    completedSteps={['new_inquiry', 'site_visit']}
+    onStepClick={(step) => navigateToStep(step)}
+    showAISuggestions={true}
+  />
+
+  Features:
+  - Shows journey: Inquiry → Site Visit → Estimate → Conversion → Job → Portal
+  - Highlights current/completed steps
+  - AI suggestion badges on relevant steps
+  - Click to navigate between steps
+
+  4.5 AI-Friendly Schemas & Hooks
+
+  Standardized TypeScript interfaces:
+  interface LeadSchema {
+    id: string
+    name: string
+    contact: { email?: string; phone?: string }
+    service_type: string
+    urgency: 'low' | 'medium' | 'high'
+    source?: string
+    notes?: string
+    status: 'new' | 'qualified' | 'converted'
+  }
+
+  interface AIContext {
+    currentStep: string
+    entityData: LeadSchema | EstimateSchema | JobSchema
+    historicalActions: string[]
+    suggestedActions: AIAction[]
+  }
+
+  // Hook for AI assistance
+  const { suggestions, acceptSuggestion } = useSmartAssistant(journey)
+
+  4.6 Multi-Photo Capture & Batch Upload
+
+  Enhanced photo functionality:
+  - Mobile: Continuous capture mode via @capacitor-community/camera-preview
+  - Desktop: Drag & drop multiple files
+  - Gallery: Multi-select with <input type="file" multiple>
+  - Preview: Thumbnail grid with reorder/delete
+  - Batch Upload: Progress tracking, 3 concurrent uploads
+  - Metadata: GPS location, descriptions per photo
+
+  4.7 Transactional Lead Conversion
+
+  Atomic database operations:
+  -- Postgres function for safe conversion
+  CREATE FUNCTION convert_lead_to_job(
+    p_lead_id UUID,
+    p_tenant_id UUID
+  ) RETURNS TABLE(account_id UUID, contact_id UUID, job_id UUID)
+  AS $$
+  BEGIN
+    -- All inserts in transaction
+    -- Rollback on any failure
+  END;
+  $$ LANGUAGE plpgsql;
+
+  4.8 Error Handling & Logging
+
+  - Replace alert() with toast notifications
+  - Structured error logging to Sentry
+  - User-friendly error messages
+  - Retry logic for failed operations
+
+  5. Non-Functional Requirements
+
+  | Area          | Requirement                                    |
+  |---------------|------------------------------------------------|
+  | Performance   | Store update → UI paint <120ms                 |
+  | Security      | Respect tenant RLS; no cross-tenant data leaks |
+  | Offline       | Queue operations; sync when online             |
+  | Timezone      | Use tenant locale for all timestamps           |
+  | Scalability   | Support 100+ concurrent users per tenant       |
+  | Accessibility | WCAG 2.1 AA compliance                         |
+
+  6. Technical Architecture
+
+  State Management Stack
+
+  ┌─────────────────────────────────────┐
+  │      UI Components (React)          │
+  ├─────────────────────────────────────┤
+  │    CustomerJourneyStore (Zustand)   │
+  ├─────────────────────────────────────┤
+  │  Event Bus  │  Supabase Realtime   │
+  ├─────────────────────────────────────┤
+  │      Supabase Database (RLS)       │
+  └─────────────────────────────────────┘
+
+  Data Flow
+
+  1. User action → Update store → Emit event
+  2. Store update → Trigger Supabase mutation
+  3. Database change → Realtime broadcast
+  4. Other components → Receive update → Re-render
+
+  7. Implementation Phases
+
+  Phase 1: State Layer Foundation (Week 1-2)
+
+  - Create CustomerJourneyProvider with Zustand
+  - Define TypeScript schemas for all entities
+  - Migrate NewInquiryModal to use store
+  - Set up basic event bus
+
+  Phase 2: Real-Time Infrastructure (Week 3-4)
+
+  - Implement Supabase channel subscriptions
+  - Wire up leads, jobs, estimates tables
+  - Add cross-tab synchronization
+  - Test multi-user scenarios
+
+  Phase 3: Visual Journey UI (Week 5-6)
+
+  - Build StepTracker component
+  - Integrate into all workflow modals
+  - Add navigation between steps
+  - Implement toast notifications
+
+  Phase 4: AI Integration (Week 7-8)
+
+  - Create useSmartAssistant hook
+  - Define AI action schemas
+  - Implement suggestion rendering
+  - Add feedback loop for AI training
+
+  Phase 5: Photo Batch System (Week 9-10)
+
+  - Implement PhotoCaptureEnhanced
+  - Add batch upload service
+  - Create preview gallery
+  - Test on mobile devices
+
+  Phase 6: Transactional Safety (Week 11-12)
+
+  - Create Postgres transaction functions
+  - Add rollback handling
+  - Implement retry logic
+  - Set up Sentry error tracking
+
+  8. Acceptance Criteria
+
+  ✅ Real-Time Propagation
+
+  - Create lead in NewInquiryModal → Appears in LeadsPage within 1s
+  - No manual refresh needed anywhere
+
+  ✅ Journey Auto-Advance
+
+  - Complete site visit → Step auto-advances to 'estimate'
+  - StepTracker updates immediately
+
+  ✅ AI Assistance
+
+  - At each step, 2+ contextual suggestions appear
+  - Click suggestion → Relevant modal/action triggers
+
+  ✅ Photo Batch Success
+
+  - Capture 5+ photos in one session
+  - Preview with reorder/delete
+  - Upload all with progress tracking
+  - All photos linked to correct job
+
+  ✅ Atomic Conversion
+
+  - Simulate DB error during conversion
+  - Verify full rollback (no orphan records)
+  - User sees clear error message
+
+  ✅ Cross-Component Sync
+
+  - Update in one tab → Reflects in all tabs
+  - Mobile and desktop stay in sync
+
+  9. Dependencies & Tech Stack
+
+  - Frontend: React 18 + TypeScript + Vite
+  - State: Zustand (primary) + Context API (legacy)
+  - Real-time: Supabase JS v2 (Channels + Realtime)
+  - UI Kit: Metronic 8 (Bootstrap 5)
+  - Events: EventEmitter3
+  - Photos: @capacitor-community/camera-preview
+  - Errors: Sentry
+  - Time: dayjs with timezone plugin
+  - Validation: Yup schemas
+
+  10. Testing Strategy
+
+  Unit Tests
+
+  - Journey store actions and selectors
+  - Event bus emit/subscribe
+  - Schema validation
+  - AI suggestion logic
+
+  Integration Tests
+
+  - Component → Store → Database flow
+  - Real-time subscription updates
+  - Photo upload with progress
+  - Error handling and rollback
+
+  E2E Tests
+
+  - Complete journey flow (lead → job → portal)
+  - Multi-user concurrent updates
+  - Offline → online sync
+  - Mobile photo capture flow
+
+  11. Success Metrics & Monitoring
+
+  - Journey Completion Rate: Track % of leads reaching job status
+  - AI Suggestion Acceptance: Monitor which suggestions users follow
+  - Component Update Latency: Measure real-time sync performance
+  - Photo Upload Success: Track batch upload completion rates
+  - Error Rates: Monitor Sentry for conversion failures
+
+  12. Future Enhancements
+
+  - Voice-guided journey navigation
+  - Predictive next-step recommendations
+  - Automated workflow triggers
+  - Journey analytics dashboard
+  - Mobile offline-first architecture
+  - Integration with external CRMs
+
+  ---
+  This unified PRP combines all requirements for creating a truly connected, AI-assisted        
+  customer journey system that addresses the current isolation of components while adding       
+  powerful new capabilities for contractors and their customers.

@@ -1,4 +1,7 @@
 import React from 'react'
+import { useCustomerJourneyStore, useJourneySubscriptions } from '../../stores/customerJourneyStore'
+import { StepTrackerMini } from '../journey/StepTracker'
+import { config } from '../../../lib/config'
 
 interface SmartDashboardProps {
   customer: any
@@ -23,6 +26,12 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
   onViewJobDetails,
   onScheduleService
 }) => {
+  // Enable journey tracking for customer portal
+  const { leadId, jobId, step } = useCustomerJourneyStore()
+  useJourneySubscriptions() // Auto-subscribe to real-time updates
+  
+  // Show journey tracker if there's an active journey and feature is enabled
+  const showJourneyTracker = (leadId || jobId) && step !== 'completed' && config.journey.enabled
   const hasOutstandingBalance = () => {
     // Check for unpaid invoices - this would come from invoices table
     return false // Placeholder
@@ -65,6 +74,30 @@ export const SmartDashboard: React.FC<SmartDashboardProps> = ({
 
   return (
     <div className="row g-3 g-lg-6 mb-5 mb-lg-8">
+      {/* Journey Progress Tracker - Customer View */}
+      {showJourneyTracker && (
+        <div className="col-12">
+          <div className="card card-flush bg-light-primary">
+            <div className="card-body p-4 p-lg-6">
+              <div className="d-flex align-items-center justify-content-between mb-3">
+                <h6 className="text-primary fw-bold mb-0">
+                  <i className="ki-duotone ki-route fs-2 text-primary me-2">
+                    <span className="path1"></span>
+                    <span className="path2"></span>
+                  </i>
+                  Your Service Journey
+                </h6>
+                <span className="badge badge-light-primary fs-7">Live Updates</span>
+              </div>
+              <StepTrackerMini className="mb-0" />
+              <p className="text-muted fs-7 mb-0 mt-2">
+                Track your service request progress in real-time
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Welcome Header */}
       <div className="col-12">
         <div className="card card-flush h-lg-100">

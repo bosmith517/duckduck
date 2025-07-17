@@ -15,7 +15,8 @@ export interface Estimate {
   tenant_id: string
   account_id?: string | null // Nullable for individual customers
   contact_id?: string | null // For individual customers
-  job_id?: string | null // Reference to converted job
+  lead_id?: string | null // Reference to source lead
+  job_id?: string | null // Reference to converted job (only after approval)
   status: 'draft' | 'sent' | 'pending_review' | 'awaiting_site_visit' | 'site_visit_scheduled' | 'under_negotiation' | 'revised' | 'approved' | 'rejected' | 'expired'
   total_amount: number
   created_at: string
@@ -28,6 +29,8 @@ export interface Estimate {
   valid_until?: string
   labor_cost?: number
   material_cost?: number
+  equipment_cost?: number
+  overhead_cost?: number
   notes?: string
   version?: number
   parent_estimate_id?: string
@@ -304,20 +307,23 @@ class EstimatesService {
         if (currentEstimate.job_id) {
           await supabase
             .from('job_activity_log')
-            .insert([{
+            .insert({
               job_id: currentEstimate.job_id,
               tenant_id: currentEstimate.tenant_id,
+              user_id: user?.id || null,
               activity_type: 'estimate_negotiation',
+              activity_category: 'user',
+              title: 'Estimate Negotiation',
               description: `Customer requested changes to estimate ${currentEstimate.estimate_number}`,
-              performed_by: user?.id || null,
-              details: {
+              metadata: {
                 estimate_id: id,
                 previous_status: currentEstimate.status,
                 new_status: status,
                 customer_feedback: feedback,
                 negotiation_round: (currentEstimate.negotiation_rounds || 0) + 1
-              }
-            }])
+              },
+              is_visible_to_customer: true
+            })
         }
       }
 
@@ -394,7 +400,13 @@ class EstimatesService {
           contact_id: estimate.contact_id,
           tenant_id: estimate.tenant_id,
           estimated_cost: estimate.total_amount,
-          estimate_id: estimateId // Store reference to the estimate
+          contract_price: estimate.total_amount, // Set contract price from estimate
+          estimate_id: estimateId, // Store reference to the estimate
+          // Set cost breakdowns if available from estimate
+          estimated_material_cost: estimate.material_cost || 0,
+          estimated_labor_cost: estimate.labor_cost || 0,
+          estimated_equipment_cost: estimate.equipment_cost || 0,
+          estimated_overhead_cost: estimate.overhead_cost || 0
         }])
         .select()
         .single()

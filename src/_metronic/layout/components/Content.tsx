@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react'
-import {useLocation} from 'react-router'
+import {useLocation} from 'react-router-dom'
 import clsx from 'clsx'
 import {useLayout} from '../core'
 import {DrawerComponent} from '../../assets/ts/components'
