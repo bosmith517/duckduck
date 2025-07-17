@@ -10,7 +10,7 @@ import { logPhotoUpload } from '../../utils/activityLogger'
 
 interface JobPhoto {
   id: string
-  photo_type: 'receipt' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'
+  photo_type: 'site_visit' | 'receipt' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'
   file_url: string
   description: string
   taken_at: string
@@ -39,7 +39,7 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
   const [photos, setPhotos] = useState<JobPhoto[]>([])
   const [loading, setLoading] = useState(true)
   const [showPhotoCapture, setShowPhotoCapture] = useState(false)
-  const [selectedPhotoType, setSelectedPhotoType] = useState<'receipt' | 'job_progress' | 'before' | 'after' | 'general'>('job_progress')
+  const [selectedPhotoType, setSelectedPhotoType] = useState<'site_visit' | 'receipt' | 'job_progress' | 'before' | 'after' | 'general'>('job_progress')
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0)
   const [showPhotoViewer, setShowPhotoViewer] = useState(false)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
@@ -128,6 +128,7 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
 
   const getPhotoTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
+      'site_visit': 'Site Visit',
       'receipt': 'Receipt',
       'job_progress': 'Job Progress',
       'before': 'Before',
@@ -139,6 +140,7 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
 
   const getPhotoTypeColor = (type: string) => {
     const colors: Record<string, string> = {
+      'site_visit': 'info',
       'receipt': 'success',
       'job_progress': 'primary',
       'before': 'warning',

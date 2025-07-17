@@ -6,7 +6,7 @@ import './JobPhotosTab.css'
 
 interface JobPhoto {
   id: string
-  photo_type: 'job_progress' | 'before' | 'after' | 'general' | 'reference'
+  photo_type: 'site_visit' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'
   file_url: string
   description: string
   taken_at: string
@@ -38,7 +38,7 @@ const JobPhotosTab: React.FC<JobPhotosTabProps> = ({ jobId, tenantId }) => {
     
     try {
       // Only show customer-appropriate photo types (excluding receipts for privacy)
-      const customerPhotoTypes = ['job_progress', 'before', 'after', 'general', 'reference']
+      const customerPhotoTypes = ['site_visit', 'job_progress', 'before', 'after', 'general', 'reference']
       
       const { data, error } = await supabase
         .from('job_photos_view')
@@ -62,6 +62,7 @@ const JobPhotosTab: React.FC<JobPhotosTabProps> = ({ jobId, tenantId }) => {
 
   const getPhotoTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
+      'site_visit': 'Site Visit',
       'job_progress': 'Progress Update',
       'before': 'Before',
       'after': 'After',
@@ -73,6 +74,7 @@ const JobPhotosTab: React.FC<JobPhotosTabProps> = ({ jobId, tenantId }) => {
 
   const getPhotoTypeColor = (type: string) => {
     const colors: Record<string, string> = {
+      'site_visit': 'info',
       'job_progress': 'primary',
       'before': 'warning',
       'after': 'success',
