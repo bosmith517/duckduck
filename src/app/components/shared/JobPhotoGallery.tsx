@@ -39,7 +39,7 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
   const [photos, setPhotos] = useState<JobPhoto[]>([])
   const [loading, setLoading] = useState(true)
   const [showPhotoCapture, setShowPhotoCapture] = useState(false)
-  const [selectedPhotoType, setSelectedPhotoType] = useState<'site_visit' | 'receipt' | 'job_progress' | 'before' | 'after' | 'general'>('job_progress')
+  const [selectedPhotoType, setSelectedPhotoType] = useState<'site_visit' | 'receipt' | 'job_progress' | 'before' | 'after' | 'general' | 'reference'>('job_progress')
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0)
   const [showPhotoViewer, setShowPhotoViewer] = useState(false)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
@@ -133,7 +133,8 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
       'job_progress': 'Job Progress',
       'before': 'Before',
       'after': 'After',
-      'general': 'General'
+      'general': 'General',
+      'reference': 'Reference'
     }
     return labels[type] || 'Photo'
   }
@@ -145,7 +146,8 @@ const JobPhotoGallery: React.FC<JobPhotoGalleryProps> = ({
       'job_progress': 'primary',
       'before': 'warning',
       'after': 'info',
-      'general': 'secondary'
+      'general': 'secondary',
+      'reference': 'secondary'
     }
     return colors[type] || 'secondary'
   }
