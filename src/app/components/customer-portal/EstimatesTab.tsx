@@ -45,29 +45,68 @@ const EstimatesTab: React.FC<EstimatesTabProps> = ({ jobId, tenantId, portalToke
   const loadEstimate = async () => {
     try {
       setLoading(true)
+      let foundEstimate: EstimateData | null = null
 
-      // First get the job to find the estimate_id
-      const { data: job, error: jobError } = await supabase
-        .from('jobs')
-        .select('estimate_id')
-        .eq('id', jobId)
-        .single()
+      // First try to find estimates that belong to this job
+      const { data: jobEstimates, error: jobEstimatesError } = await supabase
+        .from('estimates')
+        .select(`
+          *,
+          estimate_line_items(
+            id,
+            description,
+            quantity,
+            unit_price,
+            line_total,
+            item_type,
+            sort_order
+          )
+        `)
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-      if (jobError || !job?.estimate_id) {
+      if (!jobEstimatesError && jobEstimates && jobEstimates.length > 0) {
+        foundEstimate = jobEstimates[0]
+      } else {
+        // If no job estimates, check if job was created from an estimate
+        const { data: job, error: jobError } = await supabase
+          .from('jobs')
+          .select('estimate_id')
+          .eq('id', jobId)
+          .single()
+
+        if (!jobError && job?.estimate_id) {
+          // Load the estimate that created this job
+          const { data: estimateData, error: estimateError } = await supabase
+            .from('estimates')
+            .select(`
+              *,
+              estimate_line_items(
+                id,
+                description,
+                quantity,
+                unit_price,
+                line_total,
+                item_type,
+                sort_order
+              )
+            `)
+            .eq('id', job.estimate_id)
+            .single()
+
+          if (!estimateError && estimateData) {
+            foundEstimate = estimateData
+          }
+        }
+      }
+
+      if (!foundEstimate) {
         console.log('No estimate associated with this job')
         return
       }
 
-      // Load the estimate
-      const { data: estimateData, error: estimateError } = await supabase
-        .from('estimates')
-        .select('*')
-        .eq('id', job.estimate_id)
-        .single()
-
-      if (estimateError) throw estimateError
-
-      setEstimate(estimateData)
+      setEstimate(foundEstimate)
 
       // Log portal activity if we have a portal token
       if (portalTokenId && tenantId) {
@@ -76,7 +115,7 @@ const EstimatesTab: React.FC<EstimatesTabProps> = ({ jobId, tenantId, portalToke
             portal_token_id: portalTokenId,
             tenant_id: tenantId,
             activity_type: 'view_estimate',
-            metadata: { estimate_id: estimateData.id }
+            metadata: { estimate_id: foundEstimate.id }
           }
         })
       }
@@ -302,18 +341,31 @@ const EstimatesTab: React.FC<EstimatesTabProps> = ({ jobId, tenantId, portalToke
                 </tr>
               </thead>
               <tbody>
-                {estimate.line_items?.map((item, index) => (
-                  <tr key={index} className="fs-6 text-gray-800">
-                    <td>{item.description}</td>
-                    <td className="text-end">{item.quantity}</td>
-                    <td className="text-end">${item.unit_price.toFixed(2)}</td>
-                    <td className="text-end fw-bold">${(item.quantity * item.unit_price).toFixed(2)}</td>
-                  </tr>
-                )) || (
-                  <tr>
-                    <td colSpan={4} className="text-center text-muted">No line items</td>
-                  </tr>
-                )}
+                {(() => {
+                  // Check for line items from the separate table first
+                  const lineItems = (estimate as any).estimate_line_items?.length > 0 
+                    ? (estimate as any).estimate_line_items.sort((a: any, b: any) => a.sort_order - b.sort_order)
+                    : estimate.line_items || []
+                  
+                  if (lineItems.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={4} className="text-center text-muted">No line items</td>
+                      </tr>
+                    )
+                  }
+                  
+                  return lineItems.map((item: any, index: number) => (
+                    <tr key={item.id || index} className="fs-6 text-gray-800">
+                      <td>{item.description}</td>
+                      <td className="text-end">{item.quantity}</td>
+                      <td className="text-end">${(item.unit_price || 0).toFixed(2)}</td>
+                      <td className="text-end fw-bold">
+                        ${(item.line_total || (item.quantity * item.unit_price)).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))
+                })()}
               </tbody>
               <tfoot>
                 <tr className="fs-5 text-gray-900 fw-bold">
