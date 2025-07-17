@@ -153,10 +153,17 @@ export const DocumentAutofill: React.FC<DocumentAutofillProps> = ({
           body: {
             documentUrl: urlData.signedUrl,
             documentId: documentId,
-            fields: Object.entries(editedFields).map(([name, value]) => ({
-              fieldName: name,
-              fieldValue: value
-            }))
+            path: documentPath,
+            bucket: 'business-documents',
+            fields: Object.entries(editedFields).map(([name, value]) => {
+              // Get the field type from the analyzed fields
+              const field = fields.find(f => f.fieldName === name)
+              return {
+                fieldName: name,
+                fieldValue: value,
+                fieldType: field?.fieldType || 'text'
+              }
+            })
           }
         })
         data = result.data

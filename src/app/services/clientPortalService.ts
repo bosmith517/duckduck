@@ -201,8 +201,8 @@ export class ClientPortalService {
       }
 
       // Log the portal creation activity
-      if (portalToken?.id) {
-        await this.logPortalActivity(portalToken.id, 'login', {
+      if (portalToken?.id && job.tenant_id) {
+        await this.logPortalActivity(portalToken.id, 'login', job.tenant_id, {
           activity_description: 'Portal token generated and welcome message sent',
           customer_name: customerName,
           job_id: jobId
@@ -254,8 +254,8 @@ export class ClientPortalService {
         return null
       }
 
-      // Log portal access
-      await this.logPortalActivity(tokenData.token_id, 'login', {
+      // Log portal access - pass tenant_id directly since we already have it
+      await this.logPortalActivity(tokenData.token_id, 'login', tokenData.tenant_id, {
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'
       })
 
@@ -277,34 +277,41 @@ export class ClientPortalService {
    */
   static async logPortalActivity(
     portalTokenId: string, 
-    activityType: PortalActivity['activity_type'], 
+    activityType: PortalActivity['activity_type'],
+    tenantId: string,
     metadata: any = {}
   ): Promise<void> {
     try {
-      // Get the tenant_id from the portal token
-      const { data: tokenData } = await supabase
-        .from('client_portal_tokens')
-        .select('tenant_id')
-        .eq('id', portalTokenId)
-        .single()
-
-      if (!tokenData?.tenant_id) {
-        console.warn('Could not get tenant_id for portal activity logging')
-        return
+      console.log('🔍 logPortalActivity called with:', {
+        portalTokenId,
+        activityType,
+        tenantId,
+        metadata
+      })
+      
+      const insertData = {
+        portal_token_id: portalTokenId,
+        tenant_id: tenantId,
+        activity_type: activityType,
+        page_visited: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        ip_address: this.getClientIP(),
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        metadata: metadata,
+        created_at: new Date().toISOString()
       }
-
-      await supabase
+      
+      console.log('🔍 Inserting portal activity:', insertData)
+      
+      const { data, error } = await supabase
         .from('portal_activity_log')
-        .insert({
-          portal_token_id: portalTokenId,
-          tenant_id: tokenData.tenant_id,
-          activity_type: activityType,
-          page_visited: typeof window !== 'undefined' ? window.location.pathname : undefined,
-          ip_address: this.getClientIP(),
-          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-          metadata: metadata,
-          created_at: new Date().toISOString()
-        })
+        .insert(insertData)
+        .select()
+        
+      if (error) {
+        console.error('❌ Portal activity insert error:', error)
+      } else {
+        console.log('✅ Portal activity inserted:', data)
+      }
     } catch (error) {
       console.error('Error logging portal activity:', error)
     }
@@ -379,7 +386,8 @@ export class ClientPortalService {
    */
   private static getClientIP(): string {
     // This is a simplified approach - in production you might use a service
-    return 'unknown'
+    // Return a valid IP address format for the inet column type
+    return '0.0.0.0'
   }
 
   /**
@@ -434,8 +442,8 @@ export class ClientPortalService {
         }
       })
 
-      if (!error) {
-        await this.logPortalActivity(analytics.token.id, 'message_sent', {
+      if (!error && job.tenant_id) {
+        await this.logPortalActivity(analytics.token.id, 'message_sent', job.tenant_id, {
           message_type: 'reminder',
           reminder_reason: 'inactive_portal'
         })

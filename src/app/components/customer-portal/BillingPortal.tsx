@@ -59,11 +59,15 @@ interface Invoice {
 interface BillingPortalProps {
   customerId: string
   customerName: string
+  portalTokenId?: string
+  tenantId?: string
 }
 
 const BillingPortal: React.FC<BillingPortalProps> = ({
   customerId,
-  customerName
+  customerName,
+  portalTokenId,
+  tenantId
 }) => {
   const [activeTab, setActiveTab] = useState<'estimates' | 'invoices'>('estimates')
   const [estimates, setEstimates] = useState<Estimate[]>([])
@@ -163,14 +167,17 @@ const BillingPortal: React.FC<BillingPortalProps> = ({
 
   const markPortalViewed = async () => {
     try {
-      await supabase
-        .from('portal_activity_log')
-        .insert({
-          contact_id: customerId,
-          activity_type: 'login',
-          ip_address: '0.0.0.0', // Would get real IP in production
-          created_at: new Date().toISOString()
-        })
+      if (portalTokenId && tenantId) {
+        await supabase
+          .from('portal_activity_log')
+          .insert({
+            portal_token_id: portalTokenId,
+            tenant_id: tenantId,
+            activity_type: 'login',
+            ip_address: '0.0.0.0', // Would get real IP in production
+            created_at: new Date().toISOString()
+          })
+      }
     } catch (error) {
       console.error('Error logging portal access:', error)
     }
@@ -220,14 +227,17 @@ const BillingPortal: React.FC<BillingPortalProps> = ({
       if (error) throw error
 
       // Log the activity
-      await supabase
-        .from('portal_activity_log')
-        .insert({
-          contact_id: customerId,
-          activity_type: action === 'accept' ? 'accept_estimate' : 'decline_estimate',
-          reference_id: estimateId,
-          ip_address: '0.0.0.0'
-        })
+      if (portalTokenId && tenantId) {
+        await supabase
+          .from('portal_activity_log')
+          .insert({
+            portal_token_id: portalTokenId,
+            tenant_id: tenantId,
+            activity_type: action === 'accept' ? 'accept_estimate' : 'decline_estimate',
+            metadata: { reference_id: estimateId },
+            ip_address: '0.0.0.0'
+          })
+      }
 
       showToast.success(`Estimate ${action === 'accept' ? 'accepted' : 'declined'} successfully`)
       setShowEstimateModal(false)
@@ -244,14 +254,17 @@ const BillingPortal: React.FC<BillingPortalProps> = ({
 
     // Log view activity
     try {
-      await supabase
-        .from('portal_activity_log')
-        .insert({
-          contact_id: customerId,
-          activity_type: 'view_estimate',
-          reference_id: estimate.id,
-          ip_address: '0.0.0.0'
-        })
+      if (portalTokenId && tenantId) {
+        await supabase
+          .from('portal_activity_log')
+          .insert({
+            portal_token_id: portalTokenId,
+            tenant_id: tenantId,
+            activity_type: 'view_estimate',
+            metadata: { reference_id: estimate.id },
+            ip_address: '0.0.0.0'
+          })
+      }
     } catch (error) {
       console.error('Error logging estimate view:', error)
     }
@@ -270,14 +283,17 @@ const BillingPortal: React.FC<BillingPortalProps> = ({
           .eq('id', invoice.id)
       }
 
-      await supabase
-        .from('portal_activity_log')
-        .insert({
-          contact_id: customerId,
-          activity_type: 'view_invoice',
-          reference_id: invoice.id,
-          ip_address: '0.0.0.0'
-        })
+      if (portalTokenId && tenantId) {
+        await supabase
+          .from('portal_activity_log')
+          .insert({
+            portal_token_id: portalTokenId,
+            tenant_id: tenantId,
+            activity_type: 'view_invoice',
+            metadata: { reference_id: invoice.id },
+            ip_address: '0.0.0.0'
+          })
+      }
     } catch (error) {
       console.error('Error logging invoice view:', error)
     }

@@ -110,9 +110,11 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
   const startCamera = async () => {
     try {
       setCameraLoading(true)
+      console.log('[PhotoCapture] Starting camera - isMobileDevice:', isMobileDevice, 'isNativePlatform:', Capacitor.isNativePlatform())
       
       if (isMobileDevice && Capacitor.isNativePlatform()) {
         try {
+          console.log('[PhotoCapture] Attempting to start CameraPreview')
           const cameraPreviewOptions: CameraPreviewOptions = {
             position: 'rear',
             height: 400,
@@ -123,11 +125,13 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
           }
           
           await CameraPreview.start(cameraPreviewOptions)
+          console.log('[PhotoCapture] CameraPreview started successfully')
           setCameraLoading(false)
           setShowCamera(true)
           return
         } catch (error) {
-          console.error('Camera preview error:', error)
+          console.error('[PhotoCapture] Camera preview error:', error)
+          console.log('[PhotoCapture] Falling back to native camera (MobileService.takePhoto)')
           // Fall back to native camera
           await captureWithNativeCamera()
           return

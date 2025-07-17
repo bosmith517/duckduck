@@ -139,7 +139,7 @@ const PortalIntegrationTest: React.FC = () => {
 
       // Step 7: Test activity logging
       addResult('Testing Activity Logging', true)
-      await ClientPortalService.logPortalActivity(portalToken.id, 'view_job', {
+      await ClientPortalService.logPortalActivity(portalToken.id, 'view_job', userProfile?.tenant_id || '', {
         test: true,
         page: '/test-portal'
       })
