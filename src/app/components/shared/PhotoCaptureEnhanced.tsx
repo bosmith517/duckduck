@@ -108,6 +108,33 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
     return `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
+  const checkCameraPermissions = async (): Promise<boolean> => {
+    if (!Capacitor.isNativePlatform()) {
+      return true // Browser permissions handled differently
+    }
+
+    try {
+      const permissions = await Camera.checkPermissions()
+      console.log('[PhotoCapture] Camera permissions:', permissions)
+      
+      if (permissions.camera === 'denied' || permissions.camera === 'prompt-with-rationale') {
+        console.log('[PhotoCapture] Requesting camera permissions')
+        const requested = await Camera.requestPermissions()
+        console.log('[PhotoCapture] Permission request result:', requested)
+        
+        if (requested.camera !== 'granted') {
+          showToast.error('Camera permission denied. Please enable in settings.')
+          return false
+        }
+      }
+      
+      return permissions.camera === 'granted' || permissions.camera === 'limited'
+    } catch (error) {
+      console.error('[PhotoCapture] Error checking permissions:', error)
+      return true // Continue anyway, let the actual camera call handle permission errors
+    }
+  }
+
   const startCamera = async () => {
     try {
       setCameraLoading(true)

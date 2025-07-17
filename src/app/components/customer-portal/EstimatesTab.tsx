@@ -14,19 +14,21 @@ interface EstimatesTabProps {
 interface EstimateData {
   id: string
   estimate_number: string
-  customer_name: string
-  service_address: string
-  service_description: string
+  project_title?: string
+  description?: string
   status: string
   total_amount: number
   created_at: string
   valid_until: string
-  line_items: any[]
+  line_items?: any[]
+  estimate_line_items?: any[]
   terms_conditions?: string
   payment_terms?: string
   signed_date?: string
   signed_by?: string
   signature_data?: string
+  signed_at?: string
+  signed_by_name?: string
 }
 
 const EstimatesTab: React.FC<EstimatesTabProps> = ({ jobId, tenantId, portalTokenId, customerId }) => {
@@ -309,23 +311,25 @@ const EstimatesTab: React.FC<EstimatesTabProps> = ({ jobId, tenantId, portalToke
       {/* Estimate Details */}
       <div className="card mb-6">
         <div className="card-body">
-          <div className="row g-5 mb-8">
-            <div className="col-sm-6">
-              <div className="fw-semibold fs-6 text-gray-600 mb-1">Service Location</div>
-              <div className="fw-bold fs-6 text-gray-800">{estimate.service_address}</div>
-            </div>
-            <div className="col-sm-6">
-              <div className="fw-semibold fs-6 text-gray-600 mb-1">Customer</div>
-              <div className="fw-bold fs-6 text-gray-800">{estimate.customer_name}</div>
-            </div>
-          </div>
+          {estimate.project_title && (
+            <>
+              <div className="mb-6">
+                <div className="fw-semibold fs-6 text-gray-600 mb-2">Project</div>
+                <div className="fw-bold fs-5 text-gray-800">{estimate.project_title}</div>
+              </div>
+              <div className="separator separator-dashed mb-6"></div>
+            </>
+          )}
 
-          <div className="separator separator-dashed mb-8"></div>
-
-          <div className="mb-8">
-            <div className="fw-semibold fs-6 text-gray-600 mb-3">Service Description</div>
-            <div className="text-gray-800">{estimate.service_description}</div>
-          </div>
+          {estimate.description && (
+            <>
+              <div className="mb-8">
+                <div className="fw-semibold fs-6 text-gray-600 mb-3">Description</div>
+                <div className="text-gray-800">{estimate.description}</div>
+              </div>
+              <div className="separator separator-dashed mb-8"></div>
+            </>
+          )}
 
           <div className="separator separator-dashed mb-8"></div>
 
@@ -395,14 +399,14 @@ const EstimatesTab: React.FC<EstimatesTabProps> = ({ jobId, tenantId, portalToke
           )}
 
           {/* Signature Section */}
-          {isApproved && estimate.signed_by && (
+          {isApproved && (estimate.signed_by || estimate.signed_by_name) && (
             <div className="bg-light-success rounded p-6">
               <div className="d-flex align-items-center mb-3">
                 <KTIcon iconName="check-circle" className="fs-2x text-success me-3" />
                 <div>
                   <div className="fw-bold fs-5 text-success">Estimate Approved</div>
                   <div className="text-gray-600">
-                    Signed by {estimate.signed_by} on {format(new Date(estimate.signed_date!), 'MMMM d, yyyy')}
+                    Signed by {estimate.signed_by_name || estimate.signed_by} on {format(new Date(estimate.signed_at || estimate.signed_date!), 'MMMM d, yyyy')}
                   </div>
                 </div>
               </div>

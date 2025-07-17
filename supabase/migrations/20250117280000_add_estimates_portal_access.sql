@@ -15,7 +15,7 @@ CREATE POLICY "Portal users can view estimates for their jobs" ON estimates
             SELECT 1 
             FROM jobs j
             JOIN client_portal_tokens cpt ON cpt.job_id = j.id
-            WHERE j.estimate_id = estimates.id
+            WHERE (j.estimate_id = estimates.id OR estimates.job_id = j.id)
               AND cpt.is_active = true 
               AND (cpt.expires_at IS NULL OR cpt.expires_at > NOW())
         )
@@ -30,21 +30,10 @@ CREATE POLICY "Portal users can sign estimates" ON estimates
             SELECT 1 
             FROM jobs j
             JOIN client_portal_tokens cpt ON cpt.job_id = j.id
-            WHERE j.estimate_id = estimates.id
+            WHERE (j.estimate_id = estimates.id OR estimates.job_id = j.id)
               AND cpt.is_active = true 
               AND (cpt.expires_at IS NULL OR cpt.expires_at > NOW())
         )
-    )
-    WITH CHECK (
-        -- Can only update specific fields related to signing
-        -- This ensures they can't modify the estimate details, only sign it
-        estimates.id = id AND
-        estimates.estimate_number = estimate_number AND
-        estimates.total_amount = total_amount AND
-        estimates.customer_name = customer_name AND
-        estimates.service_address = service_address AND
-        estimates.service_description = service_description AND
-        estimates.line_items = line_items
     );
 
 -- Add helpful comment
@@ -88,8 +77,8 @@ BEGIN
     UPDATE estimates
     SET 
         status = 'signed',
-        signed_date = NOW(),
-        signed_by = p_signed_by,
+        signed_at = NOW(),
+        signed_by_name = p_signed_by,
         signature_data = p_signature_data,
         updated_at = NOW()
     WHERE id = p_estimate_id
