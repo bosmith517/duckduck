@@ -1,0 +1,309 @@
+version: "1.0.0"
+sections:
+  main:
+    # Join the video room with AI capabilities
+    - video:
+        join_room: "{{context.room_id}}"
+        display_name: "Estimator Alex"
+    
+    # Initialize AI with vision and conversation
+    - ai:
+        voice: "rachel"
+        engine: "elevenlabs"
+        
+        params:
+          enable_vision: true
+          vision_model: "gpt-4o"
+          language: "en-US"
+          temperature: 0.3
+          top_p: 0.9
+          conversation_memory: true
+          
+        prompt:
+          role: "system"
+          text: |
+            You are Alex, a professional and friendly AI estimation specialist for TradeWorks Pro. You conduct video estimate inspections for {{context.trade_type}} services.
+            
+            YOUR CAPABILITIES:
+            - You can SEE in real-time through the customer's camera
+            - You can analyze structural issues, damage, and maintenance needs
+            - You have expert knowledge in roofing, plumbing, HVAC, and electrical systems
+            
+            YOUR PERSONALITY:
+            - Warm, patient, and professional
+            - Expert who explains things clearly
+            - Encouraging and reassuring
+            - Detail-oriented but efficient
+            
+            INSPECTION WORKFLOW:
+            1. GREETING (30 seconds)
+               - Introduce yourself warmly
+               - Confirm the service they need
+               - Explain the simple process
+               - Ask them to use their phone's REAR camera
+            
+            2. GENERAL OVERVIEW (2-3 minutes)
+               - Ask them to slowly pan around the general area
+               - Use get_visual_input() to analyze what you see
+               - Describe what you observe professionally
+               - Point out any obvious issues
+            
+            3. DETAILED INSPECTION (5-7 minutes)
+               - Guide them to specific areas based on the trade:
+                 * ROOFING: Gutters, shingles, flashing, vents
+                 * PLUMBING: Pipes, fixtures, water stains, drainage
+                 * HVAC: Units, vents, filters, thermostats
+                 * ELECTRICAL: Panels, outlets, switches, visible wiring
+               - For each issue found:
+                 * Describe what you see
+                 * Explain why it's important
+                 * Use capture_issue() to document it
+                 * Ask follow-up questions
+            
+            4. ADDITIONAL CONCERNS (2-3 minutes)
+               - Ask if there are other areas they're concerned about
+               - Let them show any additional problems
+               - Be thorough but respectful of their time
+            
+            5. WRAP-UP (1 minute)
+               - Summarize what you found
+               - Explain next steps
+               - Thank them for their time
+            
+            IMPORTANT GUIDELINES:
+            - Always be specific about what you see
+            - Guide them with clear directions ("Please move the camera to the left")
+            - If image is unclear, politely ask them to hold steady or get closer
+            - Document every significant issue with capture_issue()
+            - Keep total inspection under 15 minutes
+            - Be encouraging: "You're doing great!", "Perfect angle!"
+            - If you can't see clearly, be honest and ask for better positioning
+        
+        post_prompt:
+          role: "assistant"
+          text: |
+            Excellent! I've documented everything I've seen today. Based on my analysis, I've identified {{total_issues}} items that need attention. You'll receive a detailed estimate within 24 hours that includes:
+            - Complete breakdown of all issues found
+            - Professional recommendations for repairs
+            - Fair and transparent pricing
+            - Multiple service options if applicable
+            
+            Thank you so much for taking the time to show me around. Is there anything else you'd like me to take a look at before we finish?
+    
+    # Main inspection loop with intelligent pacing
+    - loop:
+        iterations: 30  # Maximum 15 minutes (30 * 30 seconds)
+        
+        # Analyze current view
+        - ai:
+            function: get_visual_input
+            arguments:
+              context: "{{context.current_inspection_phase}}"
+              focus_areas: "{{context.trade_specific_focus}}"
+        
+        # Process and respond to what's seen
+        - ai:
+            function: process_visual_analysis
+            arguments:
+              previous_findings: "{{context.findings}}"
+              inspection_phase: "{{context.current_phase}}"
+        
+        # Natural conversation pause
+        - wait: 
+            seconds: "{{context.adaptive_wait}}"  # 3-10 seconds based on conversation flow
+    
+    # Complete the inspection
+    - ai:
+        function: finalize_inspection
+        arguments:
+          session_id: "{{context.session_id}}"
+          trade_type: "{{context.trade_type}}"
+
+# SWAIG function definitions
+SWAIG:
+  functions:
+    - function: get_visual_input
+      purpose: "Analyze the current camera view to see what the customer is showing"
+      arguments:
+        type: "object"
+        properties:
+          context:
+            type: "string"
+            description: "Current inspection context (overview, detailed, specific_issue)"
+          focus_areas:
+            type: "array"
+            items:
+              type: "string"
+            description: "Specific areas to focus on based on trade type"
+      returns:
+        type: "object"
+        properties:
+          description:
+            type: "string"
+            description: "Detailed description of what is visible"
+          issues_detected:
+            type: "array"
+            description: "List of potential issues observed"
+          clarity_score:
+            type: "number"
+            description: "How clear the image is (0-1)"
+          guidance_needed:
+            type: "string"
+            description: "Instructions for better camera positioning if needed"
+    
+    - function: capture_issue
+      purpose: "Document a specific issue found during inspection"
+      arguments:
+        type: "object"
+        required: ["location", "issue_type", "severity", "description"]
+        properties:
+          location:
+            type: "string"
+            description: "Specific location of the issue"
+          issue_type:
+            type: "string"
+            description: "Category of issue (damage, wear, malfunction, safety)"
+          severity:
+            type: "string"
+            enum: ["minor", "moderate", "major", "critical", "safety_hazard"]
+          description:
+            type: "string"
+            description: "Detailed description of the issue"
+          measurements:
+            type: "object"
+            properties:
+              size:
+                type: "string"
+                description: "Approximate size of affected area"
+              quantity:
+                type: "number"
+                description: "Number of similar issues if multiple"
+          recommended_action:
+            type: "string"
+            enum: ["repair", "replace", "monitor", "immediate_attention"]
+          estimated_cost_range:
+            type: "object"
+            properties:
+              min:
+                type: "number"
+              max:
+                type: "number"
+      returns:
+        type: "object"
+        properties:
+          issue_id:
+            type: "string"
+          captured_frame_url:
+            type: "string"
+          timestamp:
+            type: "string"
+    
+    - function: process_visual_analysis
+      purpose: "Process what was seen and determine next inspection steps"
+      arguments:
+        type: "object"
+        properties:
+          previous_findings:
+            type: "array"
+            description: "Issues found so far"
+          inspection_phase:
+            type: "string"
+            description: "Current phase of inspection"
+      returns:
+        type: "object"
+        properties:
+          verbal_response:
+            type: "string"
+            description: "What to say to the customer"
+          next_action:
+            type: "string"
+            description: "What area to inspect next"
+          phase_complete:
+            type: "boolean"
+            description: "Whether current phase is complete"
+          adaptive_wait:
+            type: "number"
+            description: "How long to wait before next analysis (3-10 seconds)"
+    
+    - function: request_customer_input
+      purpose: "Ask the customer a specific question about what we're seeing"
+      arguments:
+        type: "object"
+        properties:
+          question_type:
+            type: "string"
+            enum: ["age", "symptoms", "frequency", "previous_repairs", "concerns"]
+          context:
+            type: "string"
+            description: "What we're looking at"
+      returns:
+        type: "object"
+        properties:
+          question:
+            type: "string"
+          wait_for_response:
+            type: "boolean"
+    
+    - function: provide_education
+      purpose: "Educate the customer about what they're showing"
+      arguments:
+        type: "object"
+        properties:
+          topic:
+            type: "string"
+            description: "What to explain"
+          issue_prevention:
+            type: "boolean"
+            description: "Include prevention tips"
+      returns:
+        type: "object"
+        properties:
+          explanation:
+            type: "string"
+          maintenance_tips:
+            type: "array"
+            items:
+              type: "string"
+    
+    - function: finalize_inspection
+      purpose: "Complete the inspection and generate summary"
+      arguments:
+        type: "object"
+        properties:
+          session_id:
+            type: "string"
+          trade_type:
+            type: "string"
+      returns:
+        type: "object"
+        properties:
+          total_issues:
+            type: "number"
+          critical_issues:
+            type: "number"
+          estimated_total_range:
+            type: "object"
+            properties:
+              min:
+                type: "number"
+              max:
+                type: "number"
+          priority_recommendations:
+            type: "array"
+            items:
+              type: "string"
+          inspection_duration:
+            type: "number"
+            description: "Duration in minutes"
+
+# Webhook configuration for real-time updates
+webhooks:
+  - url: "{{SUPABASE_URL}}/functions/v1/ai-estimating-webhook"
+    method: POST
+    headers:
+      Authorization: "Bearer {{SUPABASE_SERVICE_ROLE_KEY}}"
+      Content-Type: "application/json"
+    events:
+      - function_called
+      - issue_captured
+      - inspection_completed

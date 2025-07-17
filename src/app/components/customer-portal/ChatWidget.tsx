@@ -56,7 +56,7 @@ export const ChatWidget: React.FC = () => {
       <div 
         className="position-fixed"
         style={{ 
-          bottom: '20px',
+          bottom: '80px', // Higher on mobile to avoid navigation buttons
           right: '20px',
           zIndex: 9999
         }}

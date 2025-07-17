@@ -140,6 +140,13 @@ const PhotoCaptureEnhanced: React.FC<PhotoCaptureEnhancedProps> = ({
       setCameraLoading(true)
       console.log('[PhotoCapture] Starting camera - isMobileDevice:', isMobileDevice, 'isNativePlatform:', Capacitor.isNativePlatform())
       
+      // Check permissions first
+      const hasPermission = await checkCameraPermissions()
+      if (!hasPermission) {
+        setCameraLoading(false)
+        return
+      }
+      
       if (isMobileDevice && Capacitor.isNativePlatform()) {
         try {
           console.log('[PhotoCapture] Attempting to start CameraPreview')

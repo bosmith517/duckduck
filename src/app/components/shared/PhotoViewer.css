@@ -1,0 +1,71 @@
+/* PhotoViewer.css */
+
+/* Swipe container styling */
+.photo-swipe-container {
+  overflow: hidden;
+  cursor: grab;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.photo-swipe-container:active {
+  cursor: grabbing;
+}
+
+/* Ensure smooth transitions for desktop navigation */
+.photo-viewer-transition {
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 767px) {
+  /* Adjust modal footer to avoid chat bubble */
+  .modal-footer {
+    padding-bottom: 100px !important;
+  }
+  
+  /* Improve touch targets on mobile */
+  .btn-sm {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Enhance swipe hint visibility */
+  .swipe-hint {
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+}
+
+/* Improve image loading experience */
+.photo-loading {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Dot indicators styling */
+.photo-dot-indicator {
+  transition: all 0.3s ease;
+}
+
+.photo-dot-indicator:hover {
+  transform: scale(1.2);
+}
+
+/* Prevent accidental touches on navigation buttons */
+.photo-nav-button {
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}

@@ -31,6 +31,7 @@ import SimpleTrackingTest from '../pages/test/SimpleTrackingTest'
 import BasicVideoTest from '../pages/test/BasicVideoTest'
 import VideoDebugPage from '../pages/test/VideoDebugPage'
 import SimpleVideoTest from '../pages/test/SimpleVideoTest'
+import VideoSystemDiagnostics from '../pages/test/VideoSystemDiagnostics'
 import LandingPage from '../pages/marketing/LandingPage'
 import SignupPage from '../pages/marketing/SignupPage'
 import HomeownerSignupPage from '../pages/marketing/HomeownerSignupPage'
@@ -162,6 +163,7 @@ const AppRoutes: FC = () => {
         <Route path='test-video-debug' element={<VideoDebugPage />} />
         <Route path='test-simple-video' element={<SimpleVideoTest />} />
         <Route path='test-basic-video' element={<BasicVideoTest />} />
+        <Route path='test-video-diagnostics' element={<VideoSystemDiagnostics />} />
         
         {/* Error pages and logout - wrapped in App for consistent layout */}
         <Route element={<App />}>

@@ -3,13 +3,12 @@
   "short_name": "TradeWorks",
   "description": "Professional Field Service Management Platform",
   "start_url": "/mobile/my-day?source=pwa",
-"scope": "/mobile/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
   "categories": ["business", "productivity", "utilities"],
-  "scope": "/",
   "icons": [
     {
       "src": "/icons/icon-72x72.png",

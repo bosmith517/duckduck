@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { KTIcon } from '../../../_metronic/helpers'
+// Custom styles in PhotoViewer.css if needed
 
 interface Photo {
   id: string
@@ -27,6 +28,8 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageLoading, setImageLoading] = useState(true)
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
 
   useEffect(() => {
     setCurrentIndex(initialIndex)
@@ -64,9 +67,51 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
     if (e.key === 'Escape') onClose()
   }
 
-  const handleSwipe = (direction: 'left' | 'right') => {
-    if (direction === 'left') handleNext()
-    if (direction === 'right') handlePrevious()
+  // Minimum swipe distance for a valid swipe (in px)
+  const minSwipeDistance = 50
+  
+  // Add visual feedback for swipe
+  const [swipeProgress, setSwipeProgress] = useState(0)
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null) // Reset touch end
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!touchStart) return
+    
+    const currentTouch = e.targetTouches[0].clientX
+    setTouchEnd(currentTouch)
+    
+    // Calculate swipe progress for visual feedback
+    const progress = (touchStart - currentTouch) / window.innerWidth
+    setSwipeProgress(Math.max(-1, Math.min(1, progress))) // Clamp between -1 and 1
+    
+    // Prevent vertical scrolling while swiping horizontally
+    if (Math.abs(touchStart - currentTouch) > 10) {
+      e.preventDefault()
+    }
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isLeftSwipe && photos.length > 1) {
+      handleNext()
+    }
+    if (isRightSwipe && photos.length > 1) {
+      handlePrevious()
+    }
+    
+    // Reset swipe progress
+    setSwipeProgress(0)
+    setTouchStart(null)
+    setTouchEnd(null)
   }
 
   const handleDeletePhoto = () => {
@@ -132,8 +177,16 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
                 {/* Image Container */}
                 <div className="col position-relative">
                   <div 
-                    className="text-center position-relative"
-                    style={{ minHeight: '300px' }}
+                    className="text-center position-relative photo-swipe-container"
+                    style={{ 
+                      minHeight: '300px',
+                      touchAction: 'pan-y pinch-zoom', // Allow vertical scroll and zoom but we handle horizontal swipes
+                      transform: `translateX(${-swipeProgress * 30}px)`, // Visual swipe feedback
+                      transition: swipeProgress === 0 ? 'transform 0.3s ease' : 'none'
+                    }}
+                    onTouchStart={onTouchStart}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onTouchEnd}
                   >
                     {imageLoading && (
                       <div className="position-absolute top-50 start-50 translate-middle">
@@ -151,22 +204,14 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
                         maxHeight: '70vh', 
                         maxWidth: '100%',
                         display: imageLoading ? 'none' : 'block',
-                        margin: '0 auto'
+                        margin: '0 auto',
+                        userSelect: 'none', // Prevent text selection on mobile
+                        WebkitUserSelect: 'none',
+                        msUserSelect: 'none'
                       }}
                       onLoad={() => setImageLoading(false)}
                       onError={() => setImageLoading(false)}
-                    />
-
-                    {/* Mobile swipe areas */}
-                    <div
-                      className="position-absolute top-0 start-0 h-100 d-md-none"
-                      style={{ width: '30%', cursor: 'pointer' }}
-                      onClick={handlePrevious}
-                    />
-                    <div
-                      className="position-absolute top-0 end-0 h-100 d-md-none"
-                      style={{ width: '30%', cursor: 'pointer' }}
-                      onClick={handleNext}
+                      draggable={false} // Prevent drag on desktop
                     />
                   </div>
 
@@ -198,16 +243,30 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
                 </div>
               </div>
 
-              {/* Mobile navigation dots */}
+              {/* Mobile navigation dots and swipe hint */}
               {photos.length > 1 && (
                 <div className="row mt-3 d-md-none">
                   <div className="col text-center">
+                    {/* Swipe hint for first photo */}
+                    {currentIndex === 0 && (
+                      <div className="text-white-50 mb-2">
+                        <i className="ki-duotone ki-arrow-left fs-5 me-1">
+                          <span className="path1"></span>
+                          <span className="path2"></span>
+                        </i>
+                        Swipe to navigate
+                        <i className="ki-duotone ki-arrow-right fs-5 ms-1">
+                          <span className="path1"></span>
+                          <span className="path2"></span>
+                        </i>
+                      </div>
+                    )}
                     <div className="d-flex justify-content-center gap-2">
                       {photos.map((_, index) => (
                         <button
                           key={index}
                           className={`btn btn-sm rounded-circle p-0 ${
-                            index === currentIndex ? 'bg-primary' : 'bg-white-50'
+                            index === currentIndex ? 'bg-primary' : 'bg-white opacity-50'
                           }`}
                           style={{ width: '10px', height: '10px' }}
                           onClick={() => {
@@ -223,8 +282,8 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
             </div>
           </div>
 
-          {/* Footer with actions */}
-          <div className="modal-footer border-0 position-absolute bottom-0 w-100">
+          {/* Footer with actions - position higher on mobile to avoid chat bubble */}
+          <div className="modal-footer border-0 position-absolute w-100" style={{ bottom: '0' }}>
             <div className="d-flex w-100 justify-content-between">
               <div>
                 {onDelete && (
@@ -238,7 +297,8 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
                 )}
               </div>
               
-              <div className="d-flex gap-2">
+              {/* Move mobile buttons higher to avoid chat bubble */}
+              <div className="d-flex gap-2" style={{ marginBottom: '80px' }}>
                 <button
                   className="btn btn-light d-md-none"
                   onClick={handlePrevious}

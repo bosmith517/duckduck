@@ -1,12 +1,26 @@
 // TradeWorks Pro Service Worker
-const CACHE_VERSION = 2; // Increment this to force update
+const CACHE_VERSION = 3; // Increment this to force update
 const CACHE_NAME = `tradeworks-pro-v${CACHE_VERSION}`;
+const API_CACHE_NAME = `tradeworks-api-v${CACHE_VERSION}`;
+const IMAGE_CACHE_NAME = `tradeworks-images-v${CACHE_VERSION}`;
+
+// URLs to always cache
 const STATIC_CACHE_URLS = [
   '/',
   '/manifest.json',
   '/offline.html',
   // Add critical assets here
 ];
+
+// Cache duration settings (in seconds)
+const CACHE_DURATIONS = {
+  api: 5 * 60, // 5 minutes for API responses
+  html: 60 * 60, // 1 hour for HTML pages
+  css: 7 * 24 * 60 * 60, // 7 days for CSS
+  js: 7 * 24 * 60 * 60, // 7 days for JS
+  images: 30 * 24 * 60 * 60, // 30 days for images
+  fonts: 365 * 24 * 60 * 60, // 1 year for fonts
+};
 
 // Skip waiting and claim clients immediately for faster updates
 self.addEventListener('message', (event) => {
@@ -37,12 +51,21 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          // Keep current version caches
+          const currentCaches = [CACHE_NAME, API_CACHE_NAME, IMAGE_CACHE_NAME];
+          if (!currentCaches.includes(cacheName)) {
             console.log('TradeWorks Pro SW: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      // Notify all clients about the update
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({ type: 'SERVICE_WORKER_UPDATED' });
+        });
+      });
     }).then(() => {
       return self.clients.claim();
     })
@@ -72,27 +95,42 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls - Network First
-  if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase')) {
+  // API calls - Network First with cache expiration
+  if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase') || url.pathname.includes('/portal/')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache successful responses
+          // Cache successful responses with timestamp
           if (response && response.status === 200) {
             const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
+            const headers = new Headers(responseClone.headers);
+            headers.append('sw-cached-at', new Date().toISOString());
+            
+            const modifiedResponse = new Response(responseClone.body, {
+              status: responseClone.status,
+              statusText: responseClone.statusText,
+              headers: headers
+            });
+            
+            caches.open(API_CACHE_NAME).then((cache) => {
+              cache.put(request, modifiedResponse);
             });
           }
           return response;
         })
-        .catch(() => {
-          // Return cached version if available
-          return caches.match(request).then((cachedResponse) => {
-            return cachedResponse || new Response('Network error happened', {
-              status: 408,
-              headers: { 'Content-Type': 'text/plain' },
-            });
+        .catch(async () => {
+          // Check cache with expiration
+          const cachedResponse = await caches.match(request);
+          if (cachedResponse) {
+            const cachedAt = cachedResponse.headers.get('sw-cached-at');
+            if (cachedAt && !isCacheExpired(cachedAt, CACHE_DURATIONS.api)) {
+              return cachedResponse;
+            }
+          }
+          
+          return new Response('Network error - no cached data available', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain' },
           });
         })
     );
@@ -273,4 +311,32 @@ async function removeOfflineData(type, id) {
   const data = await getOfflineData(type);
   const filtered = data.filter(item => item.id !== id);
   localStorage.setItem(`offline_${type}`, JSON.stringify(filtered));
+}
+
+// Helper function to check if cache is expired
+function isCacheExpired(cachedAt, maxAge) {
+  const cacheTime = new Date(cachedAt).getTime();
+  const now = new Date().getTime();
+  const age = (now - cacheTime) / 1000; // Convert to seconds
+  return age > maxAge;
+}
+
+// Helper function to get cache type from URL
+function getCacheType(url) {
+  if (url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg|ico)$/i)) {
+    return 'image';
+  }
+  if (url.pathname.match(/\.(js)$/i)) {
+    return 'js';
+  }
+  if (url.pathname.match(/\.(css)$/i)) {
+    return 'css';
+  }
+  if (url.pathname.match(/\.(woff|woff2|ttf|otf)$/i)) {
+    return 'font';
+  }
+  if (url.pathname.match(/\.(html)$/i) || url.pathname.endsWith('/')) {
+    return 'html';
+  }
+  return 'api';
 }
