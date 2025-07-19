@@ -56,6 +56,8 @@ const PrivateRoutes = () => {
   const TestPage = lazy(() => import('../pages/test/TestPage'))
   const SimpleTestPage = lazy(() => import('../pages/test/SimpleTestPage'))
   const BackendConnectivityTest = lazy(() => import('../components/test/BackendConnectivityTest'))
+  const TestimonialTest = lazy(() => import('../pages/test/TestimonialTest'))
+  const VideoTimingTest = lazy(() => import('../pages/test/VideoTimingTest'))
   
   // Hidden Settings Pages (Now Accessible!)
   const CompanyConfigurationPage = lazy(() => import('../pages/settings/CompanyConfigurationPage'))
@@ -69,6 +71,7 @@ const PrivateRoutes = () => {
   const BillingDashboardPage = lazy(() => import('../pages/billing/BillingDashboardPage'))
   const CommunicationsHubPage = lazy(() => import('../pages/communications/CommunicationsHubPage'))
   const CustomersPage = lazy(() => import('../pages/customers/CustomersPage'))
+  const TestimonialManagementPage = lazy(() => import('../pages/video-testimonials/TestimonialManagementPage'))
   
   // Hidden Advanced Modules (Now Accessible!)
   const BuilderPage = lazy(() => import('../pages/layout-builder/BuilderPage'))
@@ -100,6 +103,7 @@ const PrivateRoutes = () => {
   const SignalWireVideoTestPage = lazy(() => import('../pages/test/SignalWireVideoTestPage'))
   const MultiPhotoTestPage = lazy(() => import('../pages/test/MultiPhotoTestPage'))
   const CustomerJourneyTestPage = lazy(() => import('../pages/test/CustomerJourneyTestPage'))
+  const VideoWithAITest = lazy(() => import('../pages/test/VideoWithAITest'))
   const TrackingPage = lazy(() => import('../pages/tracking/TrackingPage'))
   const TrackingOverviewPage = lazy(() => import('../pages/tracking/TrackingOverviewPage'))
   const LandingPage = lazy(() => import('../pages/marketing/LandingPage'))
@@ -396,6 +400,14 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        <Route
+          path='communications/testimonials'
+          element={
+            <SuspensedView>
+              <TestimonialManagementPage />
+            </SuspensedView>
+          }
+        />
         {/* AI-Powered Video Estimating - Primary Feature */}
         <Route
           path='video-estimating'
@@ -467,12 +479,30 @@ const PrivateRoutes = () => {
         {/* Legacy route redirect */}
         <Route path='call-center' element={<Navigate to='/communications/call-center' />} />
         
-        {/* Test Page */}
-        <Route
+        {/* Test Page - Disabled to allow specific test routes */}
+        {/* <Route
           path='test/*'
           element={
             <SuspensedView>
               <TestPage />
+            </SuspensedView>
+          }
+        /> */}
+        
+        {/* Specific Test Routes */}
+        <Route
+          path='test/test-testimonial'
+          element={
+            <SuspensedView>
+              <TestimonialTest />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/video-timing-test'
+          element={
+            <SuspensedView>
+              <VideoTimingTest />
             </SuspensedView>
           }
         />
@@ -895,6 +925,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <PurchaseLogsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/video-with-ai'
+          element={
+            <SuspensedView>
+              <VideoWithAITest />
             </SuspensedView>
           }
         />

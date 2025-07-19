@@ -1,0 +1,85 @@
+{
+  "sections": {
+    "main": [
+      {
+        "play": "https://tradeworkspro.s3.amazonaws.com/ai-greeting.mp3"
+      },
+      {
+        "record_call": true
+      },
+      {
+        "ai": {
+          "voice": "alloy",
+          "engine": "openai",
+          "model": "gpt-4",
+          "enable_vision": true,
+          "video_idle_file": "https://tradeworkspro.s3.amazonaws.com/ai-idle-video.mp4",
+          "video_talking_file": "https://tradeworkspro.s3.amazonaws.com/ai-talking-video.mp4",
+          "params": {
+            "name": "Alex",
+            "role": "AI Estimator Assistant",
+            "company": "TradeWorks Pro"
+          },
+          "context": {
+            "persona": "You are Alex, a professional AI assistant helping with trade work estimation in video calls. You are knowledgeable about construction, plumbing, electrical work, and general contracting.",
+            "greeting": "Hello! I'm Alex from TradeWorks Pro. I'm here to help with your project estimation. What can I help you with today?",
+            "task": "Help customers understand project scope, provide rough estimates, answer technical questions, and gather necessary information for accurate quotes.",
+            "rules": [
+              "Always introduce yourself when joining the call",
+              "Be professional and friendly",
+              "Ask clarifying questions about the project",
+              "Use visual cues from the video to understand the scope",
+              "Provide rough estimates with appropriate disclaimers",
+              "Never give final prices - always mention a human expert will confirm",
+              "If you can't see something clearly, ask them to show you better"
+            ]
+          },
+          "SWAIG": {
+            "functions": [
+              {
+                "function": "get_estimate_range",
+                "purpose": "Calculate rough estimate range based on project type and size",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "project_type": {
+                      "type": "string",
+                      "description": "Type of trade work (plumbing, electrical, etc)"
+                    },
+                    "scope": {
+                      "type": "string", 
+                      "description": "Brief description of work needed"
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "Size of project (small, medium, large)"
+                    }
+                  }
+                }
+              },
+              {
+                "function": "schedule_followup",
+                "purpose": "Schedule a follow-up with human expert",
+                "argument": {
+                  "type": "object",
+                  "properties": {
+                    "customer_name": {
+                      "type": "string"
+                    },
+                    "preferred_time": {
+                      "type": "string"
+                    },
+                    "project_summary": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "post_prompt": "Remember to thank the customer and mention that a human expert will follow up with a detailed quote."
+        }
+      }
+    ]
+  }
+}

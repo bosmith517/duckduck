@@ -4,6 +4,7 @@ import {supabase} from '../../../../supabaseClient'
 import {showToast} from '../../../utils/toast'
 import {VisionResultsPanel} from './VisionResultsPanel'
 import {GuidedPromptsPanel} from './GuidedPromptsPanel'
+import {AIAgentButton} from './AIAgentButton'
 import {Video} from '@signalwire/js'                 // ✅ static import only
 
 interface ActiveSessionViewProps {
@@ -77,75 +78,77 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
 
   const initializeSignalWire = async (token: string) => {
     try {
-      console.log('Requesting media permissions.')
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {width: {ideal: 1280}, height: {ideal: 720}},
-        audio: {echoCancellation: true, noiseSuppression: true}
-      })
-      ;(window as any).localStream = stream
-
-      console.log('Creating RoomSession')
+      console.log('🚀 Initializing SignalWire with proven approach')
+      
+      // Create room session using our working pattern
       const roomSession = new Video.RoomSession({
         token,
-        rootElement: videoContainerRef.current
+        rootElement: videoContainerRef.current,
+        logLevel: 'debug' // Keep debug for troubleshooting
       })
 
       ;(window as any).currentRoomSession = roomSession
 
-      roomSession.on('room.joined', async () => {
+      // Set up event handlers with our proven pattern
+      roomSession.on('room.joined', async (params: any) => {
+        console.log('🎉 Estimator joined room successfully:', params)
         setIsConnected(true)
         await updateSessionStatus('active')
+        startVisionProcessing()
         showToast.success('Connected to video session')
       })
 
       roomSession.on('room.left', (params: any) => {
+        console.log('Room left:', params)
         setIsConnected(false)
         if (params?.error) {
-          showToast.error(params.error.message || 'Video error')
+          console.error('Room left with error:', params.error)
+          // Don't show error if it's an SDP renegotiation issue
+          if (!params.error.message?.includes('setRemoteDescription')) {
+            showToast.error(params.error.message || 'Video error')
+          }
         }
       })
 
-      await roomSession.join()
-    } catch (mediaError: any) {
-      console.error('Media/SignalWire error:', mediaError)
-      
-      // Handle media errors gracefully
-      if (mediaError.name === 'NotFoundError') {
-        showToast.warning('No camera/microphone found. Continuing in viewer mode.')
-        console.log('Continuing without media stream...')
-        
-        // Continue with SignalWire connection without media
-        try {
-          console.log('Creating RoomSession without media')
-          const roomSession = new Video.RoomSession({
-            token,
-            rootElement: videoContainerRef.current,
-            audio: false,
-            video: false
-          })
-
-          ;(window as any).currentRoomSession = roomSession
-
-          roomSession.on('room.joined', async () => {
-            setIsConnected(true)
-            await updateSessionStatus('active')
-            showToast.success('Connected to video session (viewer mode)')
-          })
-
-          roomSession.on('room.left', (params: any) => {
-            setIsConnected(false)
-            if (params?.error) {
-              showToast.error(params.error.message || 'Video error')
-            }
-          })
-
-          await roomSession.join()
-        } catch (roomError: any) {
-          console.error('Room connection error:', roomError)
-          showToast.error('Failed to connect to video session')
+      // @ts-ignore - deprecated event
+      roomSession.on('error', (error: any) => {
+        console.error('Room session error:', error)
+        // Handle SDP renegotiation errors gracefully (known SignalWire SDK issue)
+        if (error.message?.includes('setRemoteDescription') || error.message?.includes('wrong state')) {
+          console.log('Ignoring SDP renegotiation error - this is expected SignalWire SDK behavior')
+          return
         }
+        showToast.error(`Connection error: ${error.message}`)
+      })
+
+      roomSession.on('member.joined', (e: any) => {
+        console.log(`Member joined: ${e.member.name}`)
+        if (e.member.name.includes('Customer')) {
+          showToast.info('Customer has joined the session')
+        }
+      })
+
+      roomSession.on('member.left', (e: any) => {
+        console.log(`Member left: ${e.member.name}`)
+      })
+
+      // Join using our proven approach
+      console.log('Joining room with estimator token...')
+      await roomSession.join()
+      
+    } catch (error: any) {
+      console.error('SignalWire connection error:', error)
+      
+      // Handle specific error types
+      if (error.name === 'NotFoundError') {
+        showToast.warning('No camera/microphone found. Continuing in viewer mode.')
+        // The room session will still work for viewing customer video
+      } else if (error.message?.includes('Invalid arguments')) {
+        showToast.error('Room configuration error. Please check the session setup.')
+      } else if (error.name === 'NotAllowedError') {
+        showToast.warning('Media access denied. You can still view the customer video.')
       } else {
-        showToast.error(mediaError.message || 'SignalWire error')
+        showToast.error('Failed to connect to video session. Connection may take up to 45 seconds.')
       }
     }
   }
@@ -385,6 +388,19 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
                 Mock Mode
               </label>
             </div>
+            <AIAgentButton
+              roomName={session.room_id}
+              agentName="Alex"
+              agentRole="AI Estimator"
+              onAgentAdded={() => {
+                console.log('AI Estimator added to session')
+                showToast.success('AI Estimator joined the session')
+              }}
+              onError={(error) => {
+                console.error('AI Estimator error:', error)
+                showToast.error(`Failed to add AI: ${error}`)
+              }}
+            />
             <button
               className='btn btn-light-primary btn-sm'
               onClick={handleManualCapture}

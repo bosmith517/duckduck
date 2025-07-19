@@ -65,12 +65,14 @@ serve(async (req) => {
     const scriptExecuteUrl = `https://${signalwireSpaceUrl}/api/video/scripts/${aiScriptId}/execute`
     const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
     
-    // Video Scripts API parameters
+    // Video Scripts API parameters for executing the AI script
     const executePayload = {
       room_name: room_name,
-      display_name: 'Estimator Alex',
-      join_params: {
-        permissions: ['room.subscribe', 'room.publish']
+      display_name: 'AI Estimator Alex',
+      metadata: {
+        session_id: session_id,
+        trade_type: trade_type,
+        role: 'estimator'
       }
     }
     
@@ -84,8 +86,9 @@ serve(async (req) => {
       },
       body: JSON.stringify(executePayload)
     })
-
+    
     const responseText = await executeResponse.text()
+
     console.log('Script execution response:', executeResponse.status, responseText)
 
     if (!executeResponse.ok) {

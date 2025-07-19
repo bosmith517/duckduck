@@ -11,9 +11,10 @@ interface TestResult {
   details?: any
 }
 
-export const VideoSystemDiagnostics: React.FC = () => {
+const VideoSystemDiagnostics: React.FC = () => {
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
+  const [shouldStop, setShouldStop] = useState(false)
   const [credentials, setCredentials] = useState({
     projectId: '',
     apiToken: '',
@@ -49,36 +50,253 @@ export const VideoSystemDiagnostics: React.FC = () => {
   const runCompleteDiagnostics = async () => {
     setIsRunning(true)
     setTestResults([])
+    setShouldStop(false)
+    
+    let roomData: any = null
     
     try {
       // Test 1: Check Supabase Connection
+      if (shouldStop) return
       await testSupabaseConnection()
       
       // Test 2: Check SignalWire Credentials
+      if (shouldStop) return
       await testSignalWireCredentials()
       
-      // Test 3: Create Test Room
-      await testCreateRoom()
+      // Test 3: WebRTC Capability Check
+      if (shouldStop) return
+      await testWebRTCCapabilities()
       
-      // Test 4: Generate Room Token
-      await testGenerateToken()
+      // Test 4: Network Connectivity Check
+      if (shouldStop) return
+      await testNetworkConnectivity()
       
-      // Test 5: Test Media Permissions
+      // Test 5: Create Test Room
+      if (shouldStop) return
+      roomData = await testCreateRoom()
+      
+      // Test 6: Generate Room Token
+      if (shouldStop) return
+      roomData = await testGenerateToken(roomData)
+      
+      // Test 7: Test Media Permissions
+      if (shouldStop) return
       await testMediaPermissions()
       
-      // Test 6: Join Room
-      await testJoinRoom()
+      // Test 8: Join Room (The critical test)
+      if (shouldStop) return
+      await testJoinRoom(roomData)
       
-      // Test 7: Add AI to Room
-      await testAddAI()
+      // Test 9: Add AI to Room
+      if (shouldStop) return
+      await testAddAI(roomData)
       
-      // Test 8: Test Vision Capabilities
+      // Test 10: Test Vision Capabilities
+      if (shouldStop) return
       await testVisionCapabilities()
       
     } catch (error) {
       console.error('Diagnostic error:', error)
+      if (shouldStop) {
+        updateTestResult('Diagnostics', 'failed', 'Test stopped by user', null)
+      }
     } finally {
       setIsRunning(false)
+      setShouldStop(false)
+    }
+  }
+
+  const stopDiagnostics = () => {
+    setShouldStop(true)
+    setIsRunning(false)
+    updateTestResult('Diagnostics', 'failed', 'Test stopped by user', null)
+  }
+
+  const testWebRTCCapabilities = async () => {
+    const step = 'WebRTC Capabilities'
+    updateTestResult(step, 'testing', 'Testing WebRTC support...')
+    
+    try {
+      const capabilities = {
+        hasRTCPeerConnection: 'RTCPeerConnection' in window,
+        hasGetUserMedia: 'getUserMedia' in navigator.mediaDevices,
+        hasWebSocket: 'WebSocket' in window,
+        hasMediaStream: 'MediaStream' in window,
+        hasRTCSessionDescription: 'RTCSessionDescription' in window,
+        hasRTCIceCandidate: 'RTCIceCandidate' in window
+      }
+
+      // Test STUN server connectivity
+      const stunTest = await testSTUNConnectivity()
+      
+      // Get supported codecs
+      const supportedCodecs = await getSupportedCodecs()
+      
+      const allSupported = Object.values(capabilities).every(Boolean)
+      
+      if (!allSupported) {
+        throw new Error('Missing required WebRTC APIs')
+      }
+
+      updateTestResult(step, 'success', 'WebRTC fully supported', null, {
+        ...capabilities,
+        stunConnectivity: stunTest,
+        supportedCodecs
+      })
+    } catch (error) {
+      updateTestResult(step, 'failed', 'WebRTC not supported or limited', error)
+      throw error
+    }
+  }
+
+  const testSTUNConnectivity = async (): Promise<boolean> => {
+    try {
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      })
+
+      const gatheringPromise = new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 5000)
+        
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            clearTimeout(timeout)
+            resolve(true)
+          }
+        }
+      })
+
+      // Create a dummy data channel to trigger ICE gathering
+      pc.createDataChannel('test')
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+
+      const result = await gatheringPromise
+      pc.close()
+      
+      return result
+    } catch (error) {
+      console.error('STUN connectivity test failed:', error)
+      return false
+    }
+  }
+
+  const getSupportedCodecs = async () => {
+    try {
+      const pc = new RTCPeerConnection()
+      
+      // Add a transceiver to get codec capabilities
+      const transceiver = pc.addTransceiver('video')
+      const capabilities = RTCRtpReceiver.getCapabilities('video')
+      
+      pc.close()
+      
+      return {
+        videoCodecs: capabilities?.codecs?.map(c => c.mimeType) || [],
+        audioCodecs: RTCRtpReceiver.getCapabilities('audio')?.codecs?.map(c => c.mimeType) || []
+      }
+    } catch (error) {
+      return { videoCodecs: [], audioCodecs: [] }
+    }
+  }
+
+  const testNetworkConnectivity = async () => {
+    const step = 'Network Connectivity'
+    updateTestResult(step, 'testing', 'Testing network connectivity...')
+    
+    try {
+      const tests = []
+      
+      // Test 1: SignalWire WebSocket endpoint
+      const wsTest = await testWebSocketConnection()
+      tests.push({ name: 'SignalWire WebSocket', result: wsTest })
+      
+      // Test 2: HTTPS connectivity to SignalWire
+      const httpsTest = await testHTTPSConnectivity()
+      tests.push({ name: 'HTTPS to SignalWire', result: httpsTest })
+      
+      // Test 3: Network type detection
+      const networkInfo = getNetworkInfo()
+      tests.push({ name: 'Network Info', result: networkInfo })
+      
+      // Test 4: Latency test
+      const latencyTest = await testLatency()
+      tests.push({ name: 'Latency Test', result: latencyTest })
+
+      const allPassed = tests.every(t => t.result !== false)
+      
+      if (!allPassed) {
+        throw new Error('Network connectivity issues detected')
+      }
+
+      updateTestResult(step, 'success', 'Network connectivity verified', null, {
+        tests: tests.reduce((acc, t) => ({ ...acc, [t.name]: t.result }), {})
+      })
+    } catch (error) {
+      updateTestResult(step, 'failed', 'Network connectivity issues', error)
+      throw error
+    }
+  }
+
+  const testWebSocketConnection = async (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      try {
+        const ws = new WebSocket('wss://relay.signalwire.com')
+        const timeout = setTimeout(() => {
+          ws.close()
+          resolve(false)
+        }, 5000)
+        
+        ws.onopen = () => {
+          clearTimeout(timeout)
+          ws.close()
+          resolve(true)
+        }
+        
+        ws.onerror = () => {
+          clearTimeout(timeout)
+          resolve(false)
+        }
+      } catch (error) {
+        resolve(false)
+      }
+    })
+  }
+
+  const testHTTPSConnectivity = async (): Promise<boolean> => {
+    try {
+      const response = await fetch('https://relay.signalwire.com', {
+        method: 'HEAD',
+        mode: 'no-cors' // Avoid CORS issues
+      })
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  const getNetworkInfo = () => {
+    const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection
+    
+    return {
+      online: navigator.onLine,
+      effectiveType: connection?.effectiveType || 'unknown',
+      downlink: connection?.downlink || 'unknown',
+      rtt: connection?.rtt || 'unknown'
+    }
+  }
+
+  const testLatency = async (): Promise<number> => {
+    try {
+      const start = performance.now()
+      await fetch('https://relay.signalwire.com', { method: 'HEAD', mode: 'no-cors' })
+      const end = performance.now()
+      return Math.round(end - start)
+    } catch (error) {
+      return -1
     }
   }
 
@@ -92,7 +310,7 @@ export const VideoSystemDiagnostics: React.FC = () => {
       
       updateTestResult(step, 'success', 'Supabase connected successfully', null, {
         hasSession: !!data.session,
-        url: supabase.supabaseUrl
+        url: (supabase as any).supabaseUrl
       })
     } catch (error) {
       updateTestResult(step, 'failed', 'Supabase connection failed', error)
@@ -140,41 +358,85 @@ export const VideoSystemDiagnostics: React.FC = () => {
     updateTestResult(step, 'testing', 'Creating test video room...')
     
     try {
-      const { data, error } = await supabase.functions.invoke('create-video-room', {
+      // Try the simple video room endpoint first as it has better error handling
+      const { data, error } = await supabase.functions.invoke('create-simple-video-room', {
         body: {
-          room_name: `test_diagnostics_${Date.now()}`,
-          trade_type: 'ROOFING',
-          enable_vision: true,
-          enable_recording: false,
-          max_participants: 3
+          // Empty body - the function will create a simple test room
         }
       })
 
       if (error) throw error
-      if (!data || !data.room_name) throw new Error('No room data returned')
+      if (!data) throw new Error('No data returned from edge function')
+      
+      console.log('Edge function response:', data)
+      
+      // The simple endpoint returns { room: { id, name, url }, token, debug_url }
+      const roomInfo = data.room || data.room_data || data
+      const token = data.token
+      
+      console.log('Room info:', roomInfo)
+      
+      // Check if we have the required data
+      const roomName = roomInfo.name || roomInfo.room_name || roomInfo.id
+      const roomId = roomInfo.id
+      const roomUrl = roomInfo.url || data.debug_url
+      
+      if (!roomName || !roomId) {
+        console.error('Missing required room data. Full response:', data)
+        throw new Error('Missing room name or ID in response')
+      }
 
-      setTestRoomData(data)
+      // Store room data and token for subsequent tests
+      const testData = {
+        room_name: roomName,
+        room_id: roomId,
+        room_url: roomUrl,
+        token: token || null,
+        debug_url: data.debug_url
+      }
+      
+      setTestRoomData(testData)
+      console.log('Test room data set:', testData)
       updateTestResult(step, 'success', 'Video room created successfully', null, {
-        roomName: data.room_name,
-        roomUrl: data.room_url,
-        roomId: data.room_id
+        roomName: roomName,
+        roomUrl: testData.room_url,
+        roomId: roomId,
+        token: token ? 'Generated' : 'Not generated'
       })
+      
+      return testData
     } catch (error) {
       updateTestResult(step, 'failed', 'Failed to create video room', error)
       throw error
     }
   }
 
-  const testGenerateToken = async () => {
+  const testGenerateToken = async (roomData: any) => {
     const step = 'Generate Room Token'
     updateTestResult(step, 'testing', 'Generating room access token...')
     
     try {
-      if (!testRoomData) throw new Error('No test room available')
+      if (!roomData) {
+        console.error('roomData is null:', roomData)
+        throw new Error('No test room available')
+      }
+
+      console.log('Checking token in roomData:', roomData)
+      
+      // Check if we already have a token from room creation
+      if (roomData.token) {
+        console.log('Token already exists:', roomData.token.substring(0, 50) + '...')
+        updateTestResult(step, 'success', 'Token already generated with room', null, {
+          tokenLength: roomData.token.length,
+          hasToken: true,
+          source: 'room_creation'
+        })
+        return roomData
+      }
 
       const { data, error } = await supabase.functions.invoke('generate-room-token', {
         body: {
-          room_id: testRoomData.room_name,
+          room_id: roomData.room_name,
           user_name: 'Test User',
           permissions: [
             'room.self.audio_mute',
@@ -194,7 +456,9 @@ export const VideoSystemDiagnostics: React.FC = () => {
       })
       
       // Store token for next test
-      testRoomData.token = data.token
+      const updatedRoomData = { ...roomData, token: data.token }
+      setTestRoomData(updatedRoomData)
+      return updatedRoomData
     } catch (error) {
       updateTestResult(step, 'failed', 'Failed to generate room token', error)
       throw error
@@ -232,49 +496,192 @@ export const VideoSystemDiagnostics: React.FC = () => {
     }
   }
 
-  const testJoinRoom = async () => {
+  const testJoinRoom = async (roomData: any) => {
     const step = 'Join Video Room'
     updateTestResult(step, 'testing', 'Attempting to join video room...')
     
     try {
-      if (!testRoomData || !testRoomData.token) {
+      if (!roomData || !roomData.token) {
         throw new Error('No room token available')
       }
 
-      // Create room session
+      // Create room session with production-grade configuration
       const roomSession = new Video.RoomSession({
-        token: testRoomData.token,
+        token: roomData.token,
         rootElement: videoContainerRef.current,
-        audio: false, // Start muted for testing
-        video: false
+        // Remove deprecated audio/video - will be set on join()
+        logLevel: 'debug', // Enable detailed logging
+        debug: {
+          logWsTraffic: true // Log WebSocket traffic for debugging
+        }
       })
 
-      // Set up event handlers with promises
+      // Comprehensive event monitoring for production-level debugging
       const joinPromise = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('Join timeout - no response after 30 seconds'))
+          console.error('⏰ Join timeout reached - Connection analysis:')
+          console.error('- WebSocket state:', (roomSession as any).state)
+          console.error('- Connection state:', (roomSession as any).peer?.connectionState)
+          console.error('- ICE state:', (roomSession as any).peer?.iceConnectionState)
+          console.error('- Gathering state:', (roomSession as any).peer?.iceGatheringState)
+          reject(new Error('Join timeout - WebRTC connection failed after 30 seconds'))
         }, 30000)
 
+        // Core connection events
         roomSession.on('room.joined', (params: any) => {
+          console.log('✅ Room joined successfully:', {
+            roomId: params.room_id,
+            roomSessionId: params.room_session_id,
+            memberId: params.member_id,
+            memberCount: params.room?.members?.length || 0
+          })
           clearTimeout(timeout)
           resolve(params)
         })
 
-        roomSession.on('error', (error: any) => {
+        // @ts-ignore - deprecated event
+        roomSession.on('error' as any, (error: any) => {
+          console.error('❌ Room session error:', {
+            name: error.name,
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+          })
           clearTimeout(timeout)
           reject(error)
         })
 
         roomSession.on('room.left', (params: any) => {
+          console.log('👋 Room left:', params)
           if (params?.error) {
             clearTimeout(timeout)
             reject(new Error(params.error.message || 'Room left with error'))
           }
         })
+
+        // Member management events
+        roomSession.on('member.joined', (params: any) => {
+          console.log('👤 Member joined:', {
+            memberId: params.member.id,
+            name: params.member.name,
+            type: params.member.type,
+            totalMembers: params.room?.members?.length || 0
+          })
+        })
+
+        roomSession.on('member.left', (params: any) => {
+          console.log('👤 Member left:', {
+            memberId: params.member.id,
+            name: params.member.name,
+            reason: params.reason
+          })
+        })
+
+        roomSession.on('member.updated', (params: any) => {
+          console.log('👤 Member updated:', {
+            memberId: params.member.id,
+            changes: params.member
+          })
+        })
+
+        // Room state events
+        roomSession.on('room.updated', (params: any) => {
+          console.log('🔄 Room updated:', {
+            roomId: params.room_id,
+            name: params.room_name,
+            locked: params.locked,
+            recording: params.recording
+          })
+        })
+
+        // @ts-ignore - deprecated event
+        roomSession.on('room.audience_count', (params: any) => {
+          console.log('📊 Audience count:', params.count)
+        })
+
+        // Media stream events
+        roomSession.on('stream.started', (params: any) => {
+          console.log('🎥 Stream started:', {
+            memberId: params.member_id,
+            streamId: params.stream_id,
+            type: params.stream.type
+          })
+        })
+
+        roomSession.on('stream.ended', (params: any) => {
+          console.log('🎥 Stream ended:', {
+            memberId: params.member_id,
+            streamId: params.stream_id
+          })
+        })
+
+        // WebRTC connection monitoring
+        // @ts-ignore - deprecated event
+        roomSession.on('peer.connection.state' as any, (params: any) => {
+          console.log('🔗 Peer connection state:', params.state)
+        })
+
+        // @ts-ignore - deprecated event
+        roomSession.on('peer.ice.state' as any, (params: any) => {
+          console.log('🧊 ICE connection state:', params.state)
+        })
+
+        // @ts-ignore - deprecated event
+        roomSession.on('peer.ice.gathering.state', (params: any) => {
+          console.log('🧊 ICE gathering state:', params.state)
+        })
+
+        // Layout and recording events
+        roomSession.on('layout.changed', (params: any) => {
+          console.log('🎨 Layout changed:', params.layout)
+        })
+
+        roomSession.on('recording.started', (params: any) => {
+          console.log('🔴 Recording started:', params)
+        })
+
+        roomSession.on('recording.ended', (params: any) => {
+          console.log('🔴 Recording ended:', params)
+        })
+
+        // Playback events for video estimating
+        roomSession.on('playback.started', (params: any) => {
+          console.log('▶️ Playback started:', params)
+        })
+
+        roomSession.on('playback.ended', (params: any) => {
+          console.log('▶️ Playback ended:', params)
+        })
+
+        // WebSocket connection monitoring
+        // @ts-ignore - deprecated event
+        roomSession.on('signaling.state' as any, (params: any) => {
+          console.log('📡 Signaling state:', params.state)
+        })
+
+        // AI/Script events (for when AI is added)
+        // @ts-ignore - deprecated event
+        roomSession.on('session.started', (params: any) => {
+          console.log('🤖 Session started:', params)
+        })
+
+        // @ts-ignore - deprecated event
+        roomSession.on('session.ended', (params: any) => {
+          console.log('🤖 Session ended:', params)
+        })
       })
 
-      // Attempt to join
-      await roomSession.join()
+      // Attempt to join with minimal media options for diagnostics
+      console.log('🔗 Attempting to join room with minimal media configuration...')
+      console.log('Token preview:', roomData.token.substring(0, 50) + '...')
+      console.log('Room name:', roomData.room_name)
+      console.log('Room ID:', roomData.room_id)
+      
+      await roomSession.join({
+        audio: true,  // Required for 'member' role
+        video: false  // Disabled to avoid media permission issues
+      })
+      
       const joinResult = await joinPromise
 
       updateTestResult(step, 'success', 'Successfully joined video room', null, {
@@ -297,12 +704,12 @@ export const VideoSystemDiagnostics: React.FC = () => {
     }
   }
 
-  const testAddAI = async () => {
+  const testAddAI = async (roomData: any) => {
     const step = 'Add AI Agent'
     updateTestResult(step, 'testing', 'Adding AI agent to room...')
     
     try {
-      if (!testRoomData) throw new Error('No test room available')
+      if (!roomData) throw new Error('No test room available')
       if (!credentials.aiScriptId) {
         updateTestResult(step, 'failed', 'No AI Script ID configured', null)
         return
@@ -310,7 +717,7 @@ export const VideoSystemDiagnostics: React.FC = () => {
 
       const { data, error } = await supabase.functions.invoke('add-ai-to-video-room', {
         body: {
-          room_name: testRoomData.room_name,
+          room_name: roomData.room_name,
           session_id: 'test-session',
           trade_type: 'ROOFING'
         }
@@ -442,7 +849,7 @@ export const VideoSystemDiagnostics: React.FC = () => {
           {/* Run Tests Button */}
           <div className="text-center mb-5">
             <button
-              className="btn btn-lg btn-primary"
+              className="btn btn-lg btn-primary me-3"
               onClick={runCompleteDiagnostics}
               disabled={isRunning}
             >
@@ -461,6 +868,68 @@ export const VideoSystemDiagnostics: React.FC = () => {
                 </>
               )}
             </button>
+            
+            {isRunning && (
+              <button
+                className="btn btn-lg btn-danger"
+                onClick={stopDiagnostics}
+              >
+                <i className="ki-duotone ki-cross fs-2 me-2">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                Stop Diagnostics
+              </button>
+            )}
+          </div>
+
+          {/* Subtest Links */}
+          <div className="alert alert-light mb-5">
+            <h5 className="mb-3">🔬 Focused Subtests</h5>
+            <p className="mb-3">If the main diagnostics fail, use these focused tests to isolate specific issues:</p>
+            <div className="d-flex gap-3 flex-wrap">
+              <a 
+                href="/test-simple-video" 
+                className="btn btn-light-info"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i className="ki-duotone ki-arrow-right fs-2 me-2">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                Simple Video Test
+              </a>
+              <a 
+                href="/test-basic-video" 
+                className="btn btn-light-info"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i className="ki-duotone ki-arrow-right fs-2 me-2">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                Basic Video Test
+              </a>
+              <a 
+                href="/test-just-join-room" 
+                className="btn btn-light-warning"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i className="ki-duotone ki-target fs-2 me-2">
+                  <span className="path1"></span>
+                  <span className="path2"></span>
+                </i>
+                🎯 Just Join Room Test
+              </a>
+            </div>
+            <div className="mt-2">
+              <small className="text-muted">
+                <strong>Just Join Room Test</strong> - Minimal test focusing only on room joining without any extra features
+              </small>
+            </div>
           </div>
 
           {/* Test Results */}

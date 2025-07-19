@@ -26,8 +26,8 @@ export const AICallMonitoringDashboard: React.FC = () => {
     aiSuccessRate: 0
   })
 
-  const updateIntervalRef = useRef<NodeJS.Timeout>()
-  const realtimeChannelRef = useRef<any>()
+  const updateIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const realtimeChannelRef = useRef<any>(null)
 
   useEffect(() => {
     if (userProfile?.tenant_id) {

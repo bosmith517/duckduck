@@ -39,18 +39,14 @@ export const VideoEstimateInitiator: React.FC<VideoEstimateInitiatorProps> = ({
     try {
       setIsCreating(true)
 
-      // Step 1: Create the video room with AI capabilities
+      // Step 1: Create the video room using our proven SignalWire approach
       const roomName = `estimate_${selectedTrade.toLowerCase()}_${Date.now()}`
       
-      const { data: roomData, error: roomError } = await supabase.functions.invoke('create-video-room', {
+      const { data: roomData, error: roomError } = await supabase.functions.invoke('create-signalwire-room', {
         body: {
           room_name: roomName,
-          trade_type: selectedTrade,
-          enable_vision: true, // Enable AI vision for estimation
-          enable_recording: true,
-          max_participants: 3, // Customer, AI, and optionally a human agent
-          contact_id: contactId,
-          lead_id: leadId
+          customer_name: customerInfo.name,
+          session_id: null // Will be set after session creation
         }
       })
 
@@ -66,8 +62,9 @@ export const VideoEstimateInitiator: React.FC<VideoEstimateInitiatorProps> = ({
           account_id: accountId,
           trade_type: selectedTrade,
           room_id: roomData.room_name,
-          room_url: roomData.room_url,
-          status: sessionType === 'immediate' ? 'active' : 'scheduled',
+          signalwire_room_id: roomData.room_id,
+          signalwire_room_name: roomData.room_name,
+          status: sessionType === 'immediate' ? 'pending' : 'scheduled',
           scheduled_at: sessionType === 'scheduled' ? scheduledTime : null,
           metadata: {
             customer_info: customerInfo,
@@ -81,23 +78,13 @@ export const VideoEstimateInitiator: React.FC<VideoEstimateInitiatorProps> = ({
 
       if (sessionError) throw sessionError
 
-      // Step 3: Add AI to the room
-      const { error: aiError } = await supabase.functions.invoke('add-ai-to-video-room', {
-        body: {
-          room_name: roomData.room_name,
-          session_id: session.id,
-          trade_type: selectedTrade
-        }
-      })
-
-      if (aiError) {
-        console.error('AI addition error:', aiError)
-        showToast.warning('Room created but AI assistant may not be available')
-      }
+      // Step 3: Set up AI integration (optional for now)
+      // The AI can be added to the room later when the session starts
+      console.log('Session created with SignalWire room:', roomData.room_name)
 
       // Step 4: Send invitation to customer
       if (customerInfo.phone || customerInfo.email) {
-        await sendCustomerInvitation(session, roomData.room_url)
+        await sendCustomerInvitation(session)
       }
 
       showToast.success('Video estimation session created successfully!')
@@ -111,7 +98,7 @@ export const VideoEstimateInitiator: React.FC<VideoEstimateInitiatorProps> = ({
     }
   }
 
-  const sendCustomerInvitation = async (session: any, roomUrl: string) => {
+  const sendCustomerInvitation = async (session: any) => {
     try {
       // Generate customer portal link
       const portalUrl = `${window.location.origin}/customer-portal/video-estimate/${session.id}`

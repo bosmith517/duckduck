@@ -58,13 +58,17 @@ serve(async (req) => {
     const tokenRequest = {
       user_name: clientIdentity,
       room_name: room_name,
+      auto_create_room: true,  // This creates the room and token in one step
       permissions: [
         "room.list_available_layouts",
         "room.set_layout", 
         "room.self.audio_mute",
         "room.self.audio_unmute",
         "room.self.video_mute",
-        "room.self.video_unmute"
+        "room.self.video_unmute",
+        "room.self.set_input_volume",
+        "room.self.set_output_volume",
+        "room.self.set_input_sensitivity"
       ]
     };
     

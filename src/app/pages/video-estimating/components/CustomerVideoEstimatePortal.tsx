@@ -99,46 +99,32 @@ export const CustomerVideoEstimatePortal: React.FC = () => {
     try {
       setIsConnecting(true)
 
-      // Get customer token for the room
-      const { data: tokenData, error: tokenError } = await supabase
-        .functions.invoke('generate-room-token', {
-          body: {
-            room_id: session.room_id,
-            user_name: session.metadata?.customer_info?.name || 'Customer',
-            permissions: [
-              'room.self.audio_mute',
-              'room.self.audio_unmute',
-              'room.self.video_mute',
-              'room.self.video_unmute'
-            ]
-          }
-        })
-
-      if (tokenError) throw tokenError
-
-      // Request camera/microphone permissions
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: 'environment', // Prefer rear camera on mobile
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: true
+      // Create room and token using our working REST API approach
+      const roomName = `customer_${session.id}_${Date.now()}`
+      
+      // Use the working SignalWire REST API pattern
+      const { data: roomData, error: roomError } = await supabase.functions.invoke('create-signalwire-room', {
+        body: {
+          room_name: roomName,
+          customer_name: session.metadata?.customer_info?.name || 'Customer',
+          session_id: session.id
+        }
       })
 
-      // Initialize SignalWire room
+      if (roomError) throw roomError
+
+      // Initialize SignalWire room using our proven approach
       const roomSession = new Video.RoomSession({
-        token: tokenData.token,
+        token: roomData.token,
         rootElement: videoContainerRef.current,
-        audio: true,
-        video: true
+        logLevel: 'debug' // Keep debug logging for troubleshooting
       })
 
       roomSessionRef.current = roomSession
 
-      // Set up event listeners
-      roomSession.on('room.joined', () => {
-        console.log('Joined room successfully')
+      // Set up event listeners using our working pattern
+      roomSession.on('room.joined', (params: any) => {
+        console.log('🎉 Customer joined room successfully:', params)
         setIsConnected(true)
         setIsConnecting(false)
         setCurrentStep(1)
@@ -148,21 +134,33 @@ export const CustomerVideoEstimatePortal: React.FC = () => {
 
       roomSession.on('member.joined', (e: any) => {
         console.log('Member joined:', e.member.name)
-        if (e.member.name === 'Estimator Alex') {
+        if (e.member.name.includes('Alex') || e.member.name.includes('AI')) {
           setAiStatus('ready')
           showToast.info('Alex has joined the session')
         }
       })
 
-      roomSession.on('room.left', () => {
+      roomSession.on('room.left', (params: any) => {
         console.log('Left room')
         setIsConnected(false)
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop())
+        if (params?.error) {
+          console.error('Room left with error:', params.error)
         }
       })
 
-      // Join the room
+      // @ts-ignore - deprecated event
+      roomSession.on('error', (error: any) => {
+        console.error('Room session error:', error)
+        // Don't immediately show error - let the room try to recover
+        if (error.message?.includes('setRemoteDescription') || error.message?.includes('wrong state')) {
+          console.log('Ignoring SDP renegotiation error - this is expected')
+          return
+        }
+        showToast.error(`Connection error: ${error.message}`)
+      })
+
+      // Join the room using our proven approach
+      console.log('Joining room with customer-optimized settings...')
       await roomSession.join()
 
       // Subscribe to AI analysis updates via real-time
@@ -189,8 +187,10 @@ export const CustomerVideoEstimatePortal: React.FC = () => {
       
       if (error.name === 'NotAllowedError') {
         showToast.error('Camera/microphone access denied. Please allow access and try again.')
+      } else if (error.message?.includes('Invalid arguments')) {
+        showToast.error('Room setup error. Please contact support.')
       } else {
-        showToast.error('Failed to start video session')
+        showToast.error('Failed to start video session. This may take up to 45 seconds to connect.')
       }
     }
   }

@@ -213,23 +213,26 @@ const SimpleVideoTest: React.FC = () => {
         }
       }
 
-      // Create room session
-      addLog('Creating RoomSession object')
+      // Create room session with production configuration
+      addLog('Creating RoomSession object with production settings')
       const roomSession = new Video.RoomSession({
         token: targetToken,
         rootElement: videoContainerRef.current,
-        audio: true,
-        video: true
+        logLevel: 'debug',
+        debug: {
+          logWsTraffic: true
+        }
       })
 
       roomSessionRef.current = roomSession
 
-      // Set up all event handlers
+      // Set up comprehensive event handlers (production-grade)
       roomSession.on('room.joined', (params: any) => {
         addLog('EVENT: room.joined', 'success')
         addLog(`Room ID: ${params.room?.id}`, 'info')
         addLog(`Member ID: ${params.member_id}`, 'info')
         addLog(`Room session ID: ${params.room_session_id}`, 'info')
+        addLog(`Member count: ${params.room?.members?.length || 0}`, 'info')
         setStatus('Connected to room!')
       })
 
@@ -238,15 +241,49 @@ const SimpleVideoTest: React.FC = () => {
       })
 
       roomSession.on('member.joined', (params: any) => {
-        addLog(`EVENT: member.joined - ${params.member.name}`, 'info')
+        addLog(`EVENT: member.joined - ${params.member.name} (${params.member.type})`, 'info')
       })
 
       roomSession.on('member.left', (params: any) => {
         addLog(`EVENT: member.left - ${params.member.name}`, 'info')
       })
 
-      roomSession.on('error', (error: any) => {
+      roomSession.on('member.updated', (params: any) => {
+        addLog(`EVENT: member.updated - ${params.member.name}`, 'info')
+      })
+
+      roomSession.on('stream.started', (params: any) => {
+        addLog(`EVENT: stream.started - ${params.stream.type} from ${params.member_id}`, 'info')
+      })
+
+      roomSession.on('stream.ended', (params: any) => {
+        addLog(`EVENT: stream.ended - ${params.stream.type} from ${params.member_id}`, 'info')
+      })
+
+      // @ts-ignore - deprecated event
+      roomSession.on('peer.connection.state' as any, (params: any) => {
+        addLog(`EVENT: peer.connection.state - ${params.state}`, 'info')
+      })
+
+      // @ts-ignore - deprecated event
+      roomSession.on('peer.ice.state' as any, (params: any) => {
+        addLog(`EVENT: peer.ice.state - ${params.state}`, 'info')
+      })
+
+      // @ts-ignore - deprecated event
+      roomSession.on('peer.ice.gathering.state' as any, (params: any) => {
+        addLog(`EVENT: peer.ice.gathering.state - ${params.state}`, 'info')
+      })
+
+      // @ts-ignore - deprecated event
+      roomSession.on('signaling.state' as any, (params: any) => {
+        addLog(`EVENT: signaling.state - ${params.state}`, 'info')
+      })
+
+      // @ts-ignore - deprecated event
+      roomSession.on('error' as any, (error: any) => {
         addLog(`EVENT: error - ${error.message || JSON.stringify(error)}`, 'error')
+        addLog(`Error details: ${JSON.stringify(error, null, 2)}`, 'error')
       })
 
       roomSession.on('room.left', (params: any) => {
@@ -257,9 +294,20 @@ const SimpleVideoTest: React.FC = () => {
         setStatus('Disconnected from room')
       })
 
-      // Attempt to join
-      addLog('Calling roomSession.join()')
-      await roomSession.join()
+      // Attempt to join with production-level media configuration
+      addLog('Calling roomSession.join() with production media settings')
+      await roomSession.join({
+        audio: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true
+        },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        }
+      })
       
       addLog('Join method completed, waiting for events...', 'info')
 
@@ -515,6 +563,13 @@ const SimpleVideoTest: React.FC = () => {
           <li>If getting CORS errors, check Edge Function headers</li>
           <li>Room names must be unique - they include timestamps</li>
         </ul>
+        <div className="mt-3">
+          <strong>Having connection issues?</strong> Try:
+          <ul className="mb-0 mt-2">
+            <li><a href="/test-just-join-room" className="alert-link">Just Join Room Test</a> - Focused debugging with multiple approaches</li>
+            <li><a href="/test-signalwire-client" className="alert-link">SignalWire Client Test</a> - Uses official documentation approach</li>
+          </ul>
+        </div>
       </div>
     </div>
   )

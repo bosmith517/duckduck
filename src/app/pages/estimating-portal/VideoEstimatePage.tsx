@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../../supabaseClient'
 import { VideoSession } from '../video-estimating/VideoEstimatingHub'
-import SignalWireVideoRoom from '../../components/video/SignalWireVideoRoom'
+import SignalWireVideoRoomSimple from '../../components/video/SignalWireVideoRoomSimple'
 import { ErrorBoundary } from '../../components/common/ErrorBoundary'
 
 const VideoEstimatePage: React.FC = () => {
@@ -15,6 +15,9 @@ const VideoEstimatePage: React.FC = () => {
   const [isAddingAI, setIsAddingAI] = useState(false)
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false)
   const [aiAttempted, setAiAttempted] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string>('')
+  const [actualRoomId, setActualRoomId] = useState<string | null>(null)
+  const [permissionsRequested, setPermissionsRequested] = useState(false)
   
   const sessionId = searchParams.get('session')
   const token = searchParams.get('token') // Portal JWT for Supabase
@@ -22,7 +25,31 @@ const VideoEstimatePage: React.FC = () => {
   
   useEffect(() => {
     if (sessionId && token) {
-      loadSession()
+      // Pre-request media permissions to avoid delays
+      const preRequestPermissions = async () => {
+        try {
+          console.log('[VideoEstimate] Pre-requesting media permissions...')
+          setStatusMessage('Requesting camera and microphone permissions...')
+          await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+            .then(stream => {
+              // Important: Stop the stream immediately after getting permissions
+              // We just want to trigger the permission prompt, not keep the media active
+              stream.getTracks().forEach(track => track.stop())
+              console.log('[VideoEstimate] Media permissions granted and stream stopped')
+              setPermissionsRequested(true)
+              setStatusMessage('')
+            })
+        } catch (err) {
+          console.warn('[VideoEstimate] Media permission pre-request failed:', err)
+          setStatusMessage('')
+          // Continue anyway - SignalWire will request permissions later
+        }
+      }
+      
+      // Pre-request permissions then load session
+      preRequestPermissions().then(() => {
+        loadSession()
+      })
     } else {
       setError('Invalid session link')
       setLoading(false)
@@ -114,8 +141,8 @@ const VideoEstimatePage: React.FC = () => {
   }
 
   const handleRoomJoined = useCallback(() => {
-    console.log('Room joined successfully')
-    setAiStatus('Connected to room. Waiting for AI estimator...')
+    console.log('[VideoEstimate] Room joined successfully')
+    setAiStatus('Connected to room. Adding AI estimator...')
     setHasJoinedRoom(true)
   }, [])
 
@@ -123,11 +150,15 @@ const VideoEstimatePage: React.FC = () => {
     console.log('Member joined:', member)
     const memberName = member.name || ''
     
-    // Check if this is the AI estimator
-    if (memberName.includes('AI') || memberName.includes('Estimator') || 
-        memberName.includes('Alex') || memberName === '+19999999999' ||
-        member.id?.includes('ai') || member.id?.includes('script')) {
-      console.log('AI Estimator has joined the session')
+    // Check if this is the AI estimator (case-insensitive)
+    const lowerName = memberName.toLowerCase()
+    const memberId = (member.id || '').toLowerCase()
+    
+    if (lowerName.includes('ai') || lowerName.includes('estimator') || 
+        lowerName.includes('alex') || lowerName.includes('assistant') ||
+        memberName === '+19999999999' || memberId.includes('ai') || 
+        memberId.includes('script') || memberId.includes('relay')) {
+      console.log('[VideoEstimate] AI Estimator has joined the session:', member)
       setAiStatus('AI estimator Alex is now connected! Say hello and they will guide you through the inspection.')
       
       // Play a sound to indicate AI joined
@@ -157,27 +188,51 @@ const VideoEstimatePage: React.FC = () => {
     
     try {
       setIsAddingAI(true)
-      console.log('Adding AI to room:', session.room_id)
-      const { data: aiResult, error: aiError } = await supabase.functions.invoke('add-ai-to-video-room', {
+      
+      console.log('[VideoEstimate] Adding AI to room using video SWML method')
+      
+      // For the relay bin, we should use the original room name from the database
+      // The AI will find the active session with this room name
+      const targetRoomName = session.room_id
+      
+      console.log('[VideoEstimate] Target room name for AI:', targetRoomName)
+      console.log('[VideoEstimate] Session details:', {
+        session_id: session.id,
+        room_name: targetRoomName,
+        trade_type: session.trade_type
+      })
+      
+      // Use the video SWML method which has been proven to work with relay bin
+      const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-join-video-swml', {
         body: {
-          room_name: session.room_id,
+          room_name: targetRoomName,
           session_id: session.id,
-          trade_type: session.trade_type
+          trade_type: session.trade_type || 'general'
         }
       })
       
-      console.log('AI add result:', aiResult, 'Error:', aiError)
+      console.log('[VideoEstimate] AI SWML result:', aiResult, 'Error:', aiError)
       
       if (aiError) {
-        setAiStatus(`Failed to add AI: ${aiError.message}`)
+        console.error('[VideoEstimate] Failed to add AI:', aiError)
+        setAiStatus('AI assistant could not join. A human estimator will assist you.')
       } else if (aiResult?.success) {
-        setAiStatus('AI estimator has been invited to the room')
+        console.log('[VideoEstimate] AI triggered successfully via:', aiResult.method)
+        setAiStatus('AI Estimator Alex is connecting... This may take up to 30 seconds.')
+        
+        // Set a timeout to update status if AI doesn't join
+        setTimeout(() => {
+          setAiStatus(prev => 
+            prev.includes('connected') ? prev : 
+            'AI is taking longer than expected. Please continue with your inspection.'
+          )
+        }, 30000)
       } else {
-        setAiStatus(`Failed to add AI: ${aiResult?.error || 'Unknown error'}`)
-        console.log('Full AI response:', aiResult)
+        console.log('[VideoEstimate] Unexpected AI response:', aiResult)
+        setAiStatus('AI integration in progress...')
       }
     } catch (error: any) {
-      console.error('Error adding AI:', error)
+      console.error('[VideoEstimate] Error adding AI:', error)
       setAiStatus(`Error: ${error.message}`)
     } finally {
       setIsAddingAI(false)
@@ -187,11 +242,11 @@ const VideoEstimatePage: React.FC = () => {
   // Auto-add AI when room is joined (only once)
   useEffect(() => {
     if (hasJoinedRoom && session && !isAddingAI && !aiAttempted) {
-      console.log('Auto-adding AI to room after join')
+      console.log('[VideoEstimate] Auto-adding AI to room after join')
       setAiAttempted(true) // Prevent multiple attempts
       const timer = setTimeout(() => {
         handleAddAI()
-      }, 2000) // Wait 2 seconds for room to stabilize
+      }, 500) // Reduced wait time since test shows it works quickly
       
       return () => clearTimeout(timer)
     }
@@ -204,7 +259,12 @@ const VideoEstimatePage: React.FC = () => {
           <div className='spinner-border text-light mb-3' role='status'>
             <span className='visually-hidden'>Loading...</span>
           </div>
-          <div>Loading video session...</div>
+          <div>{statusMessage || 'Loading video session...'}</div>
+          {statusMessage && statusMessage.includes('permissions') && (
+            <div className='mt-3 text-muted'>
+              <small>Please allow camera and microphone access when prompted</small>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -263,10 +323,10 @@ const VideoEstimatePage: React.FC = () => {
         </div>
       </div>
       
-      {/* Video Room - Using SignalWireVideoRoom */}
+      {/* Video Room - Using SignalWireVideoRoomSimple */}
       <div className='flex-grow-1 position-relative'>
         <ErrorBoundary>
-          <SignalWireVideoRoom
+          <SignalWireVideoRoomSimple
             token={swToken}
             roomName={session?.room_id}
             userName="Customer"
@@ -292,6 +352,16 @@ const VideoEstimatePage: React.FC = () => {
                 AI Assistant Status
               </h5>
               <p className='mb-0 text-primary fw-bold'>{aiStatus}</p>
+              {aiStatus.includes('joining') && (
+                <div className='mt-2'>
+                  <div className='spinner-border spinner-border-sm text-primary me-2' role='status'>
+                    <span className='visually-hidden'>Loading...</span>
+                  </div>
+                  <small className='text-muted'>
+                    AI is connecting to your video session. This may take 10-20 seconds...
+                  </small>
+                </div>
+              )}
               {aiStatus.includes('connected') && (
                 <div className='mt-2'>
                   <small className='text-muted'>
@@ -299,7 +369,7 @@ const VideoEstimatePage: React.FC = () => {
                   </small>
                 </div>
               )}
-              {!aiStatus.includes('connected') && !aiStatus.includes('invited') && (
+              {!aiStatus.includes('connected') && !aiStatus.includes('joining') && !aiStatus.includes('invited') && !isAddingAI && (
                 <div className='mt-2'>
                   <button 
                     className='btn btn-sm btn-primary'

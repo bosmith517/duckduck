@@ -31,6 +31,8 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const roomSessionRef = useRef<any>(null)
+  const actualRoomIdRef = useRef<string | null>(null)
+  const actualRoomSessionIdRef = useRef<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -143,13 +145,42 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
         console.log('Letting SignalWire handle ICE server configuration')
       }
       
+      // Request permissions first to avoid delays
+      // This "pre-warms" the browser's media permissions, so when SignalWire needs them, they're already available
+      if (enableAudio || enableVideo) {
+        try {
+          console.log('Pre-requesting media permissions to avoid delays...')
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+          // Stop the stream immediately - we just needed to trigger permissions
+          stream.getTracks().forEach(track => track.stop())
+          console.log('Media permissions pre-warmed successfully')
+        } catch (err) {
+          console.error('Failed to pre-request media permissions:', err)
+          // Continue anyway - SignalWire will handle permissions
+        }
+      }
+      
       const roomSession = new SignalWire.Video.RoomSession(roomSessionConfig)
+      
+      console.log('Room session created, setting up event handlers...')
 
       // Set up event handlers
       roomSession.on('room.joined', (params) => {
         console.log('Room joined:', params)
         setIsConnected(true)
         setIsConnecting(false)
+        
+        // Extract the actual room ID from the event or roomSession
+        const actualRoomId = (params as any).room_id || (params.room as any)?.id || roomSession.roomId
+        const actualRoomSessionId = params.room_session?.id || roomSession.id
+        
+        console.log('Extracted room details:', { 
+          actualRoomId, 
+          actualRoomSessionId,
+          fromParams: (params as any).room_id,
+          fromRoom: (params.room as any)?.id,
+          fromSession: roomSession.roomId
+        })
         
         if (params.room && 'members' in params.room) {
           const memberMap = new Map()
@@ -159,6 +190,7 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
           setMembers(memberMap)
         }
         
+        // Pass the room session to the callback
         onRoomJoined?.(roomSession)
       })
 
@@ -175,7 +207,12 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
 
       roomSession.on('member.joined', (e) => {
         console.log(`${e.member.name} joined the room.`)
+        // Don't update members here if they're already in the list from room.joined/room.updated
         setMembers(prev => {
+          if (prev.has(e.member.id)) {
+            console.log(`Member ${e.member.id} already in list, skipping duplicate`)
+            return prev
+          }
           const newMap = new Map(prev)
           newMap.set(e.member.id, e.member)
           return newMap
@@ -204,6 +241,19 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
 
       roomSession.on('layout.changed', (params) => {
         console.log('Layout changed:', params)
+        
+        // Store the actual room ID from layout change event
+        if (params.room_id && !actualRoomIdRef.current) {
+          actualRoomIdRef.current = params.room_id
+          actualRoomSessionIdRef.current = params.room_session_id
+          
+          console.log('Captured actual room IDs from layout change:', {
+            room_id: params.room_id,
+            room_session_id: params.room_session_id
+          })
+          
+          // No need to call onRoomJoined again here
+        }
       })
 
       roomSession.on('room.left', () => {
@@ -214,15 +264,25 @@ export const SignalWireVideoRoom: React.FC<SignalWireVideoRoomProps> = ({
       // Store room session reference
       roomSessionRef.current = roomSession
 
-      // Join the room
-      console.log('Joining room...')
-      await roomSession.join()
+      // Join the room with audio/video options like the testimonial component
+      console.log('Joining room with audio/video options...')
+      await roomSession.join({
+        audio: enableAudio,
+        video: enableVideo
+      })
       console.log('Successfully joined room')
 
     } catch (err: any) {
       console.error('Error joining room:', err)
-      setError(err.message || 'Could not join video session.')
       setIsConnecting(false)
+      
+      // Handle specific error codes
+      if (err.code === '102') {
+        setError('Connection timed out. The video session may have expired. Please refresh the page.')
+      } else {
+        setError(err.message || 'Could not join video session.')
+      }
+      
       onError?.(err)
     }
   }

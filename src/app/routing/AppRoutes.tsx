@@ -31,13 +31,29 @@ import SimpleTrackingTest from '../pages/test/SimpleTrackingTest'
 import BasicVideoTest from '../pages/test/BasicVideoTest'
 import VideoDebugPage from '../pages/test/VideoDebugPage'
 import SimpleVideoTest from '../pages/test/SimpleVideoTest'
-import VideoSystemDiagnostics from '../pages/test/VideoSystemDiagnostics'
+import JustJoinRoomTest from '../pages/test/JustJoinRoomTest'
+import SignalWireClientTest from '../pages/test/SignalWireClientTest'
+import NuclearOptionTest from '../pages/test/NuclearOptionTest'
+import RealtimeVideoTest from '../pages/test/RealtimeVideoTest'
+import RealtimeVideoTestV2 from '../pages/test/RealtimeVideoTestV2'
+import VideoRoomDiagnostic from '../pages/test/VideoRoomDiagnostic'
+import SignalWireProperTest from '../pages/test/SignalWireProperTest'
+import { FastRoomJoinTest } from '../pages/test/FastRoomJoinTest'
+import UltraFastRoomTest from '../pages/test/UltraFastRoomTest'
+import DirectSignalWireTest from '../pages/test/DirectSignalWireTest'
+import TestimonialStyleTest from '../pages/test/TestimonialStyleTest'
+import ReusableRoomTest from '../pages/test/ReusableRoomTest'
+import NoMediaJoinTest from '../pages/test/NoMediaJoinTest'
+import TestimonialTest from '../pages/test/TestimonialTest'
+import VideoTimingTest from '../pages/test/VideoTimingTest'
 import LandingPage from '../pages/marketing/LandingPage'
 import SignupPage from '../pages/marketing/SignupPage'
 import HomeownerSignupPage from '../pages/marketing/HomeownerSignupPage'
 import CustomerPortalLandingPage from '../pages/marketing/CustomerPortalLandingPage'
 import {ResetPasswordPage} from '../pages/auth/ResetPasswordPage'
 import {AuthCallbackPage} from '../pages/auth/AuthCallbackPage'
+import TestimonialRequestPage from '../pages/video-testimonials/TestimonialRequestPage'
+import TestimonialThankYouPage from '../pages/video-testimonials/TestimonialThankYouPage'
 import {AcceptInvitationPage} from '../pages/auth/AcceptInvitationPage'
 import {PasswordSetupPage} from '../pages/auth/PasswordSetupPage'
 import {PasswordResetTestPage} from '../pages/test/PasswordResetTestPage'
@@ -48,6 +64,14 @@ import PwaStartPage from '../pages/PwaStartPage'
 import PublicBookingPage from '../pages/bookings/PublicBookingPageV3'
 import TestAvailabilityPage from '../pages/bookings/TestAvailabilityPage'
 import PortalTestPage from '../pages/test/PortalTestPage'
+import AIIntegrationTest from '../pages/test/AIIntegrationTest'
+import { SimpleRoomComparisonTest } from '../pages/test/SimpleRoomComparisonTest'
+import { FixedSessionTest } from '../pages/test/FixedSessionTest'
+import { ICEServerDebugTest } from '../pages/test/ICEServerDebugTest'
+import { TestimonialQuickTest } from '../pages/test/TestimonialQuickTest'
+import { DirectTokenTest } from '../pages/test/DirectTokenTest'
+import { TokenInspectorTest } from '../pages/test/TokenInspectorTest'
+import { TokenAnalyzerTest } from '../pages/test/TokenAnalyzerTest'
 
 
 /**
@@ -127,6 +151,10 @@ const AppRoutes: FC = () => {
         <Route path='book/:slug' element={<PublicBookingPage />} />
         <Route path='test-availability/:slug' element={<TestAvailabilityPage />} />
         
+        {/* Video testimonial routes - public access with token */}
+        <Route path='testimonial/:token' element={<TestimonialRequestPage />} />
+        <Route path='testimonial/thank-you' element={<TestimonialThankYouPage />} />
+        
         {/* Marketing routes - always accessible */}
         <Route path='/' element={
           new URLSearchParams(window.location.search).get('source') === 'pwa' 
@@ -163,7 +191,29 @@ const AppRoutes: FC = () => {
         <Route path='test-video-debug' element={<VideoDebugPage />} />
         <Route path='test-simple-video' element={<SimpleVideoTest />} />
         <Route path='test-basic-video' element={<BasicVideoTest />} />
-        <Route path='test-video-diagnostics' element={<VideoSystemDiagnostics />} />
+        <Route path='test-just-join-room' element={<JustJoinRoomTest />} />
+        <Route path='test-signalwire-client' element={<SignalWireClientTest />} />
+        <Route path='test-nuclear-option' element={<NuclearOptionTest />} />
+        <Route path='test-realtime-video' element={<RealtimeVideoTest />} />
+        <Route path='test-realtime-v2' element={<RealtimeVideoTestV2 />} />
+        <Route path='test-video-diagnostic' element={<VideoRoomDiagnostic />} />
+        <Route path='test-signalwire-proper' element={<SignalWireProperTest />} />
+        <Route path='test-fast-room-join' element={<FastRoomJoinTest />} />
+        <Route path='test-ultra-fast-room' element={<UltraFastRoomTest />} />
+        <Route path='test-direct-signalwire' element={<DirectSignalWireTest />} />
+        <Route path='test-testimonial-style' element={<TestimonialStyleTest />} />
+        <Route path='test-reusable-room' element={<ReusableRoomTest />} />
+        <Route path='test-no-media-join' element={<NoMediaJoinTest />} />
+        <Route path='test-ai-integration' element={<AIIntegrationTest />} />
+        <Route path='test-testimonial' element={<TestimonialTest />} />
+        <Route path='video-timing-test' element={<VideoTimingTest />} />
+        <Route path='test-room-comparison' element={<SimpleRoomComparisonTest />} />
+        <Route path='test-fixed-session' element={<FixedSessionTest />} />
+        <Route path='test-ice-debug' element={<ICEServerDebugTest />} />
+        <Route path='test-testimonial-quick' element={<TestimonialQuickTest />} />
+        <Route path='test-direct-token' element={<DirectTokenTest />} />
+        <Route path='test-token-inspector' element={<TokenInspectorTest />} />
+        <Route path='test-token-analyzer' element={<TokenAnalyzerTest />} />
         
         {/* Error pages and logout - wrapped in App for consistent layout */}
         <Route element={<App />}>

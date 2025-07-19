@@ -85,11 +85,21 @@ serve(async (req) => {
         console.log('Trying outbound call method...')
         
         const callUrl = `https://${signalwireSpaceUrl}/api/laml/2010-04-01/Accounts/${signalwireProjectId}/Calls`
+        
+        // Get configured phone number or use default
+        const aiPhoneNumber = Deno.env.get('SIGNALWIRE_AI_PHONE_NUMBER') || '+15559991234'
+        const fromNumber = Deno.env.get('SIGNALWIRE_FROM_NUMBER') || aiPhoneNumber
+        
+        // Use our SWML endpoint
+        const swmlUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-video-swml?room=${encodeURIComponent(room_id)}`
+        
         const callPayload = {
-          To: `sip:${room_id}@${signalwireSpaceUrl}`,
-          From: aiAgentId,
-          Url: `https://${signalwireSpaceUrl}/ai/agents/${aiAgentId}/connect`,
-          Method: 'POST'
+          To: aiPhoneNumber,
+          From: fromNumber,
+          Url: swmlUrl,
+          Method: 'POST',
+          StatusCallback: `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-call-status`,
+          StatusCallbackMethod: 'POST'
         }
         
         const callResponse = await fetch(callUrl, {
