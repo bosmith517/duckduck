@@ -22,6 +22,8 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
   const [capturedFrames, setCapturedFrames] = useState<string[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [useMockMode, setUseMockMode] = useState(false)
+  const [selectedCamera, setSelectedCamera] = useState<string>('')
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([])
   const videoContainerRef = useRef<HTMLDivElement>(null)
   const processingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -84,6 +86,17 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
         console.log('✅ Media permissions granted')
+        
+        // Enumerate available cameras after permission granted
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const cameras = devices.filter(device => device.kind === 'videoinput')
+        setAvailableCameras(cameras)
+        console.log('Available cameras:', cameras)
+        
+        // Select the first available camera if none selected
+        if (cameras.length > 0 && !selectedCamera) {
+          setSelectedCamera(cameras[0].deviceId)
+        }
       } catch (permError) {
         console.warn('⚠️ Media permissions denied, continuing without pre-granted permissions:', permError)
       }
@@ -141,9 +154,24 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
         console.log(`Member left: ${e.member.name}`)
       })
 
-      // Join using our proven approach
+      // Join using our proven approach with camera selection
       console.log('Joining room with estimator token...')
-      await roomSession.join()
+      const joinConfig: any = {
+        audio: true,
+        video: true
+      }
+      
+      // Apply selected camera if available
+      if (selectedCamera) {
+        joinConfig.video = {
+          deviceId: { exact: selectedCamera },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+        console.log('Using selected camera:', selectedCamera)
+      }
+      
+      await roomSession.join(joinConfig)
       
     } catch (error: any) {
       console.error('SignalWire connection error:', error)
@@ -380,6 +408,26 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
           </div>
           <div className='d-flex gap-2 align-items-center'>
             <span className='badge badge-light-info me-2'>v11-CLEAN-FINAL</span>
+            
+            {/* Camera Selector */}
+            {availableCameras.length > 1 && (
+              <select 
+                className='form-select form-select-sm w-auto'
+                value={selectedCamera}
+                onChange={(e) => {
+                  setSelectedCamera(e.target.value)
+                  console.log('Camera selected:', e.target.value)
+                }}
+                disabled={isConnected}
+              >
+                {availableCameras.map((camera) => (
+                  <option key={camera.deviceId} value={camera.deviceId}>
+                    {camera.label || `Camera ${camera.deviceId.substring(0, 8)}`}
+                  </option>
+                ))}
+              </select>
+            )}
+            
             <div className='form-check form-switch form-check-custom form-check-solid'>
               <input
                 className='form-check-input'

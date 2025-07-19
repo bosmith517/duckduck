@@ -43,61 +43,19 @@ serve(async (req) => {
       )
     }
 
-    if (!aiScriptId || aiScriptId === 'YOUR_AI_SCRIPT_ID') {
-      console.log('No AI script configured, skipping')
+    // Always try to add AI using SWML execution
+    console.log('Executing AI SWML for room:', room_name)
+    
+    // Get the SWML configuration
+    const swmlUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-estimator-swml?room_id=${encodeURIComponent(room_name)}`
+    const swmlResponse = await fetch(swmlUrl)
+    
+    if (!swmlResponse.ok) {
+      console.error('Failed to get SWML configuration')
       return new Response(
         JSON.stringify({ 
           success: false,
-          error: 'AI script not configured'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      )
-    }
-
-    console.log('Executing AI script for room:', room_name)
-    console.log('Script ID:', aiScriptId)
-    console.log('Space URL:', signalwireSpaceUrl)
-
-    // SignalWire Video Scripts API endpoint
-    const scriptExecuteUrl = `https://${signalwireSpaceUrl}/api/video/scripts/${aiScriptId}/execute`
-    const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
-    
-    // Video Scripts API parameters for executing the AI script
-    const executePayload = {
-      room_name: room_name,
-      display_name: 'AI Estimator Alex',
-      metadata: {
-        session_id: session_id,
-        trade_type: trade_type,
-        role: 'estimator'
-      }
-    }
-    
-    console.log('Execute payload:', executePayload)
-    
-    const executeResponse = await fetch(scriptExecuteUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(executePayload)
-    })
-    
-    const responseText = await executeResponse.text()
-
-    console.log('Script execution response:', executeResponse.status, responseText)
-
-    if (!executeResponse.ok) {
-      console.error('Script execution failed:', responseText)
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Failed to execute AI script',
-          details: responseText
+          error: 'Failed to get SWML configuration'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -105,16 +63,101 @@ serve(async (req) => {
         }
       )
     }
-
+    
+    const swml = await swmlResponse.json()
+    console.log('SWML configuration loaded')
+    
+    const auth = btoa(`${signalwireProjectId}:${signalwireApiToken}`)
+    
+    // Try Method 1: Direct SWML execution
+    const swmlExecuteUrl = `https://${signalwireSpaceUrl}/api/relay/rest/execute`
+    
+    const executeResponse = await fetch(swmlExecuteUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        swml: swml,
+        context: {
+          room_id: room_name,
+          session_id: session_id,
+          trade_type: trade_type
+        }
+      })
+    })
+    
+    const executeResult = await executeResponse.text()
+    console.log('SWML execution response:', executeResponse.status, executeResult)
+    
+    if (!executeResponse.ok) {
+      // Method 2: Try creating a call that executes the SWML
+      console.log('Direct execution failed, trying call method...')
+      
+      const callUrl = `https://${signalwireSpaceUrl}/api/laml/2010-04-01/Accounts/${signalwireProjectId}/Calls`
+      
+      const callResponse = await fetch(callUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          To: `sip:${room_name}@${signalwireSpaceUrl}`,
+          From: 'ai-estimator',
+          Url: swmlUrl,
+          Method: 'GET'
+        })
+      })
+      
+      if (callResponse.ok) {
+        const callData = await callResponse.json()
+        console.log('AI call initiated successfully:', callData.sid)
+        
+        if (session_id) {
+          const supabase = createClient(
+            Deno.env.get('SUPABASE_URL')!,
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+          )
+          
+          await supabase
+            .from('video_sessions')
+            .update({
+              ai_agent_status: 'swml_call_initiated',
+              ai_call_sid: callData.sid,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', session_id)
+        }
+        
+        return new Response(
+          JSON.stringify({
+            success: true,
+            method: 'call_with_swml',
+            call_sid: callData.sid,
+            message: 'AI agent joining room via SWML call'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        )
+      } else {
+        const callError = await callResponse.text()
+        console.error('Call creation failed:', callError)
+      }
+    }
+    
     let executeData
     try {
-      executeData = JSON.parse(responseText)
+      executeData = JSON.parse(executeResult)
     } catch {
-      executeData = { response: responseText }
+      executeData = { response: executeResult }
     }
-
+    
     // Update session if provided
-    if (session_id) {
+    if (session_id && executeResponse.ok) {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL')!,
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -123,17 +166,19 @@ serve(async (req) => {
       await supabase
         .from('video_sessions')
         .update({
-          ai_agent_status: 'script_executed',
+          ai_agent_status: 'swml_executed',
+          ai_swml_response: executeData,
           updated_at: new Date().toISOString()
         })
         .eq('id', session_id)
     }
-
+    
     return new Response(
       JSON.stringify({
-        success: true,
-        script_id: aiScriptId,
-        execution_result: executeData
+        success: executeResponse.ok,
+        method: 'direct_swml',
+        execution_result: executeData,
+        message: executeResponse.ok ? 'AI agent joining room' : 'AI agent will join shortly'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
