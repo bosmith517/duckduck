@@ -24,7 +24,13 @@ export const AIAgentButton: React.FC<AIAgentButtonProps> = ({
   const [status, setStatus] = useState('')
 
   const addAIAgent = async () => {
+    console.log('=== AI Agent Button Clicked ===')
+    console.log('Room Name:', roomName)
+    console.log('Agent Name:', agentName)
+    console.log('Agent Role:', agentRole)
+    
     if (!roomName) {
+      console.error('No room name provided!')
       setStatus('No room available')
       return
     }
@@ -33,46 +39,13 @@ export const AIAgentButton: React.FC<AIAgentButtonProps> = ({
     setStatus('Adding AI agent...')
 
     try {
-      // Custom SWML configuration for the agent
-      const agentConfig = {
-        sections: {
-          main: [
-            {
-              ai: {
-                voice: "alloy",
-                engine: "openai", 
-                model: "gpt-4",
-                enable_vision: true,
-                params: {
-                  name: agentName,
-                  role: agentRole
-                },
-                context: {
-                  persona: `You are ${agentName}, a professional ${agentRole} in this video call.`,
-                  greeting: `Hello! I'm ${agentName}, your ${agentRole}. I'm here to help assess your project and provide an estimate. What can I help you with today?`,
-                  task: "Help participants with project estimation, answer technical questions, and gather necessary information for accurate quotes.",
-                  rules: [
-                    "Always be professional and helpful",
-                    "Use the video feed to understand context and assess the project",
-                    "Ask for clarification when something is unclear",
-                    "Provide accurate and helpful information",
-                    "Take note of important details for the estimate",
-                    "Guide the customer to show relevant areas"
-                  ]
-                }
-              }
-            }
-          ]
-        }
-      }
-
-      console.log('Adding AI agent to room:', roomName)
+      console.log('Invoking add-ai-agent-simple Edge Function...')
       
-      // Using simplified version until full SWML deployment is ready
       const { data, error } = await supabase.functions.invoke('add-ai-agent-simple', {
         body: {
           room_name: roomName,
-          agent_config: agentConfig
+          agent_name: agentName,
+          agent_role: agentRole
         }
       })
 

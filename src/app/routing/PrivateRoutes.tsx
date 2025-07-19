@@ -104,6 +104,7 @@ const PrivateRoutes = () => {
   const MultiPhotoTestPage = lazy(() => import('../pages/test/MultiPhotoTestPage'))
   const CustomerJourneyTestPage = lazy(() => import('../pages/test/CustomerJourneyTestPage'))
   const VideoWithAITest = lazy(() => import('../pages/test/VideoWithAITest'))
+  const AIJoinDebugTest = lazy(() => import('../pages/test/AIJoinDebugTest'))
   const TrackingPage = lazy(() => import('../pages/tracking/TrackingPage'))
   const TrackingOverviewPage = lazy(() => import('../pages/tracking/TrackingOverviewPage'))
   const LandingPage = lazy(() => import('../pages/marketing/LandingPage'))
@@ -933,6 +934,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <VideoWithAITest />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path='test/ai-join-debug'
+          element={
+            <SuspensedView>
+              <AIJoinDebugTest />
             </SuspensedView>
           }
         />
