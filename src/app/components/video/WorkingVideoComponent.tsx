@@ -138,8 +138,8 @@ export const WorkingVideoComponent: React.FC<WorkingVideoComponentProps> = ({
       // Try passing ICE servers to RoomSession
       const roomSessionConfig: any = {
         token,
-        rootElement: videoRef.current!,
-        speakerDetection: false // Disable speaker detection to avoid device watcher issues
+        rootElement: videoRef.current!
+        // Note: speakerDetection removed as it's not in RoomSessionOptions type
       }
       
       // Based on SignalWireVideoRoom.tsx, it seems RoomSession might accept iceServers

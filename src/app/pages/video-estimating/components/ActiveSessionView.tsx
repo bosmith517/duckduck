@@ -92,8 +92,8 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
       const roomSession = new Video.RoomSession({
         token,
         rootElement: videoContainerRef.current,
-        logLevel: 'debug', // Keep debug for troubleshooting
-        speakerDetection: false // Disable speaker detection to avoid device watcher issues
+        logLevel: 'debug' // Keep debug for troubleshooting
+        // Note: speakerDetection removed as it's not in RoomSessionOptions type
       })
 
       ;(window as any).currentRoomSession = roomSession
