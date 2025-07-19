@@ -38,21 +38,21 @@ serve(async (req) => {
     try {
       // Use the existing AI Estimator to join the room
       if (aiEstimatorId) {
-        // SignalWire API to add AI agent to video room
-        const apiUrl = `https://${spaceUrl}/api/relay/rest/calls`
+        // Try using the webhook trigger approach for the AI agent
+        // The AI Estimator ID might be a webhook ID or agent ID
+        const apiUrl = `https://${spaceUrl}/api/ai/agents/${aiEstimatorId}/trigger`
         const auth = btoa(`${projectId}:${apiToken}`)
 
+        // Trigger the agent with room information
         const payload = {
-          to: room_name,
-          from: aiEstimatorId,
-          url: `https://${spaceUrl}/laml/voice/${aiEstimatorId}`,
-          method: 'POST',
-          timeout: 30,
-          // Additional parameters for video room
-          parameters: {
-            room_name: room_name,
-            join_as: agent_name,
-            enable_vision: true
+          action: "join_room",
+          room_name: room_name,
+          room_type: "video",
+          params: {
+            agent_name: agent_name,
+            agent_role: agent_role,
+            enable_vision: true,
+            greeting: `Hello! I'm ${agent_name}, your ${agent_role}. How can I help you today?`
           }
         }
 
