@@ -24,13 +24,17 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
   const [useMockMode, setUseMockMode] = useState(false)
   const [selectedCamera, setSelectedCamera] = useState<string>('')
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([])
+  const [showCameraSelector, setShowCameraSelector] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
   const videoContainerRef = useRef<HTMLDivElement>(null)
   const processingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   console.log('ActiveSessionView version: 2024-01-13-v11-CLEAN-FINAL')  // ✅
+  console.log('Session data:', session)
+  console.log('Room ID:', session.room_id)
 
   useEffect(() => {
-    initializeSession()
+    checkCameraPermissions()
     return () => {
       if (processingIntervalRef.current) clearInterval(processingIntervalRef.current)
       if ((window as any).localStream) {
@@ -43,6 +47,42 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
       }
     }
   }, [session])
+
+  const checkCameraPermissions = async () => {
+    try {
+      // Request permissions to enumerate devices
+      await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      
+      // Enumerate available cameras
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const cameras = devices.filter(device => device.kind === 'videoinput')
+      setAvailableCameras(cameras)
+      console.log('Available cameras:', cameras)
+      
+      // If multiple cameras, show selector
+      if (cameras.length > 1) {
+        setShowCameraSelector(true)
+        setIsInitializing(false)
+      } else if (cameras.length === 1) {
+        // Auto-select the only camera
+        setSelectedCamera(cameras[0].deviceId)
+        setIsInitializing(false)
+        initializeSession()
+      } else {
+        throw new Error('No cameras found')
+      }
+    } catch (error) {
+      console.error('Camera permission error:', error)
+      showToast.error('Camera access required for video estimating')
+      setIsInitializing(false)
+    }
+  }
+
+  const handleCameraSelection = (cameraId: string) => {
+    setSelectedCamera(cameraId)
+    setShowCameraSelector(false)
+    initializeSession()
+  }
 
   const initializeSession = async () => {
     try {
@@ -80,26 +120,7 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
 
   const initializeSignalWire = async (token: string) => {
     try {
-      console.log('🚀 Initializing SignalWire with proven approach')
-      
-      // Request permissions BEFORE creating RoomSession to avoid device watcher error
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-        console.log('✅ Media permissions granted')
-        
-        // Enumerate available cameras after permission granted
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        const cameras = devices.filter(device => device.kind === 'videoinput')
-        setAvailableCameras(cameras)
-        console.log('Available cameras:', cameras)
-        
-        // Select the first available camera if none selected
-        if (cameras.length > 0 && !selectedCamera) {
-          setSelectedCamera(cameras[0].deviceId)
-        }
-      } catch (permError) {
-        console.warn('⚠️ Media permissions denied, continuing without pre-granted permissions:', permError)
-      }
+      console.log('🚀 Initializing SignalWire with selected camera:', selectedCamera)
       
       // Create room session using our working pattern
       const roomSession = new Video.RoomSession({
@@ -395,6 +416,49 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
     </div>
   )
 
+  // Camera selection modal
+  if (showCameraSelector && !isConnected) {
+    return (
+      <div className='d-flex flex-column h-100'>
+        <div className='flex-grow-1 d-flex align-items-center justify-content-center'>
+          <div className='card' style={{ maxWidth: '500px', width: '100%' }}>
+            <div className='card-header'>
+              <h3 className='card-title'>Select Camera for Video Estimating</h3>
+            </div>
+            <div className='card-body'>
+              <p className='mb-4'>Please select which camera you'd like to use for this video estimating session:</p>
+              
+              <div className='d-flex flex-column gap-3'>
+                {availableCameras.map((camera) => (
+                  <button
+                    key={camera.deviceId}
+                    className='btn btn-light-primary btn-lg text-start'
+                    onClick={() => handleCameraSelection(camera.deviceId)}
+                  >
+                    <i className='ki-duotone ki-camera fs-2 me-3'>
+                      <span className='path1'></span>
+                      <span className='path2'></span>
+                    </i>
+                    {camera.label || `Camera ${camera.deviceId.substring(0, 8)}`}
+                  </button>
+                ))}
+              </div>
+              
+              <div className='mt-4'>
+                <button
+                  className='btn btn-secondary w-100'
+                  onClick={onEnd}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className='d-flex flex-column h-100'>
       {/* Header */}
@@ -414,11 +478,24 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
               <select 
                 className='form-select form-select-sm w-auto'
                 value={selectedCamera}
-                onChange={(e) => {
-                  setSelectedCamera(e.target.value)
-                  console.log('Camera selected:', e.target.value)
+                onChange={async (e) => {
+                  const newCameraId = e.target.value
+                  setSelectedCamera(newCameraId)
+                  console.log('Camera selected:', newCameraId)
+                  
+                  // If connected, switch camera
+                  if (isConnected && (window as any).currentRoomSession) {
+                    try {
+                      const roomSession = (window as any).currentRoomSession
+                      await roomSession.updateCamera({ deviceId: newCameraId })
+                      console.log('Camera switched successfully')
+                    } catch (error) {
+                      console.error('Error switching camera:', error)
+                      showToast.error('Failed to switch camera')
+                    }
+                  }
                 }}
-                disabled={isConnected}
+                disabled={!isConnected}
               >
                 {availableCameras.map((camera) => (
                   <option key={camera.deviceId} value={camera.deviceId}>
@@ -446,7 +523,7 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
               </label>
             </div>
             <AIAgentButton
-              roomName={session.room_id}
+              roomName={session.metadata?.signalwire_room_id || session.room_id}
               agentName="Alex"
               agentRole="AI Estimator"
               onAgentAdded={() => {
@@ -492,7 +569,16 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
             className='h-100 w-100'
             style={{ minHeight: '500px' }}
           >
-            {isConnected ? (
+            {isInitializing ? (
+              <div className='h-100 w-100 d-flex align-items-center justify-content-center'>
+                <div className='text-center text-white'>
+                  <div className='spinner-border text-light mb-3' role='status'>
+                    <span className='visually-hidden'>Initializing...</span>
+                  </div>
+                  <div>Checking camera permissions...</div>
+                </div>
+              </div>
+            ) : isConnected ? (
               useMockMode ? <MockVideoDisplay /> : null // SignalWire SDK renders its own UI
             ) : (
               <div className='h-100 w-100 d-flex align-items-center justify-content-center'>
