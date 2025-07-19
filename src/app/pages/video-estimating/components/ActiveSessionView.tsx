@@ -80,11 +80,20 @@ export const ActiveSessionView: React.FC<ActiveSessionViewProps> = ({
     try {
       console.log('🚀 Initializing SignalWire with proven approach')
       
+      // Request permissions BEFORE creating RoomSession to avoid device watcher error
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        console.log('✅ Media permissions granted')
+      } catch (permError) {
+        console.warn('⚠️ Media permissions denied, continuing without pre-granted permissions:', permError)
+      }
+      
       // Create room session using our working pattern
       const roomSession = new Video.RoomSession({
         token,
         rootElement: videoContainerRef.current,
-        logLevel: 'debug' // Keep debug for troubleshooting
+        logLevel: 'debug', // Keep debug for troubleshooting
+        speakerDetection: false // Disable speaker detection to avoid device watcher issues
       })
 
       ;(window as any).currentRoomSession = roomSession

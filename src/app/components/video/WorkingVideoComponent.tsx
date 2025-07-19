@@ -127,10 +127,19 @@ export const WorkingVideoComponent: React.FC<WorkingVideoComponentProps> = ({
       
       setStatus('3. Connecting to SignalWire...')
       
+      // Request permissions BEFORE creating RoomSession to avoid device watcher error
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        console.log('✅ Media permissions granted')
+      } catch (permError) {
+        console.warn('⚠️ Media permissions denied, continuing without pre-granted permissions:', permError)
+      }
+      
       // Try passing ICE servers to RoomSession
       const roomSessionConfig: any = {
         token,
-        rootElement: videoRef.current!
+        rootElement: videoRef.current!,
+        speakerDetection: false // Disable speaker detection to avoid device watcher issues
       }
       
       // Based on SignalWireVideoRoom.tsx, it seems RoomSession might accept iceServers
